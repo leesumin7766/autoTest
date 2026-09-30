@@ -1,0 +1,162 @@
+services:
+  db:
+    build:
+      context: ./db
+    image: autotest-db-pgvector
+    container_name: autotest-db-1
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: autotest
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U test -d autotest" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    ports:
+      - "8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/autotest
+      SPRING_DATASOURCE_USERNAME: test
+      SPRING_DATASOURCE_PASSWORD: test
+
+  test-management-service:
+    build:
+      context: .
+      dockerfile: test-management-service/Dockerfile
+    ports:
+      - "8082:8082"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/autotest
+      SPRING_DATASOURCE_USERNAME: test
+      SPRING_DATASOURCE_PASSWORD: test
+
+  test-execution-service:
+    build:
+      context: .
+      dockerfile: test-execution-service/Dockerfile
+    ports:
+      - "8083:8083"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/autotest
+      SPRING_DATASOURCE_USERNAME: test
+      SPRING_DATASOURCE_PASSWORD: test
+
+  report-service:
+    build:
+      context: .
+      dockerfile: report-service/Dockerfile
+    ports:
+      - "8084:8084"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/autotest
+      SPRING_DATASOURCE_USERNAME: test
+      SPRING_DATASOURCE_PASSWORD: test
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - test-management-service
+      - test-execution-service
+      - report-service
+
+  minio:
+    image: quay.io/minio/minio
+    container_name: autotest-minio-1
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+
+  ai-service:
+    build: ./ai-service
+    container_name: autotest-ai-service-1
+    ports:
+      - "8005:8005"
+    environment:
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY}
+    volumes:
+      - ./ai-service:/app
+    depends_on:
+      - db
+
+  crawler-service:
+    build: ./crawler-service
+    container_name: autotest-crawler-1
+    ports:
+      - "8006:8006"
+    volumes:
+      - ./crawler-service:/app
+
+volumes:
+  db_data:
+  minio_data:
+
+
+  minio:
+    image: minio/minio
+    container_name: autotest-minio-1
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+
+  ai-service:
+    build: ./ai-service
+    container_name: autotest-ai-service-1
+    ports:
+      - "8005:8005"
+    environment:
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY}
+    volumes:
+      - ./ai-service:/app
+    depends_on:
+      - db
+
+  crawler-service:
+    build: ./crawler-service
+    container_name: autotest-crawler-1
+    ports:
+      - "8006:8006"
+    volumes:
+      - ./crawler-service:/app
+
+volumes:
+  db_data:
+  minio_data:
