@@ -11,3 +11,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+s3:
+  endpoint: ${S3_ENDPOINT:http://localhost:8333}
+  region: us-east-1
+  access-key: ${S3_ACCESS_KEY}
+  secret-key: ${S3_SECRET_KEY}
+  bucket: autotest-submissions
+  enabled: true
+  path-style-access: true
