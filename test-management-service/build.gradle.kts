@@ -6,9 +6,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("software.amazon.awssdk:s3:2.25.65")
     implementation("software.amazon.awssdk:aws-core:2.25.65")
+    implementation("org.flywaydb:flyway-core")
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
     runtimeOnly("org.postgresql:postgresql")
+    runtimeOnly("org.flywaydb:flyway-database-postgresql")
 }
 
 tasks.test {

@@ -19,7 +19,7 @@ class FileParserFactoryTest {
     private final DocxFileParser docxParser = new DocxFileParser();
     private final ExcelFileParser excelParser = new ExcelFileParser();
     private final HwpFileParser hwpParser = new HwpFileParser();
-    private final FileParserFactory factory = new FileParserFactory(
+    private final DocumentFileParserFactory factory = new DocumentFileParserFactory(
             List.of(pdfParser, docxParser, excelParser, hwpParser)
     );
 
@@ -58,7 +58,7 @@ class FileParserFactoryTest {
 
     @Test
     void factoryFailsWhenNoParserSupportsRequestedFormat() {
-        FileParserFactory pdfOnlyFactory = new FileParserFactory(List.of(pdfParser));
+        DocumentFileParserFactory pdfOnlyFactory = new DocumentFileParserFactory(List.of(pdfParser));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,

@@ -8,10 +8,10 @@ import java.util.List;
 import java.util.Objects;
 
 @Component
-public final class FileParserFactory {
+public final class DocumentFileParserFactory {
     private final List<FileParser> parsers;
 
-    public FileParserFactory(List<FileParser> parsers) {
+    public DocumentFileParserFactory(List<FileParser> parsers) {
         this.parsers = List.copyOf(parsers);
     }
 
