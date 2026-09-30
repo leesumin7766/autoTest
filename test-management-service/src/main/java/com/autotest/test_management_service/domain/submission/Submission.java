@@ -6,13 +6,19 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.autotest.test_management_service.domain.vo.MemberId;
 import com.autotest.test_management_service.domain.event.SubmissionUploadedEvent;
 
 public final class Submission {
     private static final long MAX_FILE_SIZE_BYTES = 100L * 1024 * 1024;
 
     private final SubmissionId submissionId;
+    private final MemberId memberId;
     private final ProductId productId;
+    private final com.autotest.test_management_service.domain.vo.SubmissionType submissionType;
+    private final StoredPath storedPath;
+    private final String extractedText;
+    private final List<TestCase> testCases;
     private final List<SubmissionFile> files;
     private final SubmissionStatus status;
     private final Instant uploadedAt;
@@ -20,24 +26,87 @@ public final class Submission {
 
     private Submission(
             SubmissionId submissionId,
+            MemberId memberId,
             ProductId productId,
+            com.autotest.test_management_service.domain.vo.SubmissionType submissionType,
+            StoredPath storedPath,
+            String extractedText,
+            List<TestCase> testCases,
             List<SubmissionFile> files,
             SubmissionStatus status,
             Instant uploadedAt,
             List<Object> domainEvents
     ) {
         this.submissionId = Objects.requireNonNull(submissionId, "submissionId");
+        this.memberId = Objects.requireNonNull(memberId, "memberId");
         this.productId = Objects.requireNonNull(productId, "productId");
+        this.submissionType = Objects.requireNonNull(submissionType, "submissionType");
+        this.storedPath = storedPath;
+        this.extractedText = Objects.requireNonNull(extractedText, "extractedText");
+        this.testCases = List.copyOf(testCases);
         this.files = List.copyOf(files);
         this.status = Objects.requireNonNull(status, "status");
         this.uploadedAt = uploadedAt;
         this.domainEvents = List.copyOf(domainEvents);
     }
 
-    static Submission draft(ProductId productId) {
+        public static Submission create(
+            MemberId memberId,
+            ProductId productId,
+            com.autotest.test_management_service.domain.vo.SubmissionType submissionType,
+            StoredPath storedPath,
+            String extractedText,
+            List<TestCase> testCases
+        ) {
         return new Submission(
                 SubmissionId.generate(),
+            memberId,
                 productId,
+            submissionType,
+            storedPath,
+            extractedText,
+            testCases,
+            List.of(),
+            SubmissionStatus.UPLOADED,
+            Instant.now(),
+            List.of()
+        );
+        }
+
+        public static Submission reconstitute(
+            SubmissionId submissionId,
+            MemberId memberId,
+            ProductId productId,
+            com.autotest.test_management_service.domain.vo.SubmissionType submissionType,
+            StoredPath storedPath,
+            String extractedText,
+            SubmissionStatus status,
+            Instant uploadedAt
+        ) {
+        return new Submission(
+            submissionId,
+            memberId,
+            productId,
+            submissionType,
+            storedPath,
+            extractedText,
+            List.of(),
+                List.of(),
+            status,
+            uploadedAt,
+                List.of()
+        );
+    }
+
+    static Submission draft(MemberId memberId, ProductId productId) {
+        return new Submission(
+                SubmissionId.generate(),
+                memberId,
+                productId,
+                com.autotest.test_management_service.domain.vo.SubmissionType.UNKNOWN,
+                null,
+                "",
+                List.of(),
                 List.of(),
                 SubmissionStatus.DRAFT,
                 null,
@@ -124,6 +193,26 @@ public final class Submission {
         return productId;
     }
 
+    public MemberId memberId() {
+        return memberId;
+    }
+
+    public com.autotest.test_management_service.domain.vo.SubmissionType submissionType() {
+        return submissionType;
+    }
+
+    public StoredPath storedPath() {
+        return storedPath;
+    }
+
+    public String extractedText() {
+        return extractedText;
+    }
+
+    public List<TestCase> testCases() {
+        return List.copyOf(testCases);
+    }
+
     public SubmissionStatus status() {
         return status;
     }
@@ -148,7 +237,19 @@ public final class Submission {
             Instant updatedUploadedAt,
             List<Object> updatedEvents
     ) {
-        return new Submission(submissionId, productId, updatedFiles, updatedStatus, updatedUploadedAt, updatedEvents);
+        return new Submission(
+            submissionId,
+            memberId,
+            productId,
+            submissionType,
+            storedPath,
+            extractedText,
+            testCases,
+            updatedFiles,
+            updatedStatus,
+            updatedUploadedAt,
+            updatedEvents
+        );
     }
 
     private int findFileIndex(SubmissionFileId fileId) {

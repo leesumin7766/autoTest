@@ -10,14 +10,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import com.autotest.test_management_service.domain.event.SubmissionUploadedEvent;
+import com.autotest.test_management_service.domain.vo.MemberId;
 
 class SubmissionTest {
     private static final ProductId PRODUCT_ID = new ProductId(1L);
+    private static final MemberId MEMBER_ID = new MemberId(2L);
     private static final long MAX_FILE_SIZE_BYTES = 100L * 1024 * 1024;
 
     @Test
     void factoryCreatesDraftAndAddingFileReturnsUpdatedAggregate() {
-        Submission draft = SubmissionFactory.create(PRODUCT_ID);
+        Submission draft = SubmissionFactory.draft(MEMBER_ID, PRODUCT_ID);
 
         Submission updated = draft.addFile(SubmissionType.AGREEMENT, metadata("agreement.pdf", 10L), FileFormat.PDF);
 
@@ -30,7 +32,7 @@ class SubmissionTest {
 
     @Test
     void addFileRejectsDuplicateSubmissionTypeAndFilesOver100Mib() {
-        Submission draft = SubmissionFactory.create(PRODUCT_ID)
+        Submission draft = SubmissionFactory.draft(MEMBER_ID, PRODUCT_ID)
                 .addFile(SubmissionType.AGREEMENT, metadata("agreement.pdf", MAX_FILE_SIZE_BYTES), FileFormat.PDF);
 
         assertThrows(IllegalArgumentException.class, () -> draft.addFile(
@@ -38,7 +40,7 @@ class SubmissionTest {
                 metadata("other.pdf", 10L),
                 FileFormat.PDF
         ));
-        assertThrows(IllegalArgumentException.class, () -> SubmissionFactory.create(PRODUCT_ID).addFile(
+        assertThrows(IllegalArgumentException.class, () -> SubmissionFactory.draft(MEMBER_ID, PRODUCT_ID).addFile(
                 SubmissionType.MANUAL,
                 metadata("manual.pdf", MAX_FILE_SIZE_BYTES + 1),
                 FileFormat.PDF
@@ -47,7 +49,7 @@ class SubmissionTest {
 
     @Test
     void uploadedTransitionRequiresStoredFilesAndRegistersEvent() {
-        Submission withFile = SubmissionFactory.create(PRODUCT_ID)
+        Submission withFile = SubmissionFactory.draft(MEMBER_ID, PRODUCT_ID)
                 .addFile(SubmissionType.FUNCTION_LIST, metadata("functions.xlsx", 100L), FileFormat.XLSX);
 
         assertThrows(IllegalStateException.class, withFile::markAsUploaded);
@@ -68,7 +70,7 @@ class SubmissionTest {
 
     @Test
     void removeFileSupportsIdAndSubmissionType() {
-        Submission withFile = SubmissionFactory.create(PRODUCT_ID)
+        Submission withFile = SubmissionFactory.draft(MEMBER_ID, PRODUCT_ID)
                 .addFile(SubmissionType.MANUAL, metadata("manual.hwp", 50L), FileFormat.HWP);
         SubmissionFileId fileId = withFile.getFiles().getFirst().id();
 
@@ -79,7 +81,7 @@ class SubmissionTest {
 
     @Test
     void getFilesReturnsAnUnmodifiableList() {
-        Submission submission = SubmissionFactory.create(PRODUCT_ID)
+        Submission submission = SubmissionFactory.draft(MEMBER_ID, PRODUCT_ID)
                 .addFile(SubmissionType.AGREEMENT, metadata("agreement.docx", 20L), FileFormat.DOCX);
         List<SubmissionFile> files = submission.getFiles();
 
