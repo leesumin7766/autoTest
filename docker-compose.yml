@@ -1,6 +1,9 @@
 ﻿services:
   db:
-    image: postgres:16-alpine
+    build:
+      context: ./db
+    image: autotest-db-pgvector
+    container_name: autotest-db-1
     environment:
       POSTGRES_USER: test
       POSTGRES_PASSWORD: test
@@ -10,7 +13,7 @@
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U test -d autotest" ]
+      test: ["CMD-SHELL", "pg_isready -U test -d autotest"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -82,6 +85,26 @@
       - test-management-service
       - test-execution-service
       - report-service
+
+  ai-service:
+    build: ./ai-service
+    container_name: autotest-ai-service-1
+    ports:
+      - "8005:8005"
+    environment:
+      - TYPESAFE_API_KEY=
+    volumes:
+      - ./ai-service:/app
+    depends_on:
+      - db
+
+  crawler-service:
+    build: ./crawler-service
+    container_name: autotest-crawler-1
+    ports:
+      - "8006:8006"
+    volumes:
+      - ./crawler-service:/app
 
 volumes:
   db_data:

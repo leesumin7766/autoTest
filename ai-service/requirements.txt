@@ -1,0 +1,11 @@
+﻿fastapi
+uvicorn[standard]
+unstructured
+pymupdf
+langchain
+langchain-community
+pgvector
+psycopg2-binary
+python-multipart
+typesafe-sdk
+python-dotenv
