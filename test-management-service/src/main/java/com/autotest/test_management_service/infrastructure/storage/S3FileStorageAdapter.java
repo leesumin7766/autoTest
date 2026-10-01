@@ -34,7 +34,7 @@ public final class S3FileStorageAdapter implements FileStoragePort {
     private static final Logger LOGGER = LoggerFactory.getLogger(S3FileStorageAdapter.class);
     private static final String S3_PATH_PREFIX = "s3://";
     private static final String LOCAL_PATH_PREFIX = "local:";
-    private static final Path DEFAULT_LOCAL_ROOT = Path.of("/tmp/autotest-submissions");
+    private static final Path DEFAULT_LOCAL_ROOT = Path.of("/tmp/autotest-docs");
 
     private final S3Client s3Client;
 

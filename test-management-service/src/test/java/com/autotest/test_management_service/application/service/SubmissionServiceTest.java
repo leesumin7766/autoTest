@@ -34,7 +34,7 @@ class SubmissionServiceTest {
 
     @Test
     void storesS3PathParsesAndPersistsSubmission() throws Exception {
-        StoredPath s3Path = new StoredPath("s3://autotest-submissions/uuid-document.pdf");
+        StoredPath s3Path = new StoredPath("s3://autotest-docs/uuid-document.pdf");
         SubmissionId submissionId = submitWithStoredPath(s3Path);
 
         assertTrue(submissionId.value() != null);
@@ -42,7 +42,7 @@ class SubmissionServiceTest {
 
     @Test
     void persistsSubmissionWhenStorageReturnsLocalFallbackPath() throws Exception {
-        StoredPath localPath = new StoredPath("local:/tmp/autotest-submissions/uuid-document.pdf");
+        StoredPath localPath = new StoredPath("local:/tmp/autotest-docs/uuid-document.pdf");
         SubmissionId submissionId = submitWithStoredPath(localPath);
 
         assertTrue(submissionId.value() != null);
@@ -66,6 +66,26 @@ class SubmissionServiceTest {
         assertEquals("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다.", exception.getMessage());
         verifyNoInteractions(submissionPersistenceService, fileStoragePort);
     }
+
+        @Test
+        void rejectsExtensionAndMimeMismatchBeforeStorage() {
+        SubmissionPersistenceService submissionPersistenceService = mock(SubmissionPersistenceService.class);
+        FileStoragePort fileStoragePort = mock(FileStoragePort.class);
+        SubmissionService service = new SubmissionService(
+            submissionPersistenceService,
+            fileStoragePort,
+            new DocumentFileParserFactory(java.util.List.of(new PdfFileParser())),
+            new FileTypeResolver()
+        );
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "document.docx", "application/pdf", "not a Word file".getBytes(StandardCharsets.UTF_8));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+            () -> service.submit(file, MEMBER_ID, PRODUCT_ID));
+
+        assertEquals("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다.", exception.getMessage());
+        verifyNoInteractions(submissionPersistenceService, fileStoragePort);
+        }
 
     private SubmissionId submitWithStoredPath(StoredPath storedPath) throws Exception {
         SubmissionPersistenceService submissionPersistenceService = mock(SubmissionPersistenceService.class);
@@ -113,6 +133,9 @@ class SubmissionServiceTest {
         var submissionCaptor = org.mockito.ArgumentCaptor.forClass(Submission.class);
         verify(submissionPersistenceService).saveUploaded(submissionCaptor.capture());
         verify(submissionPersistenceService).markAsParsed(persistedSubmission.submissionId(), persistedSubmission.extractedText());
+        var documentCaptor = org.mockito.ArgumentCaptor.forClass(
+            com.autotest.test_management_service.domain.submission.SubmittedDocument.class);
+        verify(submissionPersistenceService).saveDocument(documentCaptor.capture());
         verify(fileStoragePort).store(any(InputStream.class), eq("document.pdf"), eq("application/pdf"));
         verify(fileStoragePort).load(storedPath);
 
@@ -127,6 +150,11 @@ class SubmissionServiceTest {
         assertTrue(persistedSubmission.extractedText().contains("Sample PDF text for test"));
         assertTrue(persistedSubmission.testCases().isEmpty());
         assertEquals(uploadedSubmission.submissionId(), persistedSubmission.submissionId());
+        assertEquals(com.autotest.test_management_service.domain.submission.SubmissionType.AGREEMENT,
+            documentCaptor.getValue().role());
+        assertEquals(SubmissionType.PDF, documentCaptor.getValue().fileType());
+        assertEquals(storedPath, documentCaptor.getValue().storedPath());
+        assertTrue(documentCaptor.getValue().extractedText().contains("Sample PDF text for test"));
         var ordered = inOrder(submissionPersistenceService, fileStoragePort);
         ordered.verify(submissionPersistenceService).saveUploaded(any(Submission.class));
         ordered.verify(fileStoragePort).load(storedPath);

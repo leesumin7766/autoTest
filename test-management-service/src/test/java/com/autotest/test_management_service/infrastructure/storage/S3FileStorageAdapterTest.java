@@ -29,7 +29,7 @@ class S3FileStorageAdapterTest {
                 .thenThrow(S3Exception.builder().statusCode(503).message("S3 unavailable").build());
         S3FileStorageAdapter adapter = new S3FileStorageAdapter(
                 s3Client,
-                "autotest-submissions",
+                "autotest-docs",
                 true,
                 temporaryDirectory
         );
