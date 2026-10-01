@@ -44,7 +44,7 @@ class SubmissionControllerTest {
     void submitReturns200AndSubmissionId() throws Exception {
         SubmissionId mockSubmissionId = SubmissionId.generate();
         Submission parsedSubmission = submission(mockSubmissionId, SubmissionStatus.PARSED, null, "extracted text");
-        when(submissionService.submit(any(), eq(new MemberId(1L)), eq(new ProductId(100L))))
+        when(submissionService.submit(any(), any(com.autotest.test_management_service.domain.submission.SubmissionType.class), eq(new MemberId(1L)), eq(new ProductId(100L))))
                 .thenReturn(parsedSubmission);
 
         MockMultipartFile file = new MockMultipartFile(
@@ -57,25 +57,27 @@ class SubmissionControllerTest {
         mockMvc.perform(multipart("/api/submissions")
                         .file(file)
                         .param("productId", "100")
+                        .param("role", "AGREEMENT")
                         .header("X-Member-Id", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.submissionId").value(mockSubmissionId.value().toString()))
                 .andExpect(jsonPath("$.status").value("PARSED"))
                 .andExpect(jsonPath("$.failureReason").doesNotExist());
 
-        verify(submissionService).submit(any(), eq(new MemberId(1L)), eq(new ProductId(100L)));
+        verify(submissionService).submit(any(), eq(com.autotest.test_management_service.domain.submission.SubmissionType.AGREEMENT), eq(new MemberId(1L)), eq(new ProductId(100L)));
     }
 
     @Test
     void submitReturnsFailedStatusAndReasonWhenExtractionFails() throws Exception {
         SubmissionId id = SubmissionId.generate();
-        when(submissionService.submit(any(), eq(new MemberId(1L)), eq(new ProductId(100L))))
+        when(submissionService.submit(any(), any(com.autotest.test_management_service.domain.submission.SubmissionType.class), eq(new MemberId(1L)), eq(new ProductId(100L))))
                 .thenReturn(submission(id, SubmissionStatus.FAILED, "추출할 셀 내용이 없습니다", ""));
         MockMultipartFile file = new MockMultipartFile("file", "empty.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[] {1});
 
         mockMvc.perform(multipart("/api/submissions")
                         .file(file)
                         .param("productId", "100")
+                        .param("role", "AGREEMENT")
                         .header("X-Member-Id", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.submissionId").value(id.value().toString()))
@@ -109,14 +111,17 @@ class SubmissionControllerTest {
     @Test
     void unsupportedUploadFormatStillReturns400() throws Exception {
         doThrow(new IllegalArgumentException("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다."))
-                .when(submissionService).submit(any(), eq(new MemberId(1L)), eq(new ProductId(100L)));
+                .when(submissionService).submit(any(), any(com.autotest.test_management_service.domain.submission.SubmissionType.class), eq(new MemberId(1L)), eq(new ProductId(100L)));
         MockMultipartFile file = new MockMultipartFile("file", "document.txt", "text/plain", "not allowed".getBytes(StandardCharsets.UTF_8));
 
         mockMvc.perform(multipart("/api/submissions")
                         .file(file)
                         .param("productId", "100")
+                        .param("role", "AGREEMENT")
                         .header("X-Member-Id", "1"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다."));
     }
 
     private Submission submission(SubmissionId id, SubmissionStatus status, String failureReason, String extractedText) {
@@ -125,7 +130,7 @@ class SubmissionControllerTest {
                 new MemberId(1L),
                 new ProductId(100L),
                 SubmissionType.PDF,
-                new StoredPath("s3://autotest-submissions/document.pdf"),
+                new StoredPath("s3://autotest-docs/document.pdf"),
                 extractedText,
                 status,
                 failureReason,

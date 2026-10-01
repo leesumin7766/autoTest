@@ -31,6 +31,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -126,15 +127,57 @@ class SubmissionDatabaseIntegrationTest {
         assertEquals("추출할 셀 내용이 없습니다", getBody.get("failureReason").asText());
     }
 
+        @Test
+        void storesThreeRoleDocumentsUnderOneSubmissionAndReturnsTheirDetails() throws Exception {
+        stubStorage();
+        byte[] workbook = createWorkbook(true);
+
+        JsonNode firstResponse = upload("agreement.xlsx", workbook);
+        UUID id = UUID.fromString(firstResponse.get("submissionId").asText());
+        submissionIds.add(id);
+
+        uploadAdditional(id, "FUNCTION_LIST", "functions.xlsx", workbook);
+        uploadAdditional(id, "MANUAL", "manual.xlsx", workbook);
+
+        assertEquals(3, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM submission_files WHERE submission_id = ?", Integer.class, id));
+        assertEquals(3, jdbcTemplate.queryForObject(
+            "SELECT COUNT(DISTINCT role) FROM submission_files WHERE submission_id = ?", Integer.class, id));
+        assertEquals(3, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM submission_files WHERE submission_id = ? AND file_format = 'XLSX' AND extracted_text LIKE '%Known spreadsheet body%'",
+            Integer.class, id));
+
+        JsonNode getBody = objectMapper.readTree(mockMvc.perform(get("/api/submissions/{id}", id))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString());
+        assertEquals(3, getBody.get("documents").size());
+        assertEquals("AGREEMENT", getBody.get("documents").get(0).get("role").asText());
+        assertEquals("FUNCTION_LIST", getBody.get("documents").get(1).get("role").asText());
+        assertEquals("MANUAL", getBody.get("documents").get(2).get("role").asText());
+        assertEquals("EXCEL", getBody.get("documents").get(2).get("fileType").asText());
+        assertTrue(getBody.get("documents").get(2).get("storedPath").asText().startsWith("integration:"));
+        assertTrue(getBody.get("documents").get(2).get("extractedText").asText().contains("Known spreadsheet body"));
+        }
+
     private JsonNode upload(String filename, byte[] content) throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", filename, XLSX_CONTENT_TYPE, content);
         String response = mockMvc.perform(multipart("/api/submissions")
                         .file(file)
                         .param("productId", "100")
+                        .param("role", "AGREEMENT")
                         .header("X-Member-Id", "1"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return objectMapper.readTree(response);
+    }
+
+    private void uploadAdditional(UUID submissionId, String role, String filename, byte[] content) throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", filename, XLSX_CONTENT_TYPE, content);
+        mockMvc.perform(multipart("/api/submissions/{id}/files", submissionId)
+                        .file(file)
+                        .param("role", role)
+                        .header("X-Member-Id", "1"))
+                .andExpect(status().isOk());
     }
 
     private void stubStorage() throws Exception {
@@ -146,12 +189,15 @@ class SubmissionDatabaseIntegrationTest {
         when(fileStoragePort.load(any(StoredPath.class))).thenAnswer(invocation -> {
             assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
             String key = invocation.getArgument(0, StoredPath.class).value();
-            Map<String, Object> row = jdbcTemplate.queryForMap(
+                List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                     "SELECT submission_id, status, extracted_text FROM submissions WHERE stored_path = ?", key);
-            UUID id = (UUID) row.get("submission_id");
-            submissionIds.add(id);
-            assertEquals("UPLOADED", row.get("status"));
-            assertEquals("", row.get("extracted_text"));
+                if (!rows.isEmpty()) {
+                Map<String, Object> row = rows.get(0);
+                UUID id = (UUID) row.get("submission_id");
+                submissionIds.add(id);
+                assertEquals("UPLOADED", row.get("status"));
+                assertEquals("", row.get("extracted_text"));
+                }
             return new ByteArrayInputStream(storedFiles.get(key));
         });
     }

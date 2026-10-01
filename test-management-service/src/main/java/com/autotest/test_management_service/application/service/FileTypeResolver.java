@@ -12,7 +12,7 @@ public final class FileTypeResolver {
 
     private static final Set<String> PDF_MIMES = Set.of("application/pdf");
     private static final Set<String> EXCEL_MIMES = Set.of("application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    private static final Set<String> HWP_MIMES = Set.of("application/x-hwp", "application/haansofthwp", "application/vnd.hancom.hwp", "application/vnd.hancom.hwp.document", "application/hwp", "application/octet-stream");
+    private static final Set<String> HWP_MIMES = Set.of("application/x-hwp", "application/haansofthwp", "application/vnd.hancom.hwp", "application/vnd.hancom.hwp.document", "application/hwp", "application/vnd.hancom.hwpx");
     private static final Set<String> WORD_MIMES = Set.of("application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
     public SubmissionType resolve(String originalFilename, String contentType) {
@@ -22,7 +22,9 @@ public final class FileTypeResolver {
             throw new IllegalArgumentException("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다.");
         }
         String extension = originalFilename.substring(extensionSeparator + 1).toLowerCase(Locale.ROOT);
-        String mime = contentType != null ? contentType.toLowerCase(Locale.ROOT) : "";
+        String mime = contentType == null
+            ? ""
+            : contentType.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
 
         if ("pdf".equals(extension) && PDF_MIMES.contains(mime)) {
             return SubmissionType.PDF;
@@ -30,7 +32,7 @@ public final class FileTypeResolver {
         if (("xls".equals(extension) || "xlsx".equals(extension)) && EXCEL_MIMES.contains(mime)) {
             return SubmissionType.EXCEL;
         }
-        if (("hwp".equals(extension) || "hwpx".equals(extension)) && (HWP_MIMES.contains(mime) || mime.contains("hwp"))) {
+        if (("hwp".equals(extension) || "hwpx".equals(extension)) && HWP_MIMES.contains(mime)) {
             return SubmissionType.HWP;
         }
         if (("doc".equals(extension) || "docx".equals(extension)) && WORD_MIMES.contains(mime)) {
