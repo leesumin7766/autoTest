@@ -4,5 +4,6 @@ public enum SubmissionStatus {
     DRAFT,
     UPLOADED,
     PARSED,
-    VERIFIED
+    VERIFIED,
+    FAILED
 }

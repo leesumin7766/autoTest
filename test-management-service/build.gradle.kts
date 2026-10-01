@@ -16,8 +16,9 @@ dependencies {
     implementation("org.apache.pdfbox:pdfbox:3.0.3")
     implementation("org.apache.poi:poi:5.3.0")
     implementation("org.apache.poi:poi-ooxml:5.3.0")
+    implementation("org.apache.poi:poi-scratchpad:5.3.0")
     implementation("kr.dogfoot:hwplib:1.1.8")
-    implementation("kr.dogfoot:hwpxlib:0.1.6")
+    implementation("kr.dogfoot:hwpxlib:1.0.9")
 
     testImplementation("org.mockito:mockito-core:5.11.0")
 }

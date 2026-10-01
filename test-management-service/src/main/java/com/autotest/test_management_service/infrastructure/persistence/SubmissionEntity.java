@@ -48,6 +48,9 @@ public class SubmissionEntity {
     @Column(nullable = false, length = 20)
     private SubmissionStatus status;
 
+    @Column(name = "failure_reason", columnDefinition = "text")
+    private String failureReason;
+
     @Column(name = "uploaded_at", nullable = false)
     private Instant uploadedAt;
 
@@ -62,6 +65,7 @@ public class SubmissionEntity {
         this.storedPath = submission.storedPath().value();
         this.extractedText = submission.extractedText();
         this.status = submission.status();
+        this.failureReason = submission.failureReason();
         this.uploadedAt = submission.uploadedAt().orElseGet(Instant::now);
     }
 
@@ -78,6 +82,7 @@ public class SubmissionEntity {
                 new StoredPath(storedPath),
                 extractedText,
                 status,
+                failureReason,
                 uploadedAt
         );
     }
