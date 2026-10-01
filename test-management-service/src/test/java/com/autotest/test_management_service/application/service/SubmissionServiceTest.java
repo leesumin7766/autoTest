@@ -1,12 +1,14 @@
 package com.autotest.test_management_service.application.service;
 
 import com.autotest.test_management_service.application.storage.FileStoragePort;
+import com.autotest.test_management_service.domain.port.TestCaseRepository;
 import com.autotest.test_management_service.domain.service.SubmissionDomainService;
 import com.autotest.test_management_service.domain.submission.ProductId;
 import com.autotest.test_management_service.domain.submission.StoredPath;
 import com.autotest.test_management_service.domain.submission.Submission;
 import com.autotest.test_management_service.domain.submission.SubmissionId;
 import com.autotest.test_management_service.domain.submission.SubmissionRepository;
+import com.autotest.test_management_service.domain.submission.TestCase;
 import com.autotest.test_management_service.domain.vo.MemberId;
 import com.autotest.test_management_service.domain.vo.SubmissionType;
 import com.autotest.test_management_service.infrastructure.parser.SimpleTextFileParser;
@@ -15,6 +17,7 @@ import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -47,6 +50,7 @@ class SubmissionServiceTest {
     private SubmissionId submitWithStoredPath(StoredPath storedPath) throws Exception {
         SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
         FileStoragePort fileStoragePort = mock(FileStoragePort.class);
+        TestCaseRepository testCaseRepository = mock(TestCaseRepository.class);
         byte[] source = "print('hello')".getBytes(StandardCharsets.UTF_8);
         MockMultipartFile file = new MockMultipartFile("file", "main.py", "text/x-python", source);
 
@@ -60,7 +64,8 @@ class SubmissionServiceTest {
                 fileStoragePort,
                 new FileParserFactory(java.util.List.of(new SimpleTextFileParser())),
                 new SubmissionDomainService(),
-                new FileTypeResolver()
+                new FileTypeResolver(),
+                testCaseRepository
         );
 
         SubmissionId submissionId = service.submit(file, MEMBER_ID, PRODUCT_ID);

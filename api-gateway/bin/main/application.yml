@@ -1,0 +1,24 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: http://auth-service:8081
+          predicates:
+            - Path=/api/auth/**
+        - id: test-management-service
+          uri: http://test-management-service:8082
+          predicates:
+            - Path=/api/tests/**
+        - id: test-execution-service
+          uri: http://test-execution-service:8083
+          predicates:
+            - Path=/api/executions/**
+        - id: report-service
+          uri: http://report-service:8084
+          predicates:
+            - Path=/api/reports/**

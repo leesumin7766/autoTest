@@ -2,6 +2,7 @@ package com.autotest.test_management_service.application.service;
 
 import com.autotest.test_management_service.application.port.FileParser;
 import com.autotest.test_management_service.application.storage.FileStoragePort;
+import com.autotest.test_management_service.domain.port.TestCaseRepository;
 import com.autotest.test_management_service.domain.service.SubmissionDomainService;
 import com.autotest.test_management_service.domain.submission.ProductId;
 import com.autotest.test_management_service.domain.submission.StoredPath;
@@ -30,6 +31,7 @@ public class SubmissionService {
     private final FileParserFactory fileParserFactory;
     private final SubmissionDomainService submissionDomainService;
     private final FileTypeResolver fileTypeResolver;
+    private final TestCaseRepository testCaseRepository;
 
     @Transactional
     public SubmissionId submit(MultipartFile file, MemberId memberId, ProductId productId) {
@@ -54,14 +56,14 @@ public class SubmissionService {
         }
 
         String extractedText;
-        List<TestCase> testCases;
+        List<TestCase> parsedTestCases;
         try (InputStream parserInput = file.getInputStream()) {
             extractedText = parser.extractText(parserInput);
         } catch (IOException exception) {
             throw new UncheckedIOException("Failed to open submission file for text extraction", exception);
         }
         try (InputStream parserInput = file.getInputStream()) {
-            testCases = parser.parse(parserInput, originalFilename);
+            parsedTestCases = parser.parse(parserInput, originalFilename);
         } catch (IOException exception) {
             throw new UncheckedIOException("Failed to open submission file for parsing", exception);
         }
@@ -72,8 +74,19 @@ public class SubmissionService {
                 type,
                 storedPath,
                 extractedText,
-                testCases
+                parsedTestCases
         );
-        return submissionRepository.save(submission).submissionId();
+        Submission savedSubmission = submissionRepository.save(submission);
+        SubmissionId submissionId = savedSubmission.submissionId();
+
+        // Fill in submissionId on parsed test cases and persist them
+        List<TestCase> testCasesWithId = parsedTestCases.stream()
+                .map(tc -> tc.withSubmissionId(submissionId))
+                .toList();
+        if (!testCasesWithId.isEmpty()) {
+            testCaseRepository.saveAll(testCasesWithId);
+        }
+
+        return submissionId;
     }
 }

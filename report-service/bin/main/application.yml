@@ -1,0 +1,13 @@
+server:
+  port: 8084
+spring:
+  application:
+    name: report-service
+  datasource:
+    url: jdbc:postgresql://db:5432/autotest
+    username: test
+    password: test
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
