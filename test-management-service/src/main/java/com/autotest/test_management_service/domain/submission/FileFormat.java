@@ -21,8 +21,8 @@ public enum FileFormat {
 
         return switch (normalizedExtension.toUpperCase(Locale.ROOT)) {
             case "PDF" -> PDF;
-            case "DOCX" -> DOCX;
-            case "HWP" -> HWP;
+            case "DOC", "DOCX" -> DOCX;
+            case "HWP", "HWPX" -> HWP;
             case "XLSX" -> XLSX;
             case "XLS" -> XLS;
             default -> throw new IllegalArgumentException("Unsupported file extension: " + extension);
