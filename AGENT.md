@@ -78,6 +78,7 @@
 
 ## 7. 서비스 포트 정리
 
+- db: 5432
 - frontend: 5173
 - gateway: 8080
 - test-management-service: 8082

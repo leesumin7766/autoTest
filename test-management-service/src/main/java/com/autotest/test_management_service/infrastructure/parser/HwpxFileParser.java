@@ -4,23 +4,24 @@ import com.autotest.test_management_service.domain.submission.FileFormat;
 import com.autotest.test_management_service.domain.submission.FileMetadata;
 import com.autotest.test_management_service.domain.submission.FileParser;
 import com.autotest.test_management_service.domain.submission.ParsedContent;
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
-import org.apache.pdfbox.text.PDFTextStripper;
+import kr.dogfoot.hwpxlib.object.HWPXFile;
+import kr.dogfoot.hwpxlib.reader.HWPXReader;
+import kr.dogfoot.hwpxlib.tool.textextractor.TextExtractMethod;
+import kr.dogfoot.hwpxlib.tool.textextractor.TextExtractor;
 import org.springframework.stereotype.Component;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
 
 @Component
-public final class PdfFileParser implements FileParser {
+public final class HwpxFileParser implements FileParser {
 
     @Override
     public boolean supports(FileFormat format) {
-        return format == FileFormat.PDF;
+        return format == FileFormat.HWPX;
     }
 
     @Override
@@ -30,27 +31,31 @@ public final class PdfFileParser implements FileParser {
 
         try {
             byte[] bytes = readAllBytes(content);
-            try (PDDocument document = Loader.loadPDF(bytes)) {
-                if (document.isEncrypted()) {
-                    throw new DocumentParsingException("Encrypted PDF document cannot be parsed");
+            java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("autotest-hwpx-", ".hwpx");
+            try {
+                java.nio.file.Files.write(tempFile, bytes);
+                HWPXFile hwpxFile = HWPXReader.fromFile(tempFile.toFile());
+                if (hwpxFile == null) {
+                    throw new DocumentParsingException("Failed to parse HWPX document");
                 }
 
-                PDFTextStripper stripper = new PDFTextStripper();
-                stripper.setSortByPosition(true);
-                String extractedText = stripper.getText(document).trim();
+                String extractedText = TextExtractor.extract(hwpxFile, TextExtractMethod.InsertControlTextBetweenParagraphText, true, null);
+                if (extractedText != null) {
+                    extractedText = extractedText.trim();
+                }
 
-                if (extractedText.isBlank()) {
+                if (extractedText == null || extractedText.isBlank()) {
                     throw new DocumentParsingException("텍스트를 추출할 수 없음/OCR 필요");
                 }
 
-                return new ParsedContent(metadata, FileFormat.PDF, extractedText, bytes.length);
-            } catch (InvalidPasswordException e) {
-                throw new DocumentParsingException("Encrypted PDF document cannot be parsed", e);
+                return new ParsedContent(metadata, FileFormat.HWPX, extractedText, bytes.length);
+            } finally {
+                java.nio.file.Files.deleteIfExists(tempFile);
             }
         } catch (DocumentParsingException e) {
             throw e;
         } catch (Exception e) {
-            throw new DocumentParsingException("Failed to extract text from PDF document: " + e.getMessage(), e);
+            throw new DocumentParsingException("Failed to extract text from HWPX document: " + e.getMessage(), e);
         }
     }
 

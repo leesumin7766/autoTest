@@ -1,13 +1,11 @@
 package com.autotest.test_management_service.application.service;
 
 import com.autotest.test_management_service.application.storage.FileStoragePort;
-import com.autotest.test_management_service.domain.port.TestCaseRepository;
 import com.autotest.test_management_service.domain.service.SubmissionDomainService;
 import com.autotest.test_management_service.domain.submission.ProductId;
 import com.autotest.test_management_service.domain.submission.StoredPath;
 import com.autotest.test_management_service.domain.submission.Submission;
 import com.autotest.test_management_service.domain.submission.SubmissionId;
-import com.autotest.test_management_service.domain.submission.SubmissionRepository;
 import com.autotest.test_management_service.domain.vo.MemberId;
 import com.autotest.test_management_service.domain.vo.SubmissionType;
 import com.autotest.test_management_service.infrastructure.parser.DocumentFileParserFactory;
@@ -15,15 +13,19 @@ import com.autotest.test_management_service.infrastructure.parser.PdfFileParser;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class SubmissionServiceTest {
@@ -46,41 +48,89 @@ class SubmissionServiceTest {
         assertTrue(submissionId.value() != null);
     }
 
-    private SubmissionId submitWithStoredPath(StoredPath storedPath) throws Exception {
-        SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
+    @Test
+    void rejectsUnsupportedUploadFormatBeforeStorage() {
+        SubmissionPersistenceService submissionPersistenceService = mock(SubmissionPersistenceService.class);
         FileStoragePort fileStoragePort = mock(FileStoragePort.class);
-        TestCaseRepository testCaseRepository = mock(TestCaseRepository.class);
-        byte[] source = "dummy pdf content".getBytes(StandardCharsets.UTF_8);
+        SubmissionService service = new SubmissionService(
+                submissionPersistenceService,
+                fileStoragePort,
+                new DocumentFileParserFactory(java.util.List.of(new PdfFileParser())),
+                new FileTypeResolver()
+        );
+        MockMultipartFile file = new MockMultipartFile("file", "document.txt", "text/plain", "not allowed".getBytes(StandardCharsets.UTF_8));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> service.submit(file, MEMBER_ID, PRODUCT_ID));
+
+        assertEquals("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다.", exception.getMessage());
+        verifyNoInteractions(submissionPersistenceService, fileStoragePort);
+    }
+
+    private SubmissionId submitWithStoredPath(StoredPath storedPath) throws Exception {
+        SubmissionPersistenceService submissionPersistenceService = mock(SubmissionPersistenceService.class);
+        FileStoragePort fileStoragePort = mock(FileStoragePort.class);
+        java.util.concurrent.atomic.AtomicReference<Submission> uploadedRef = new java.util.concurrent.atomic.AtomicReference<>();
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument()) {
+            org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage();
+            doc.addPage(page);
+            try (org.apache.pdfbox.pdmodel.PDPageContentStream stream = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page)) {
+                stream.setFont(new org.apache.pdfbox.pdmodel.font.PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA), 12);
+                stream.beginText();
+                stream.newLineAtOffset(100, 700);
+                stream.showText("Sample PDF text for test");
+                stream.endText();
+            }
+            doc.save(out);
+        }
+        byte[] source = out.toByteArray();
         MockMultipartFile file = new MockMultipartFile("file", "document.pdf", "application/pdf", source);
 
         when(fileStoragePort.store(any(InputStream.class), eq("document.pdf"), eq("application/pdf")))
                 .thenReturn(storedPath);
-        when(submissionRepository.save(any(Submission.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(fileStoragePort.load(storedPath))
+                .thenAnswer(inv -> new java.io.ByteArrayInputStream(source));
+        when(submissionPersistenceService.saveUploaded(any(Submission.class)))
+            .thenAnswer(invocation -> {
+                Submission uploaded = invocation.getArgument(0);
+                uploadedRef.set(uploaded);
+                return uploaded;
+            });
+        when(submissionPersistenceService.markAsParsed(any(), any(String.class)))
+            .thenAnswer(invocation -> uploadedRef.get().markAsParsed(invocation.getArgument(1)));
 
         SubmissionService service = new SubmissionService(
-                submissionRepository,
+            submissionPersistenceService,
                 fileStoragePort,
                 new DocumentFileParserFactory(java.util.List.of(new PdfFileParser())),
-                new SubmissionDomainService(),
-                new FileTypeResolver(),
-                testCaseRepository
+            new FileTypeResolver()
         );
 
-        SubmissionId submissionId = service.submit(file, MEMBER_ID, PRODUCT_ID);
+        Submission persistedSubmission = service.submit(file, MEMBER_ID, PRODUCT_ID);
 
         var submissionCaptor = org.mockito.ArgumentCaptor.forClass(Submission.class);
-        verify(submissionRepository).save(submissionCaptor.capture());
+        verify(submissionPersistenceService).saveUploaded(submissionCaptor.capture());
+        verify(submissionPersistenceService).markAsParsed(persistedSubmission.submissionId(), persistedSubmission.extractedText());
         verify(fileStoragePort).store(any(InputStream.class), eq("document.pdf"), eq("application/pdf"));
+        verify(fileStoragePort).load(storedPath);
 
-        Submission persistedSubmission = submissionCaptor.getValue();
+        Submission uploadedSubmission = submissionCaptor.getValue();
+        assertEquals(com.autotest.test_management_service.domain.submission.SubmissionStatus.UPLOADED, uploadedSubmission.status());
+        assertEquals("", uploadedSubmission.extractedText());
         assertEquals(MEMBER_ID, persistedSubmission.memberId());
         assertEquals(PRODUCT_ID, persistedSubmission.productId());
         assertEquals(SubmissionType.PDF, persistedSubmission.submissionType());
         assertEquals(storedPath, persistedSubmission.storedPath());
-        assertEquals("", persistedSubmission.extractedText());
+        assertEquals(com.autotest.test_management_service.domain.submission.SubmissionStatus.PARSED, persistedSubmission.status());
+        assertTrue(persistedSubmission.extractedText().contains("Sample PDF text for test"));
         assertTrue(persistedSubmission.testCases().isEmpty());
-        assertEquals(persistedSubmission.submissionId(), submissionId);
-        return submissionId;
+        assertEquals(uploadedSubmission.submissionId(), persistedSubmission.submissionId());
+        var ordered = inOrder(submissionPersistenceService, fileStoragePort);
+        ordered.verify(submissionPersistenceService).saveUploaded(any(Submission.class));
+        ordered.verify(fileStoragePort).load(storedPath);
+        ordered.verify(submissionPersistenceService).markAsParsed(any(), any(String.class));
+        return persistedSubmission.submissionId();
     }
 }

@@ -21,6 +21,7 @@ public final class Submission {
     private final List<TestCase> testCases;
     private final List<SubmissionFile> files;
     private final SubmissionStatus status;
+    private final String failureReason;
     private final Instant uploadedAt;
     private final List<Object> domainEvents;
 
@@ -34,6 +35,7 @@ public final class Submission {
             List<TestCase> testCases,
             List<SubmissionFile> files,
             SubmissionStatus status,
+            String failureReason,
             Instant uploadedAt,
             List<Object> domainEvents
     ) {
@@ -46,34 +48,83 @@ public final class Submission {
         this.testCases = List.copyOf(testCases);
         this.files = List.copyOf(files);
         this.status = Objects.requireNonNull(status, "status");
+        this.failureReason = failureReason;
         this.uploadedAt = uploadedAt;
         this.domainEvents = List.copyOf(domainEvents);
     }
 
-        public static Submission create(
+    public static Submission create(
             MemberId memberId,
             ProductId productId,
             com.autotest.test_management_service.domain.vo.SubmissionType submissionType,
             StoredPath storedPath,
             String extractedText,
             List<TestCase> testCases
-        ) {
+    ) {
         return new Submission(
                 SubmissionId.generate(),
-            memberId,
+                memberId,
                 productId,
-            submissionType,
-            storedPath,
-            extractedText,
-            testCases,
-            List.of(),
-            SubmissionStatus.UPLOADED,
-            Instant.now(),
-            List.of()
+                submissionType,
+                storedPath,
+                extractedText,
+                testCases,
+                List.of(),
+                SubmissionStatus.UPLOADED,
+                null,
+                Instant.now(),
+                List.of()
         );
-        }
+    }
 
-        public static Submission reconstitute(
+    public static Submission createParsed(
+            MemberId memberId,
+            ProductId productId,
+            com.autotest.test_management_service.domain.vo.SubmissionType submissionType,
+            StoredPath storedPath,
+            String extractedText,
+            List<TestCase> testCases
+    ) {
+        return new Submission(
+                SubmissionId.generate(),
+                memberId,
+                productId,
+                submissionType,
+                storedPath,
+                extractedText,
+                testCases,
+                List.of(),
+                SubmissionStatus.PARSED,
+                null,
+                Instant.now(),
+                List.of()
+        );
+    }
+
+    public static Submission createFailed(
+            MemberId memberId,
+            ProductId productId,
+            com.autotest.test_management_service.domain.vo.SubmissionType submissionType,
+            StoredPath storedPath,
+            String failureReason
+    ) {
+        return new Submission(
+                SubmissionId.generate(),
+                memberId,
+                productId,
+                submissionType,
+                storedPath,
+                "",
+                List.of(),
+                List.of(),
+                SubmissionStatus.FAILED,
+                failureReason,
+                Instant.now(),
+                List.of()
+        );
+    }
+
+    public static Submission reconstitute(
             SubmissionId submissionId,
             MemberId memberId,
             ProductId productId,
@@ -81,21 +132,27 @@ public final class Submission {
             StoredPath storedPath,
             String extractedText,
             SubmissionStatus status,
+            String failureReason,
             Instant uploadedAt
-        ) {
+    ) {
         return new Submission(
-            submissionId,
-            memberId,
-            productId,
-            submissionType,
-            storedPath,
-            extractedText,
-            List.of(),
+                submissionId,
+                memberId,
+                productId,
+                submissionType,
+                storedPath,
+                extractedText,
                 List.of(),
-            status,
-            uploadedAt,
+                List.of(),
+                status,
+                failureReason,
+                uploadedAt,
                 List.of()
         );
+    }
+
+    public String failureReason() {
+        return failureReason;
     }
 
     static Submission draft(MemberId memberId, ProductId productId) {
@@ -109,6 +166,7 @@ public final class Submission {
                 List.of(),
                 List.of(),
                 SubmissionStatus.DRAFT,
+                null,
                 null,
                 List.of()
         );
@@ -177,8 +235,46 @@ public final class Submission {
     }
 
     public Submission markAsParsed() {
+        return markAsParsed(extractedText);
+    }
+
+    public Submission markAsParsed(String parsedText) {
         requireStatus(SubmissionStatus.UPLOADED);
-        return copy(files, SubmissionStatus.PARSED, uploadedAt, domainEvents);
+        return new Submission(
+                submissionId,
+                memberId,
+                productId,
+                submissionType,
+                storedPath,
+                Objects.requireNonNull(parsedText, "parsedText"),
+                testCases,
+                files,
+                SubmissionStatus.PARSED,
+                null,
+                uploadedAt,
+                domainEvents
+        );
+    }
+
+    public Submission markAsFailed(String reason) {
+        requireStatus(SubmissionStatus.UPLOADED);
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("Failure reason must not be blank");
+        }
+        return new Submission(
+                submissionId,
+                memberId,
+                productId,
+                submissionType,
+                storedPath,
+                "",
+                testCases,
+                files,
+                SubmissionStatus.FAILED,
+                reason,
+                uploadedAt,
+                domainEvents
+        );
     }
 
     public List<SubmissionFile> getFiles() {
@@ -247,6 +343,7 @@ public final class Submission {
             testCases,
             updatedFiles,
             updatedStatus,
+            failureReason,
             updatedUploadedAt,
             updatedEvents
         );

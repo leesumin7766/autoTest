@@ -4,8 +4,10 @@ import java.util.Locale;
 
 public enum FileFormat {
     PDF,
+    DOC,
     DOCX,
     HWP,
+    HWPX,
     XLSX,
     XLS;
 
@@ -21,8 +23,10 @@ public enum FileFormat {
 
         return switch (normalizedExtension.toUpperCase(Locale.ROOT)) {
             case "PDF" -> PDF;
-            case "DOC", "DOCX" -> DOCX;
-            case "HWP", "HWPX" -> HWP;
+            case "DOC" -> DOC;
+            case "DOCX" -> DOCX;
+            case "HWP" -> HWP;
+            case "HWPX" -> HWPX;
             case "XLSX" -> XLSX;
             case "XLS" -> XLS;
             default -> throw new IllegalArgumentException("Unsupported file extension: " + extension);
