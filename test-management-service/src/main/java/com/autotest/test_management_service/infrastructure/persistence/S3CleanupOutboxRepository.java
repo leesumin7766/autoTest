@@ -1,5 +1,6 @@
 package com.autotest.test_management_service.infrastructure.persistence;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -46,7 +47,7 @@ public class S3CleanupOutboxRepository {
                     UPDATE s3_cleanup_outbox
                     SET attempts = ?, next_attempt_at = ?
                     WHERE cleanup_id = ? AND completed_at IS NULL
-                    """, job.attempts(), Instant.now().plusSeconds(retrySeconds), job.cleanupId());
+                    """, job.attempts(), Timestamp.from(Instant.now().plusSeconds(retrySeconds)), job.cleanupId());
         }
         return due;
     }

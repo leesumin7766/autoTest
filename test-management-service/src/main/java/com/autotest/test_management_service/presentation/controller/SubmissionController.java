@@ -131,10 +131,16 @@ public class SubmissionController {
                 List<SubmittedDocument> documents,
                 AiDocumentDeliveryService.DeliveryResult aiDelivery
             ) {
+                String failureReason = documents.stream()
+                    .filter(document -> document.status() == SubmissionStatus.FAILED)
+                    .map(SubmittedDocument::failureReason)
+                    .filter(reason -> reason != null && !reason.isBlank())
+                    .findFirst()
+                    .orElse(null);
             return new SubmissionResponse(
                     submission.submissionId().value(),
                     submission.status(),
-                    submission.failureReason(),
+                    failureReason,
                     documents.stream().map(document -> UploadedDocumentResponse.from(document, aiDelivery)).toList(),
                     aiDelivery
             );

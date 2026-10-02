@@ -14,7 +14,6 @@ public final class Submission {
     private final ProductId productId;
     private final List<TestCase> testCases;
     private final SubmissionStatus status;
-    private final String failureReason;
     private final Instant uploadedAt;
     private final List<Object> domainEvents;
 
@@ -24,7 +23,6 @@ public final class Submission {
             ProductId productId,
             List<TestCase> testCases,
             SubmissionStatus status,
-            String failureReason,
             Instant uploadedAt,
             List<Object> domainEvents
     ) {
@@ -33,14 +31,13 @@ public final class Submission {
         this.productId = Objects.requireNonNull(productId, "productId");
         this.testCases = List.copyOf(testCases);
         this.status = Objects.requireNonNull(status, "status");
-        this.failureReason = failureReason;
         this.uploadedAt = uploadedAt;
         this.domainEvents = List.copyOf(domainEvents);
     }
 
     public static Submission create(MemberId memberId, ProductId productId) {
         return new Submission(SubmissionId.generate(), memberId, productId, List.of(),
-                SubmissionStatus.UPLOADED, null, Instant.now(), List.of());
+            SubmissionStatus.UPLOADED, Instant.now(), List.of());
     }
 
     public static Submission reconstitute(
@@ -48,41 +45,32 @@ public final class Submission {
             MemberId memberId,
             ProductId productId,
             SubmissionStatus status,
-            String failureReason,
             Instant uploadedAt
     ) {
-        return new Submission(submissionId, memberId, productId, List.of(), status, failureReason,
+            return new Submission(submissionId, memberId, productId, List.of(), status,
                 uploadedAt, List.of());
     }
 
     static Submission draft(MemberId memberId, ProductId productId) {
         return new Submission(SubmissionId.generate(), memberId, productId, List.of(),
-                SubmissionStatus.DRAFT, null, null, List.of());
+            SubmissionStatus.DRAFT, null, List.of());
     }
 
     public Submission markAsUploaded() {
         requireStatus(SubmissionStatus.DRAFT);
         Instant uploadTime = Instant.now();
         return new Submission(submissionId, memberId, productId, testCases, SubmissionStatus.UPLOADED,
-                null, uploadTime, List.of(new SubmissionUploadedEvent(submissionId, productId, uploadTime)));
+                uploadTime, List.of(new SubmissionUploadedEvent(submissionId, productId, uploadTime)));
     }
 
-    public Submission withProcessingStatus(SubmissionStatus nextStatus, String nextFailureReason) {
+    public Submission withProcessingStatus(SubmissionStatus nextStatus) {
         if (nextStatus != SubmissionStatus.UPLOADED
                 && nextStatus != SubmissionStatus.PARSED
                 && nextStatus != SubmissionStatus.FAILED) {
             throw new IllegalArgumentException("Unsupported submission processing status: " + nextStatus);
         }
-        if (nextStatus == SubmissionStatus.FAILED
-                && (nextFailureReason == null || nextFailureReason.isBlank())) {
-            throw new IllegalArgumentException("Failed submission requires a failure reason");
-        }
         return new Submission(submissionId, memberId, productId, testCases, nextStatus,
-                nextStatus == SubmissionStatus.FAILED ? nextFailureReason : null, uploadedAt, domainEvents);
-    }
-
-    public String failureReason() {
-        return failureReason;
+            uploadedAt, domainEvents);
     }
 
     public SubmissionId submissionId() {

@@ -26,7 +26,7 @@ autoTest/
 │   │   └── presentation/          # SubmissionController
 │   ├── src/main/resources/
 │   │   ├── application.yml
-│   │   └── db/migration/V1__create_submissions.sql
+│   │   └── db/migration/            # Flyway V1–V6
 │   └── src/test/java/             # 도메인, 서비스, 파서, 저장소, 컨트롤러 테스트
 ├── gradle/wrapper/                # Gradle 8.10.2 Wrapper
 ├── gradlew / gradlew.bat
@@ -42,12 +42,9 @@ autoTest/
 └── README.md
 ```
 
-`.gradle/`, `build/`, 서비스별 `bin/`, `node_modules/`, `__pycache__/` 등은 캐시·빌드·설치 산출물입니다. DB 마이그레이션 SQL은 루트 `db/`가 아니라 `test-management-service/src/main/resources/db/migration/`에 있습니다.
-
 ## 2. 개발 환경
 
 - Java 21: 루트 Gradle toolchain 및 Java 서비스 Dockerfile 기준
-- Gradle 8.10.2: 내장 Wrapper 사용
 - Python 3.13: `ai-service/Dockerfile` 기준
 - Node.js `24.21.0` (저장소 루트 `.nvmrc` 기준)
 - npm `11.19.0` (Node.js 설치에 포함된 버전)
@@ -200,24 +197,42 @@ curl.exe -F "file=@시험합의서.pdf" -F "productId=1" -F "role=AGREEMENT" -H 
 
 ### 제출 테이블
 
-`submissions`는 세트 상태와 기존 단일 업로드 호환 필드를 보관하고, `submission_files`는 역할별 파일 정보를 보관합니다. `V3__create_submission_files.sql`에서 파일 테이블을 추가했습니다.
+`submissions`는 제출 세트의 식별자와 세트 상태만 보관합니다. 문서 정보를 submissions에 중복 저장하지 않습니다.
 
 ```sql
 submission_id   UUID PRIMARY KEY
 member_id       BIGINT NOT NULL
 product_id      BIGINT NOT NULL
-submission_type VARCHAR(20) NOT NULL
-stored_path     TEXT NOT NULL
-extracted_text  TEXT NOT NULL
 status          VARCHAR(20) NOT NULL
 uploaded_at     TIMESTAMPTZ NOT NULL
 ```
 
-`submission_files`에는 `submission_id`, 역할, 파일 분류 및 확장자 형식, 원본 파일명, 저장 경로, 추출 텍스트, 처리 상태가 저장됩니다. 한 세트 안에서 같은 역할은 한 번만 등록할 수 있습니다. 파싱 실패 파일만 실패 교체 경로로 교체할 수 있습니다.
+`submission_files`가 문서 정보의 유일한 기준입니다. 역할, 파일 분류 및 확장자 형식, 원본 파일명, MIME, 저장 경로, 추출 텍스트, 문서 파싱 상태와 실패 이유를 보관합니다. 한 세트 안에서 같은 역할은 한 번만 등록할 수 있습니다. 파싱 실패 파일만 실패 교체 경로로 교체할 수 있습니다.
+
+세트 상태 규칙은 다음과 같습니다.
+
+- 필수 역할 중 하나라도 누락됐고 실패가 없으면 `UPLOADED`입니다. 첫 문서만 `PARSED`여도 세트는 준비 완료가 아닙니다.
+- 하나라도 문서 파싱이 실패하면 `FAILED`입니다. 실패 이유는 해당 `submission_files` 문서에서 응답합니다.
+- `AGREEMENT`, `FUNCTION_LIST`, `MANUAL` 각 한 행이 모두 `PARSED`이고 추출 텍스트가 비어 있지 않을 때만 세트가 `PARSED`입니다.
+- AI 전달 상태(`NOT_READY`, `PENDING`, `FAILED`, `DELIVERED`)는 문서 준비 상태와 별도로 `submission_ai_deliveries`에 저장합니다.
+
+V5는 submissions의 legacy 파일 사본을 `submission_legacy_file_archive`에 보존한 뒤 `submission_type`, `stored_path`, `extracted_text`를 제거합니다. 문서 행이 없는 제출은 역할·형식·식별자를 추정하지 않고 legacy 값과 보존 사유만 archive에 남깁니다. V6는 기존 세트 실패 사유도 archive에 보존하고 세트 상태를 문서 행에서 재계산한 뒤 parent의 중복 `failure_reason`을 제거합니다. 기존 Flyway migration은 수정하지 않습니다. Hibernate는 `ddl-auto=validate`로 스키마만 확인합니다.
+
+운영 스키마 변경 전 DB 백업을 만들고 archive 결과를 확인합니다. 복구가 필요하면 운영 DB를 직접 덮어쓰지 말고 별도 DB에 백업을 복원해 검증합니다. 현재 로컬 환경에서 확보한 custom-format 사전 백업은 `test-management-service/build/autotest-before-submission-files-v6.dump`에 있습니다.
+
+```powershell
+docker compose exec -T db createdb -U test autotest_restore_check
+docker compose cp test-management-service/build/autotest-before-submission-files-v6.dump db:/tmp/autotest-before-submission-files-v6.dump
+docker compose exec -T db pg_restore -U test -d autotest_restore_check /tmp/autotest-before-submission-files-v6.dump
+```
+
+복원 결과를 별도 DB에서 확인한 뒤 운영 복구 여부를 결정합니다. 위 명령은 `autotest`를 변경하지 않습니다.
 
 `submission_ai_deliveries`에는 `NOT_READY`, `PENDING`, `FAILED`, `DELIVERED`, 시도 횟수, 실패 요약, `updated_at`, `delivered_at`이 기록됩니다. 각 전달 결과 반영은 해당 `attempt_count`가 아직 현재 시도와 일치할 때만 수행해 오래된 HTTP 요청이 새 시도를 덮지 못하게 합니다. AI 서비스는 `ai_document_intakes`에 제출 ID당 한 요청 본문만 저장합니다.
 
-`member_id`, `product_id`에 인덱스가 있습니다. 현재 상태 enum은 `DRAFT`, `UPLOADED`, `PARSED`, `VERIFIED`입니다. `created_at`, `TC_GENERATED`, `EXECUTING`, `COMPLETED`는 현재 스키마·enum에 없습니다.
+교체와 AI 전달 시작은 같은 제출 행 잠금으로 직렬화됩니다. 문서 준비 상태와 시도 번호를 DB에서 확정하고 트랜잭션을 종료한 뒤 AI HTTP를 호출하므로 네트워크 응답을 기다리며 DB 잠금을 유지하지 않습니다. 기존 원본 삭제와 DB 반영 실패 후 남은 새 원본은 `s3_cleanup_outbox`에 영속 예약하고 worker가 재시도합니다. 삭제 직전에 현재 문서 참조를 확인합니다.
+
+`member_id`, `product_id`에 인덱스가 있습니다. 제출 및 문서 처리 상태는 `UPLOADED`, `PARSED`, `FAILED`입니다. `DRAFT`는 API 제출 완료 상태가 아니며 `VERIFIED`, `TC_GENERATED`, `EXECUTING`, `COMPLETED`는 현재 제출 스키마·enum에 없습니다.
 
 TC는 `InMemoryTestCaseRepository`에 저장하므로 서비스 재시작 시 사라집니다. `test_cases` 테이블과 영속 저장 구현은 없습니다.
 
@@ -303,12 +318,25 @@ docker compose exec db psql -U test -d autotest -c "SELECT * FROM submissions OR
 검증 명령:
 
 ```powershell
-. \gradlew.bat :test-management-service:test --tests "com.autotest.test_management_service.application.service.AiDocumentDeliveryServiceTest" --tests "com.autotest.test_management_service.application.service.SubmissionServiceTest" --tests "com.autotest.test_management_service.presentation.controller.SubmissionControllerTest"
+docker compose exec -T db createdb -U test autotest_test
+$env:AUTOTEST_TEST_DATABASE_URL = 'jdbc:postgresql://localhost:5432/autotest_test'
+.\gradlew.bat :test-management-service:test --tests "*SubmissionDatabaseIntegrationTest" --rerun-tasks
+Remove-Item Env:AUTOTEST_TEST_DATABASE_URL
+.\gradlew.bat :test-management-service:test --tests "*AiDocumentDeliveryServiceTest" --tests "*SubmissionServiceTest" --tests "*SubmissionTest" --tests "*SubmissionControllerTest"
 python -m unittest discover -s ai-service -p test_main.py
 npm --prefix frontend run build
 ```
 
-실제 업로드 검증은 앞의 `sample/` 파일 3개를 Vite 프런트엔드에서 각 역할에 연결하고, 같은 제출 ID의 역할·`PARSED` 상태·추출 내용 키워드·AI 접수 내역을 확인합니다. 운영 DB를 초기화하는 전체 integration suite를 자동 실행하지 않습니다.
+격리 DB 테스트를 위해 `autotest_test`를 사용합니다. 이 DB가 이미 있으면 생성 명령은 건너뛰고 `AUTOTEST_TEST_DATABASE_URL`이 운영 `autotest`를 가리키지 않는지 확인합니다. integration 테스트는 자체 생성한 제출 행만 삭제합니다.
+
+실제 업로드 검증은 앞의 `sample/` 파일 3개를 Gateway를 거쳐 업로드하고, 같은 제출 ID의 문서 상태·추출 내용·S3 참조·AI 접수 내역을 확인합니다. 모든 역할이 정상 파싱되어야 세트가 `PARSED`입니다.
+
+### 검증 기록 (2026-10-02)
+
+- V5/V6 적용 전 복구 가능한 custom-format 백업을 만들었습니다. V4 백업 복사본과 실제 DB 모두 migration 전 제출 8건, 문서 21건, AI 전달 7건, AI 접수 10건이었습니다.
+- V6 적용 후 제출 8건, 문서 21건, AI 전달 7건, AI 접수 10건이 유지됐고 archive에 legacy 제출 8건이 보존됐습니다. 문서 행 누락 1건과 legacy 중복 사본 불일치 1건은 추정·삭제하지 않았습니다. submissions의 중복 파일 컬럼 4개는 제거됐고 archive와 대응하지 않는 제출은 0건입니다.
+- `sample/` 실제 경유 검증 제출 ID: `3efe8b81-903f-49b5-a30c-7acfc56692d1`. 세 역할 AGREEMENT/PDF, FUNCTION_LIST/XLSX, MANUAL/PDF가 모두 `PARSED`, 원본 경로는 모두 S3, 세트 상태는 `PARSED`, AI 전달은 attempt 1에서 `DELIVERED`, 일치하는 AI 접수는 1건입니다. 원문과 저장 경로는 기록하지 않았습니다.
+- 교체 실패/성공, XLSX→PDF 교차 형식, 동시 교체와 AI claim, 삭제 실패 후 재시도, 현재 원본 참조 보호, 재시작 뒤 durable cleanup 복구는 격리 PostgreSQL 테스트 및 별도 synthetic outbox 작업으로 확인했습니다.
 
 ## 9. 남은 구현 작업
 
@@ -327,4 +355,4 @@ npm --prefix frontend run build
 
 작업 전에 `AGENT.md`를 읽습니다. 프로젝트 목표는 문서 기반 TC 생성과 결함 탐지이며, 코드 제출·채점 방향으로 개발하지 않습니다. 기존 `@test` 파싱을 확대하거나 MinIO를 재도입하지 않습니다.
 
-`AGENT.md`의 목표 정책과 현재 소스 코드 사이에는 위에 기록한 차이가 있습니다. 실제 구현 상태는 관련 코드·설정을 함께 확인해야 합니다. `AGENT.md` 자체의 수정 금지 지침에 따라 이번 README 정리에서는 해당 파일을 변경하지 않았습니다.
+`AGENT.md`에는 작업 범위, 데이터 보존 및 검증 안전 규칙이 있습니다. 데이터 구조와 API 계약을 바꿀 때는 이 문서와 함께 갱신합니다.

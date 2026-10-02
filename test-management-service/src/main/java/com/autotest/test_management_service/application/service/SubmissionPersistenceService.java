@@ -129,14 +129,10 @@ public class SubmissionPersistenceService {
     private Submission refreshSetStatus(Submission submission, SubmissionId id) {
         List<SubmittedDocument> documents = submittedDocumentRepository.findBySubmissionId(id);
         EnumSet<SubmissionType> parsedRoles = EnumSet.noneOf(SubmissionType.class);
-        String failureReason = null;
         boolean failed = false;
         for (SubmittedDocument document : documents) {
             if (document.status() == SubmissionStatus.FAILED) {
                 failed = true;
-                if (failureReason == null) {
-                    failureReason = document.failureReason();
-                }
             } else if (document.status() == SubmissionStatus.PARSED
                     && document.extractedText() != null && !document.extractedText().isBlank()) {
                 parsedRoles.add(document.role());
@@ -144,7 +140,7 @@ public class SubmissionPersistenceService {
         }
         SubmissionStatus status = failed ? SubmissionStatus.FAILED
                 : parsedRoles.containsAll(REQUIRED_ROLES) ? SubmissionStatus.PARSED : SubmissionStatus.UPLOADED;
-        return submissionRepository.save(submission.withProcessingStatus(status, failureReason));
+        return submissionRepository.save(submission.withProcessingStatus(status));
     }
 
     private boolean hasAllReadyDocuments(List<SubmittedDocument> documents) {

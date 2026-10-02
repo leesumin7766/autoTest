@@ -13,6 +13,8 @@ import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
@@ -32,10 +34,8 @@ public class SubmissionEntity {
     private ProductId productId;
 
     @Column(nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
     private SubmissionStatus status;
-
-    @Column(name = "failure_reason", columnDefinition = "text")
-    private String failureReason;
 
     @Column(name = "uploaded_at", nullable = false)
     private Instant uploadedAt;
@@ -48,7 +48,6 @@ public class SubmissionEntity {
         this.memberId = submission.memberId();
         this.productId = submission.productId();
         this.status = submission.status();
-        this.failureReason = submission.failureReason();
         this.uploadedAt = submission.uploadedAt().orElseGet(Instant::now);
     }
 
@@ -58,6 +57,6 @@ public class SubmissionEntity {
 
     Submission toDomain() {
         return Submission.reconstitute(new SubmissionId(id), memberId, productId,
-                status, failureReason, uploadedAt);
+            status, uploadedAt);
     }
 }
