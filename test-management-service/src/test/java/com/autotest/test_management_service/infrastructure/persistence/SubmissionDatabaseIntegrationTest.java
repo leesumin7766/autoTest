@@ -1,48 +1,59 @@
 package com.autotest.test_management_service.infrastructure.persistence;
 
-import com.autotest.test_management_service.Application;
-import com.autotest.test_management_service.application.storage.FileStoragePort;
-import com.autotest.test_management_service.domain.submission.StoredPath;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.net.URI;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import com.autotest.test_management_service.Application;
+import com.autotest.test_management_service.application.service.AiDocumentDeliveryService;
+import com.autotest.test_management_service.application.service.S3CleanupOutboxWorker;
+import com.autotest.test_management_service.application.service.SubmissionPersistenceService;
+import com.autotest.test_management_service.application.storage.FileStoragePort;
+import com.autotest.test_management_service.domain.submission.StoredPath;
+import com.autotest.test_management_service.domain.submission.SubmissionId;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
         classes = Application.class,
         properties = {
-                "spring.datasource.url=jdbc:postgresql://localhost:5432/autotest",
                 "spring.datasource.username=test",
                 "spring.datasource.password=test",
                 "spring.jpa.hibernate.ddl-auto=validate",
@@ -56,6 +67,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SubmissionDatabaseIntegrationTest {
     private static final String XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
+    @DynamicPropertySource
+    static void datasourceProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", SubmissionDatabaseIntegrationTest::isolatedDatabaseUrl);
+    }
+
+    private static String isolatedDatabaseUrl() {
+        String databaseUrl = System.getenv().getOrDefault(
+                "AUTOTEST_TEST_DATABASE_URL", "jdbc:postgresql://localhost:5432/autotest_test");
+        URI databaseUri = URI.create(databaseUrl.substring("jdbc:".length()));
+        if ("/autotest".equalsIgnoreCase(databaseUri.getPath())) {
+            throw new IllegalStateException("Integration tests must not use the autotest database");
+        }
+        return databaseUrl;
+    }
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -65,17 +91,31 @@ class SubmissionDatabaseIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @Autowired
+    private S3CleanupOutboxRepository cleanupOutboxRepository;
+
+    @Autowired
+    private SubmissionPersistenceService submissionPersistenceService;
+
+    @MockitoBean
     private FileStoragePort fileStoragePort;
 
-    private final Map<String, byte[]> storedFiles = new HashMap<>();
+    @MockitoBean
+    private AiDocumentDeliveryService aiDocumentDeliveryService;
+
+    private final Map<String, byte[]> storedFiles = new ConcurrentHashMap<>();
     private final List<UUID> submissionIds = new ArrayList<>();
+    private volatile CountDownLatch loadArrivals;
+    private volatile CountDownLatch releaseLoads;
 
     @AfterEach
     void removeTestSubmissions() {
         submissionIds.forEach(id -> jdbcTemplate.update("DELETE FROM submissions WHERE submission_id = ?", id));
+        jdbcTemplate.update("DELETE FROM s3_cleanup_outbox WHERE stored_path LIKE 'integration:%'");
         submissionIds.clear();
         storedFiles.clear();
+        loadArrivals = null;
+        releaseLoads = null;
     }
 
     @Test
@@ -87,11 +127,15 @@ class SubmissionDatabaseIntegrationTest {
         UUID id = UUID.fromString(postBody.get("submissionId").asText());
         submissionIds.add(id);
 
-        assertEquals("PARSED", postBody.get("status").asText());
-        assertEquals("PARSED", jdbcTemplate.queryForObject(
+        assertEquals("UPLOADED", postBody.get("status").asText());
+        assertEquals("UPLOADED", jdbcTemplate.queryForObject(
                 "SELECT status FROM submissions WHERE submission_id = ?", String.class, id));
+        assertEquals(0, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM submission_ai_deliveries WHERE submission_id = ?", Integer.class, id));
+        assertEquals("PARSED", jdbcTemplate.queryForObject(
+            "SELECT status FROM submission_files WHERE submission_id = ?", String.class, id));
         String extractedText = jdbcTemplate.queryForObject(
-                "SELECT extracted_text FROM submissions WHERE submission_id = ?", String.class, id);
+            "SELECT extracted_text FROM submission_files WHERE submission_id = ?", String.class, id);
         assertNotNull(extractedText);
         assertEquals(true, extractedText.contains("Known spreadsheet body"));
 
@@ -99,7 +143,7 @@ class SubmissionDatabaseIntegrationTest {
                         .andExpect(status().isOk())
                         .andReturn().getResponse().getContentAsString());
         assertEquals(id.toString(), getBody.get("submissionId").asText());
-        assertEquals("PARSED", getBody.get("status").asText());
+        assertEquals("UPLOADED", getBody.get("status").asText());
         assertFalse(getBody.hasNonNull("failureReason"));
     }
 
@@ -116,9 +160,9 @@ class SubmissionDatabaseIntegrationTest {
         assertEquals("FAILED", jdbcTemplate.queryForObject(
                 "SELECT status FROM submissions WHERE submission_id = ?", String.class, id));
         assertEquals("추출할 셀 내용이 없습니다", jdbcTemplate.queryForObject(
-                "SELECT failure_reason FROM submissions WHERE submission_id = ?", String.class, id));
+            "SELECT failure_reason FROM submission_files WHERE submission_id = ?", String.class, id));
         assertEquals("", jdbcTemplate.queryForObject(
-                "SELECT extracted_text FROM submissions WHERE submission_id = ?", String.class, id));
+            "SELECT extracted_text FROM submission_files WHERE submission_id = ?", String.class, id));
 
         JsonNode getBody = objectMapper.readTree(mockMvc.perform(get("/api/submissions/{id}", id))
                         .andExpect(status().isOk())
@@ -146,6 +190,8 @@ class SubmissionDatabaseIntegrationTest {
         assertEquals(3, jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM submission_files WHERE submission_id = ? AND file_format = 'XLSX' AND extracted_text LIKE '%Known spreadsheet body%'",
             Integer.class, id));
+        assertEquals("PARSED", jdbcTemplate.queryForObject(
+            "SELECT status FROM submissions WHERE submission_id = ?", String.class, id));
 
         JsonNode getBody = objectMapper.readTree(mockMvc.perform(get("/api/submissions/{id}", id))
             .andExpect(status().isOk())
@@ -157,6 +203,109 @@ class SubmissionDatabaseIntegrationTest {
         assertEquals("EXCEL", getBody.get("documents").get(2).get("fileType").asText());
         assertTrue(getBody.get("documents").get(2).get("storedPath").asText().startsWith("integration:"));
         assertTrue(getBody.get("documents").get(2).get("extractedText").asText().contains("Known spreadsheet body"));
+        }
+
+        @Test
+        void replacesFailedXlsxWithPdfAndRetriesDurableCleanupWithoutDeletingCurrentPath() throws Exception {
+        stubStorage();
+        JsonNode failed = upload("empty.xlsx", createWorkbook(false));
+        UUID id = UUID.fromString(failed.get("submissionId").asText());
+        submissionIds.add(id);
+        StoredPath oldPath = new StoredPath(jdbcTemplate.queryForObject(
+            "SELECT stored_path FROM submission_files WHERE submission_id = ?", String.class, id));
+        when(aiDocumentDeliveryService.getStatus(id)).thenReturn(
+            new AiDocumentDeliveryService.DeliveryResult("NOT_READY", 0, null, null));
+        when(aiDocumentDeliveryService.deliverIfReady(SubmissionId.of(id))).thenReturn(
+            new AiDocumentDeliveryService.DeliveryResult("NOT_READY", 0, null, null));
+
+        byte[] pdf = createPdf("Recovered contract scope");
+        int responseStatus = replace(id, "replacement.pdf", "application/pdf", pdf);
+        assertEquals(200, responseStatus);
+
+        Map<String, Object> document = jdbcTemplate.queryForMap(
+            "SELECT file_type, file_format, original_filename, stored_path, extracted_text, status "
+                + "FROM submission_files WHERE submission_id = ?", id);
+        assertEquals("PDF", document.get("file_type"));
+        assertEquals("PDF", document.get("file_format"));
+        assertEquals("replacement.pdf", document.get("original_filename"));
+        assertEquals("PARSED", document.get("status"));
+        assertTrue(((String) document.get("extracted_text")).contains("Recovered contract scope"));
+        assertEquals("UPLOADED", jdbcTemplate.queryForObject(
+            "SELECT status FROM submissions WHERE submission_id = ?", String.class, id));
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM s3_cleanup_outbox WHERE stored_path = ? AND completed_at IS NULL",
+            Integer.class, oldPath.value()));
+        StoredPath currentPath = new StoredPath((String) document.get("stored_path"));
+
+        doThrow(new IllegalStateException("simulated object-store outage"))
+            .doNothing().when(fileStoragePort).delete(oldPath);
+        S3CleanupOutboxWorker firstWorker = new S3CleanupOutboxWorker(cleanupOutboxRepository, fileStoragePort);
+        firstWorker.processPending();
+        assertEquals(1, jdbcTemplate.queryForObject(
+            "SELECT attempts FROM s3_cleanup_outbox WHERE stored_path = ?", Integer.class, oldPath.value()));
+        assertEquals(0, jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM s3_cleanup_outbox WHERE stored_path = ? AND completed_at IS NOT NULL",
+            Integer.class, oldPath.value()));
+
+        jdbcTemplate.update("UPDATE s3_cleanup_outbox SET next_attempt_at = now() WHERE stored_path = ?", oldPath.value());
+        new S3CleanupOutboxWorker(cleanupOutboxRepository, fileStoragePort).processPending();
+        assertEquals("DELETED", jdbcTemplate.queryForObject(
+            "SELECT completion_reason FROM s3_cleanup_outbox WHERE stored_path = ?", String.class, oldPath.value()));
+
+        cleanupOutboxRepository.schedule(currentPath);
+        new S3CleanupOutboxWorker(cleanupOutboxRepository, fileStoragePort).processPending();
+        assertEquals("SKIPPED_STILL_REFERENCED", jdbcTemplate.queryForObject(
+            "SELECT completion_reason FROM s3_cleanup_outbox WHERE stored_path = ?", String.class, currentPath.value()));
+        org.mockito.Mockito.verify(fileStoragePort, org.mockito.Mockito.never()).delete(currentPath);
+        org.mockito.Mockito.verify(fileStoragePort, org.mockito.Mockito.times(2)).delete(oldPath);
+        }
+
+        @Test
+        void concurrentReplacementOfSameFailedFileCommitsExactlyOneNewDocument() throws Exception {
+        stubStorage();
+        JsonNode failed = upload("empty.xlsx", createWorkbook(false));
+        UUID id = UUID.fromString(failed.get("submissionId").asText());
+        submissionIds.add(id);
+        byte[] workbook = createWorkbook(true);
+        uploadAdditional(id, "FUNCTION_LIST", "functions.xlsx", workbook);
+        uploadAdditional(id, "MANUAL", "manual.xlsx", workbook);
+        when(aiDocumentDeliveryService.getStatus(id)).thenReturn(
+            new AiDocumentDeliveryService.DeliveryResult("NOT_READY", 0, null, null));
+        when(aiDocumentDeliveryService.deliverIfReady(SubmissionId.of(id))).thenAnswer(invocation -> {
+            java.util.Optional<SubmissionPersistenceService.DeliveryClaim> claim =
+                submissionPersistenceService.claimAiDelivery(SubmissionId.of(id));
+            return claim.map(deliveryClaim -> new AiDocumentDeliveryService.DeliveryResult(
+                "PENDING", deliveryClaim.attempt(), null, null))
+                .orElseGet(() -> new AiDocumentDeliveryService.DeliveryResult("NOT_READY", 0, null, null));
+        });
+
+        loadArrivals = new CountDownLatch(2);
+        releaseLoads = new CountDownLatch(1);
+        byte[] pdf = createPdf("Concurrent replacement");
+        ExecutorService callers = Executors.newFixedThreadPool(2);
+        try {
+            Future<Integer> first = callers.submit(() -> replaceSafely(id, "first.pdf", pdf));
+            Future<Integer> second = callers.submit(() -> replaceSafely(id, "second.pdf", pdf));
+            assertTrue(loadArrivals.await(5, TimeUnit.SECONDS));
+            releaseLoads.countDown();
+            int firstStatus = first.get(10, TimeUnit.SECONDS);
+            int secondStatus = second.get(10, TimeUnit.SECONDS);
+
+            assertEquals(1, List.of(firstStatus, secondStatus).stream().filter(status -> status == 200).count());
+                assertEquals(3, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM submission_files WHERE submission_id = ? AND status = 'PARSED'",
+                Integer.class, id));
+                assertEquals("PENDING", jdbcTemplate.queryForObject(
+                    "SELECT status FROM submission_ai_deliveries WHERE submission_id = ?", String.class, id));
+                assertEquals(1, jdbcTemplate.queryForObject(
+                    "SELECT attempt_count FROM submission_ai_deliveries WHERE submission_id = ?", Integer.class, id));
+            assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM s3_cleanup_outbox WHERE stored_path LIKE 'integration:%'",
+                Integer.class));
+        } finally {
+            releaseLoads.countDown();
+            callers.shutdownNow();
+        }
         }
 
     private JsonNode upload(String filename, byte[] content) throws Exception {
@@ -189,17 +338,51 @@ class SubmissionDatabaseIntegrationTest {
         when(fileStoragePort.load(any(StoredPath.class))).thenAnswer(invocation -> {
             assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
             String key = invocation.getArgument(0, StoredPath.class).value();
-                List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                    "SELECT submission_id, status, extracted_text FROM submissions WHERE stored_path = ?", key);
-                if (!rows.isEmpty()) {
-                Map<String, Object> row = rows.get(0);
-                UUID id = (UUID) row.get("submission_id");
-                submissionIds.add(id);
-                assertEquals("UPLOADED", row.get("status"));
-                assertEquals("", row.get("extracted_text"));
+            CountDownLatch arrivals = loadArrivals;
+            CountDownLatch release = releaseLoads;
+            if (arrivals != null && release != null) {
+                arrivals.countDown();
+                if (!release.await(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Timed out waiting for concurrent parser loads");
                 }
+            }
             return new ByteArrayInputStream(storedFiles.get(key));
         });
+    }
+
+    private int replace(UUID id, String filename, String contentType, byte[] content) throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", filename, contentType, content);
+        return mockMvc.perform(multipart("/api/submissions/{id}/files/{role}/replace", id, "AGREEMENT")
+                        .file(file)
+                        .header("X-Member-Id", "1"))
+                .andReturn().getResponse().getStatus();
+    }
+
+    private int replaceSafely(UUID id, String filename, byte[] content) {
+        try {
+            return replace(id, filename, "application/pdf", content);
+        } catch (Exception exception) {
+            return 500;
+        }
+    }
+
+    private byte[] createPdf(String text) throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        try (org.apache.pdfbox.pdmodel.PDDocument document = new org.apache.pdfbox.pdmodel.PDDocument()) {
+            org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage();
+            document.addPage(page);
+            try (org.apache.pdfbox.pdmodel.PDPageContentStream stream =
+                         new org.apache.pdfbox.pdmodel.PDPageContentStream(document, page)) {
+                stream.setFont(new org.apache.pdfbox.pdmodel.font.PDType1Font(
+                        org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA), 12);
+                stream.beginText();
+                stream.newLineAtOffset(70, 700);
+                stream.showText(text);
+                stream.endText();
+            }
+            document.save(output);
+        }
+        return output.toByteArray();
     }
 
     private byte[] createWorkbook(boolean withContent) throws Exception {

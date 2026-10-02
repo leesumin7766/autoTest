@@ -3,6 +3,7 @@ import './App.css'
 
 type Role = 'AGREEMENT' | 'FUNCTION_LIST' | 'MANUAL'
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
+type SubmissionStatus = 'UPLOADED' | 'PARSED' | 'FAILED'
 
 type DocumentResult = {
   fileId: string
@@ -12,7 +13,7 @@ type DocumentResult = {
   originalFilename: string
   storedPath: string
   extractedText: string
-  status: 'UPLOADED' | 'PARSED' | 'FAILED'
+  status: SubmissionStatus
   failureReason: string | null
   aiDelivery?: AiDeliveryResult
 }
@@ -28,7 +29,7 @@ type AiDeliveryResult = {
 
 type SubmissionResponse = {
   submissionId: string
-  status: string
+  status: SubmissionStatus
   failureReason: string | null
   documents: DocumentResult[]
   aiDelivery: AiDeliveryResult

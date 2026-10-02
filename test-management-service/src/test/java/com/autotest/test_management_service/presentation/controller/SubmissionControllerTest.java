@@ -1,38 +1,39 @@
 package com.autotest.test_management_service.presentation.controller;
 
-import com.autotest.test_management_service.application.service.SubmissionService;
-import com.autotest.test_management_service.application.service.AiDocumentDeliveryService;
-import com.autotest.test_management_service.domain.submission.ProductId;
-import com.autotest.test_management_service.domain.submission.StoredPath;
-import com.autotest.test_management_service.domain.submission.Submission;
-import com.autotest.test_management_service.domain.submission.SubmissionId;
-import com.autotest.test_management_service.domain.submission.SubmissionStatus;
-import com.autotest.test_management_service.domain.vo.MemberId;
-import com.autotest.test_management_service.domain.vo.SubmissionType;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.web.servlet.MockMvc;
-
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.autotest.test_management_service.application.service.AiDocumentDeliveryService;
+import com.autotest.test_management_service.application.service.SubmissionService;
+import com.autotest.test_management_service.domain.submission.FileFormat;
+import com.autotest.test_management_service.domain.submission.ProductId;
+import com.autotest.test_management_service.domain.submission.StoredPath;
+import com.autotest.test_management_service.domain.submission.Submission;
+import com.autotest.test_management_service.domain.submission.SubmissionId;
+import com.autotest.test_management_service.domain.submission.SubmissionStatus;
+import com.autotest.test_management_service.domain.submission.SubmittedDocument;
+import com.autotest.test_management_service.domain.vo.MemberId;
+import com.autotest.test_management_service.domain.vo.SubmissionType;
 
 @WebMvcTest(SubmissionController.class)
 class SubmissionControllerTest {
@@ -40,18 +41,20 @@ class SubmissionControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+        @MockitoBean
     private SubmissionService submissionService;
 
-        @MockBean
+                @MockitoBean
         private AiDocumentDeliveryService aiDocumentDeliveryService;
 
     @Test
     void submitReturns200AndSubmissionId() throws Exception {
         SubmissionId mockSubmissionId = SubmissionId.generate();
-        Submission parsedSubmission = submission(mockSubmissionId, SubmissionStatus.PARSED, null, "extracted text");
+        Submission parsedSubmission = submission(mockSubmissionId, SubmissionStatus.PARSED);
         when(submissionService.submit(any(), any(com.autotest.test_management_service.domain.submission.SubmissionType.class), eq(new MemberId(1L)), eq(new ProductId(100L))))
                 .thenReturn(parsedSubmission);
+        when(submissionService.findDocumentsBySubmissionId(mockSubmissionId)).thenReturn(List.of(
+                document(mockSubmissionId, SubmissionStatus.PARSED, null)));
 
         MockMultipartFile file = new MockMultipartFile(
                 "file",
@@ -77,7 +80,9 @@ class SubmissionControllerTest {
     void submitReturnsFailedStatusAndReasonWhenExtractionFails() throws Exception {
         SubmissionId id = SubmissionId.generate();
         when(submissionService.submit(any(), any(com.autotest.test_management_service.domain.submission.SubmissionType.class), eq(new MemberId(1L)), eq(new ProductId(100L))))
-                .thenReturn(submission(id, SubmissionStatus.FAILED, "추출할 셀 내용이 없습니다", ""));
+                .thenReturn(submission(id, SubmissionStatus.FAILED));
+        when(submissionService.findDocumentsBySubmissionId(id)).thenReturn(List.of(
+                document(id, SubmissionStatus.FAILED, "추출할 셀 내용이 없습니다")));
         MockMultipartFile file = new MockMultipartFile("file", "empty.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[] {1});
 
         mockMvc.perform(multipart("/api/submissions")
@@ -95,8 +100,10 @@ class SubmissionControllerTest {
     void getReturnsSubmissionStatusAndFailureReason() throws Exception {
         SubmissionId id = SubmissionId.generate();
         when(submissionService.findById(id)).thenReturn(Optional.of(
-                submission(id, SubmissionStatus.FAILED, "문서에서 텍스트를 추출할 수 없습니다", "")
+                submission(id, SubmissionStatus.FAILED)
         ));
+        when(submissionService.findDocumentsBySubmissionId(id)).thenReturn(List.of(
+                document(id, SubmissionStatus.FAILED, "문서에서 텍스트를 추출할 수 없습니다")));
 
         mockMvc.perform(get("/api/submissions/{id}", id.value()))
                 .andExpect(status().isOk())
@@ -118,7 +125,7 @@ class SubmissionControllerTest {
     void retryAiDeliveryRequiresSubmissionOwner() throws Exception {
         SubmissionId id = SubmissionId.generate();
         when(submissionService.findById(id)).thenReturn(Optional.of(
-                submission(id, SubmissionStatus.PARSED, null, "extracted text")));
+                submission(id, SubmissionStatus.PARSED)));
         when(aiDocumentDeliveryService.deliverIfReady(id)).thenReturn(
                 new AiDocumentDeliveryService.DeliveryResult("FAILED", 1, "AI service delivery failed", null));
 
@@ -136,7 +143,7 @@ class SubmissionControllerTest {
     void failedDocumentReplacementIsRejectedAfterAiDeliveryWasAttempted() throws Exception {
         SubmissionId id = SubmissionId.generate();
         when(submissionService.findById(id)).thenReturn(Optional.of(
-                submission(id, SubmissionStatus.PARSED, null, "extracted text")));
+                submission(id, SubmissionStatus.PARSED)));
         when(aiDocumentDeliveryService.getStatus(id.value())).thenReturn(
                 new AiDocumentDeliveryService.DeliveryResult("FAILED", 1, "AI service delivery failed", null));
         MockMultipartFile file = new MockMultipartFile(
@@ -167,17 +174,21 @@ class SubmissionControllerTest {
                         .string("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다."));
     }
 
-    private Submission submission(SubmissionId id, SubmissionStatus status, String failureReason, String extractedText) {
+        private Submission submission(SubmissionId id, SubmissionStatus status) {
         return Submission.reconstitute(
                 id,
                 new MemberId(1L),
                 new ProductId(100L),
-                SubmissionType.PDF,
-                new StoredPath("s3://autotest-docs/document.pdf"),
-                extractedText,
                 status,
-                failureReason,
                 Instant.parse("2026-10-01T00:00:00Z")
         );
     }
+
+        private SubmittedDocument document(SubmissionId id, SubmissionStatus status, String failureReason) {
+                return new SubmittedDocument(UUID.randomUUID(), id,
+                                com.autotest.test_management_service.domain.submission.SubmissionType.AGREEMENT,
+                                SubmissionType.PDF, FileFormat.PDF, "document.pdf", "application/pdf",
+                                new StoredPath("s3://autotest-docs/document.pdf"),
+                                status == SubmissionStatus.PARSED ? "extracted text" : "", status, failureReason, Instant.now());
+        }
 }

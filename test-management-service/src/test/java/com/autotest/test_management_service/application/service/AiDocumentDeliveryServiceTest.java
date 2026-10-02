@@ -43,8 +43,10 @@ import com.sun.net.httpserver.HttpServer;
 class AiDocumentDeliveryServiceTest {
     private final SubmissionId submissionId = SubmissionId.generate();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final SubmissionService submissionService = mock(SubmissionService.class);
+        private final SubmissionPersistenceService submissionPersistenceService = mock(SubmissionPersistenceService.class);
     private final DeliveryJdbcTemplate jdbcTemplate = new DeliveryJdbcTemplate(submissionId.value());
+        private final Submission submission = Submission.reconstitute(submissionId, new MemberId(1L), new ProductId(8L),
+            SubmissionStatus.UPLOADED, Instant.now());
     private HttpServer httpServer;
     private ExecutorService httpExecutor;
     private final AtomicInteger requests = new AtomicInteger();
@@ -57,12 +59,8 @@ class AiDocumentDeliveryServiceTest {
     @BeforeEach
     void setUp() throws IOException {
         documents = documents(true);
-        when(submissionService.findById(submissionId)).thenReturn(java.util.Optional.of(
-                Submission.reconstitute(submissionId, new MemberId(1L), new ProductId(8L),
-                        com.autotest.test_management_service.domain.vo.SubmissionType.WORD,
-                        new StoredPath("s3://autotest-docs/agreement.docx"), "", SubmissionStatus.PARSED,
-                        null, Instant.now())));
-        when(submissionService.findDocumentsBySubmissionId(submissionId)).thenAnswer(invocation -> documents);
+        when(submissionPersistenceService.claimAiDelivery(submissionId))
+            .thenAnswer(invocation -> jdbcTemplate.claim(submission, documents));
         responseBody = receipt(false, submissionId.value(), 3);
         responseStatus = 200;
         httpExecutor = Executors.newCachedThreadPool();
@@ -91,7 +89,7 @@ class AiDocumentDeliveryServiceTest {
         assertEquals("NOT_READY", result.status());
         assertEquals(0, result.attempts());
         assertEquals(0, requests.get());
-        assertEquals(0, jdbcTemplate.claims());
+        assertEquals(1, jdbcTemplate.claims());
     }
 
     @Test
@@ -200,7 +198,7 @@ class AiDocumentDeliveryServiceTest {
     }
 
     private AiDocumentDeliveryService service() {
-        return new AiDocumentDeliveryService(submissionService, jdbcTemplate, RestClient.builder(), objectMapper,
+        return new AiDocumentDeliveryService(submissionPersistenceService, jdbcTemplate, RestClient.builder(), objectMapper,
                 "http://127.0.0.1:" + httpServer.getAddress().getPort());
     }
 
@@ -289,21 +287,30 @@ class AiDocumentDeliveryServiceTest {
         @Override
         @SuppressWarnings("unchecked")
         public <T> List<T> query(String sql, RowMapper<T> rowMapper, Object... arguments) {
-            if (sql.contains("UPDATE submission_ai_deliveries")) {
-                claims++;
-                boolean freshPending = "PENDING".equals(status)
-                        && updatedAt.isAfter(Instant.now().minusSeconds(30));
-                if ("DELIVERED".equals(status) || freshPending) {
-                    return List.of();
-                }
-                status = "PENDING";
-                attempts++;
-                updatedAt = Instant.now();
-                lastError = null;
-                return (List<T>) List.of(attempts);
-            }
             return (List<T>) List.of(new AiDocumentDeliveryService.DeliveryResult(
                     status, attempts, lastError, deliveredAt, updatedAt, false));
+        }
+
+        private java.util.Optional<SubmissionPersistenceService.DeliveryClaim> claim(
+                Submission submission,
+                List<SubmittedDocument> documents
+        ) {
+            claims++;
+            if (documents.size() != 3 || documents.stream().anyMatch(document ->
+                    document.status() != SubmissionStatus.PARSED || document.extractedText().isBlank())) {
+                return java.util.Optional.empty();
+            }
+            boolean freshPending = "PENDING".equals(status)
+                    && updatedAt.isAfter(Instant.now().minusSeconds(30));
+            if ("DELIVERED".equals(status) || freshPending) {
+                return java.util.Optional.empty();
+            }
+            status = "PENDING";
+            attempts++;
+            updatedAt = Instant.now();
+            lastError = null;
+            return java.util.Optional.of(new SubmissionPersistenceService.DeliveryClaim(
+                    submission, documents, attempts));
         }
 
         private int claims() {

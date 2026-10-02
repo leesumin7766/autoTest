@@ -62,7 +62,9 @@ docker-compose.yml이 서비스 구성의 기준이다. 사용자 제공 Docker 
 → 수신 확인 → 프런트엔드에 전달 상태 표시.
 
 - 제출 세트는 submissions, 개별 문서는 submission_files에 저장한다.
+- submissions는 제출 ID, 회원·제품 ID, 세트 상태, 업로드 시각만 관리한다. 역할·파일명·형식·MIME·원본 경로·추출 텍스트·문서 상태·실패 이유는 submission_files만 기준으로 삼는다.
 - 개별 문서에는 역할·형식·원본 경로·추출 텍스트·처리 상태·실패 원인이 있다.
+- 세트 상태 규칙: 필수 문서가 일부 누락되고 실패가 없으면 UPLOADED, 하나라도 FAILED이면 FAILED, AGREEMENT/FUNCTION_LIST/MANUAL 세 행이 모두 PARSED이며 추출 텍스트가 비어 있지 않을 때만 PARSED.
 - DocumentParser는 텍스트 추출만 담당한다. 향후 산출물 생성은 ai-service에 위임한다.
 - ai-service에 문서 수신 전용 API를 구현하고 경로·요청·응답 계약을 문서화한다. 아직 없는 /generate를 구현된 API로 취급하지 않는다.
 - 전달 데이터: submissionId, productId, 문서별 fileId, role, originalFilename, format, storedPath, extractedText.
@@ -72,7 +74,10 @@ docker-compose.yml이 서비스 구성의 기준이다. 사용자 제공 Docker 
 - 전달 실패 시 원본·추출 결과를 보존하고 재업로드 없이 전달을 재시도할 수 있게 한다.
 - FAILED 또는 30초 이상 갱신되지 않은 PENDING은 조회 응답의 `aiDelivery.retryable=true`로 나타내고 프런트에서 재시도할 수 있다. 새로고침 후에도 조회로 복구한다.
 - PENDING 시도는 attempt_count로 fence한다. 이전 요청이 늦게 끝나도 최신 시도의 상태를 덮어쓰지 않는다.
-- 실패 문서 교체는 AI 전달 시도 전인 경우만 허용한다. 새 파싱이 실패하면 기존 DB 문서와 S3 원본을 보존한다. 교체 DB 반영 후에만 기존 S3 원본을 삭제한다.
+- 교체와 AI 전달 시작은 같은 제출 행 비관적 잠금을 사용한다. AI 전달 claim은 문서 준비 여부와 attempt를 확정한 뒤 트랜잭션을 끝내며 잠금 해제 후 HTTP를 호출한다.
+- 실패 문서 교체는 AI 전달 시도 전인 경우만 허용한다. 새 파싱 실패 또는 동시 교체 패배 시 기존 DB 문서와 원본을 보존한다.
+- 교체 전 원본 및 DB 반영 실패로 남은 새 원본은 트랜잭션 안에서 s3_cleanup_outbox에 예약한다. 커밋 후 worker가 삭제하며 실패는 재시도한다. 현재 submission_files가 참조하는 원본은 삭제하지 않는다.
+- 기존 Flyway 파일을 수정하지 않는다. V5는 legacy 파일 정보를 archive에 보존하고 중복 컬럼을 제거한다. V6는 legacy 실패 이유를 보존하고 문서 행으로 세트 상태를 재계산한 뒤 submissions의 중복 failure_reason을 제거한다. Hibernate는 ddl-auto=validate만 사용한다.
 - AI 접수 응답의 `accepted=true`, 제출 ID 일치, 문서 수 3을 확인한 경우에만 DELIVERED로 기록한다.
 - 재전송의 중복 접수를 방지하고 HTTP 타임아웃·오류 처리를 구현한다.
 - 서비스 간 주소는 환경변수로 설정한다.
@@ -125,6 +130,7 @@ Gateway 비교 요청은 주소를 http://localhost:8080/api/submissions로 변�
 각 POST는 새 제출을 만들 수 있으므로 진단용 문서를 사용한다.
 첫 업로드 응답에는 submissionId와 documents 등이 포함된다.
 
-운영 DB를 자동 테스트에서 truncate/reset하지 않는다. 운영 DB를 사용하는 integration test가 테스트 데이터를 직접 삭제하므로 무심코 전체 테스트 실행하지 말고, 비파괴 단위 테스트 또는 명시적으로 격리된 테스트 DB를 사용한다.
+운영 DB를 자동 테스트에서 truncate/reset하지 않는다. SubmissionDatabaseIntegrationTest는 autotest_test 또는 AUTOTEST_TEST_DATABASE_URL로 지정한 격리 DB만 사용한다. 운영 DB URL을 지정하지 않는다.
+운영 스키마 변경 전에 custom-format pg_dump 백업을 확보한다. 복구가 필요하면 운영 DB를 바로 덮어쓰지 말고 별도 DB에 백업을 복원해 확인한다.
 
 최종 보고에는 Gateway 404 원인, `sample/` 실제 파일 역할별 업로드 결과, 검증 제출 ID, 실패·PENDING 복구 결과, 다음 LLM 작업이 사용할 수신 API 계약을 정리한다.

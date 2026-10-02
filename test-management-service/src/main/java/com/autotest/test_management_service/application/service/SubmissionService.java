@@ -170,11 +170,6 @@ public class SubmissionService {
             throw persistenceFailure;
         }
 
-        try {
-            fileStoragePort.delete(failedDocument.storedPath());
-        } catch (RuntimeException cleanupFailure) {
-            logger.warn("Replaced document cleanup failed ({})", cleanupFailure.getClass().getSimpleName());
-        }
         return replacement;
     }
 
@@ -233,9 +228,16 @@ public class SubmissionService {
 
     private void cleanupStoredFile(StoredPath storedPath, RuntimeException persistenceFailure) {
         try {
-            fileStoragePort.delete(storedPath);
-        } catch (RuntimeException cleanupFailure) {
-            persistenceFailure.addSuppressed(cleanupFailure);
+            submissionPersistenceService.scheduleCleanup(storedPath);
+        } catch (RuntimeException schedulingFailure) {
+            persistenceFailure.addSuppressed(schedulingFailure);
+            try {
+                fileStoragePort.delete(storedPath);
+            } catch (RuntimeException cleanupFailure) {
+                persistenceFailure.addSuppressed(cleanupFailure);
+                logger.warn("Unreferenced document cleanup could not be scheduled or completed ({})",
+                        cleanupFailure.getClass().getSimpleName());
+            }
         }
     }
 

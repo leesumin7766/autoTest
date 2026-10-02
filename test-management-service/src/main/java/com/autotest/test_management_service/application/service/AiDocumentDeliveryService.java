@@ -2,7 +2,6 @@ package com.autotest.test_management_service.application.service;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -19,7 +18,6 @@ import org.springframework.web.client.RestClientException;
 
 import com.autotest.test_management_service.domain.submission.Submission;
 import com.autotest.test_management_service.domain.submission.SubmissionId;
-import com.autotest.test_management_service.domain.submission.SubmissionStatus;
 import com.autotest.test_management_service.domain.submission.SubmittedDocument;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,24 +26,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class AiDocumentDeliveryService {
     private static final Logger logger = LoggerFactory.getLogger(AiDocumentDeliveryService.class);
     private static final Duration PENDING_TIMEOUT = Duration.ofSeconds(30);
-    private static final List<com.autotest.test_management_service.domain.submission.SubmissionType> REQUIRED_ROLES = List.of(
-            com.autotest.test_management_service.domain.submission.SubmissionType.AGREEMENT,
-            com.autotest.test_management_service.domain.submission.SubmissionType.FUNCTION_LIST,
-            com.autotest.test_management_service.domain.submission.SubmissionType.MANUAL);
+        private static final int REQUIRED_DOCUMENT_COUNT = 3;
 
-    private final SubmissionService submissionService;
+        private final SubmissionPersistenceService submissionPersistenceService;
     private final JdbcTemplate jdbcTemplate;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
     public AiDocumentDeliveryService(
-            SubmissionService submissionService,
+            SubmissionPersistenceService submissionPersistenceService,
             JdbcTemplate jdbcTemplate,
             RestClient.Builder restClientBuilder,
             ObjectMapper objectMapper,
             @Value("${ai-service.base-url:http://localhost:8005}") String aiServiceBaseUrl
     ) {
-        this.submissionService = submissionService;
+        this.submissionPersistenceService = submissionPersistenceService;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
@@ -55,32 +50,14 @@ public class AiDocumentDeliveryService {
     }
 
     public DeliveryResult deliverIfReady(SubmissionId submissionId) {
-        Submission submission = submissionService.findById(submissionId).orElse(null);
-        if (submission == null) {
-            throw new IllegalArgumentException("Submission not found");
-        }
-
-        List<SubmittedDocument> documents = submissionService.findDocumentsBySubmissionId(submissionId);
-        if (!hasAllReadyDocuments(documents)) {
+        SubmissionPersistenceService.DeliveryClaim claim = submissionPersistenceService
+                .claimAiDelivery(submissionId).orElse(null);
+        if (claim == null) {
             return getStatus(submissionId.value());
         }
-
-        jdbcTemplate.update("""
-                INSERT INTO submission_ai_deliveries (submission_id, status, attempt_count, updated_at)
-                VALUES (?, 'NOT_READY', 0, now())
-                ON CONFLICT (submission_id) DO NOTHING
-                """, submissionId.value());
-        List<Integer> claimedAttempts = jdbcTemplate.query("""
-                UPDATE submission_ai_deliveries
-                SET status = 'PENDING', attempt_count = attempt_count + 1, last_error = NULL, updated_at = now()
-                WHERE submission_id = ? AND status <> 'DELIVERED'
-                  AND (status <> 'PENDING' OR updated_at < now() - interval '30 seconds')
-                RETURNING attempt_count
-                """, (resultSet, rowNumber) -> resultSet.getInt(1), submissionId.value());
-        if (claimedAttempts.isEmpty()) {
-            return getStatus(submissionId.value());
-        }
-        int attempt = claimedAttempts.getFirst();
+        Submission submission = claim.submission();
+        List<SubmittedDocument> documents = claim.documents();
+        int attempt = claim.attempt();
 
         AiDocumentRequest request = new AiDocumentRequest(
                 submissionId.value(), submission.productId().value(),
@@ -95,7 +72,7 @@ public class AiDocumentDeliveryService {
                     .body(AiDocumentReceipt.class);
             if (receipt == null || !receipt.accepted()
                     || !Objects.equals(receipt.submissionId(), submissionId.value())
-                    || receipt.documentCount() != REQUIRED_ROLES.size()) {
+                    || receipt.documentCount() != REQUIRED_DOCUMENT_COUNT) {
                 throw new IllegalStateException("AI service did not confirm document intake");
             }
             jdbcTemplate.update("""
@@ -141,22 +118,6 @@ public class AiDocumentDeliveryService {
                 && result.updatedAt().isBefore(Instant.now().minus(PENDING_TIMEOUT)));
             return new DeliveryResult(result.status(), result.attempts(), result.lastError(), result.deliveredAt(),
                 result.updatedAt(), retryable);
-    }
-
-    private boolean hasAllReadyDocuments(List<SubmittedDocument> documents) {
-        if (documents.size() != REQUIRED_ROLES.size()) {
-            return false;
-        }
-        EnumSet<com.autotest.test_management_service.domain.submission.SubmissionType> roles = EnumSet.noneOf(
-                com.autotest.test_management_service.domain.submission.SubmissionType.class);
-        for (SubmittedDocument document : documents) {
-            if (!REQUIRED_ROLES.contains(document.role()) || !roles.add(document.role())
-                    || document.status() != SubmissionStatus.PARSED
-                    || document.extractedText() == null || document.extractedText().isBlank()) {
-                return false;
-            }
-        }
-        return roles.size() == REQUIRED_ROLES.size();
     }
 
     public record DeliveryResult(
