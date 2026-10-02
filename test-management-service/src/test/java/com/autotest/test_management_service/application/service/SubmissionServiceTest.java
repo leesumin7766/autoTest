@@ -1,32 +1,36 @@
 package com.autotest.test_management_service.application.service;
 
-import com.autotest.test_management_service.application.storage.FileStoragePort;
-import com.autotest.test_management_service.domain.service.SubmissionDomainService;
-import com.autotest.test_management_service.domain.submission.ProductId;
-import com.autotest.test_management_service.domain.submission.StoredPath;
-import com.autotest.test_management_service.domain.submission.Submission;
-import com.autotest.test_management_service.domain.submission.SubmissionId;
-import com.autotest.test_management_service.domain.vo.MemberId;
-import com.autotest.test_management_service.domain.vo.SubmissionType;
-import com.autotest.test_management_service.infrastructure.parser.DocumentFileParserFactory;
-import com.autotest.test_management_service.infrastructure.parser.PdfFileParser;
-import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockMultipartFile;
-
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import org.springframework.mock.web.MockMultipartFile;
+
+import com.autotest.test_management_service.application.storage.FileStoragePort;
+import com.autotest.test_management_service.domain.submission.ProductId;
+import com.autotest.test_management_service.domain.submission.StoredPath;
+import com.autotest.test_management_service.domain.submission.Submission;
+import com.autotest.test_management_service.domain.submission.SubmissionId;
+import com.autotest.test_management_service.domain.submission.SubmissionStatus;
+import com.autotest.test_management_service.domain.submission.SubmittedDocument;
+import com.autotest.test_management_service.domain.vo.MemberId;
+import com.autotest.test_management_service.domain.vo.SubmissionType;
+import com.autotest.test_management_service.infrastructure.parser.DocumentFileParserFactory;
+import com.autotest.test_management_service.infrastructure.parser.PdfFileParser;
 
 class SubmissionServiceTest {
     private static final MemberId MEMBER_ID = new MemberId(17L);
@@ -86,6 +90,103 @@ class SubmissionServiceTest {
         assertEquals("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다.", exception.getMessage());
         verifyNoInteractions(submissionPersistenceService, fileStoragePort);
         }
+
+            @Test
+            void replacesFailedDocumentAfterSuccessfulReparseAndDeletesOldObject() throws Exception {
+            SubmissionPersistenceService persistence = mock(SubmissionPersistenceService.class);
+            FileStoragePort storage = mock(FileStoragePort.class);
+            SubmissionId id = SubmissionId.generate();
+            StoredPath oldPath = new StoredPath("s3://autotest-docs/failed.pdf");
+            StoredPath newPath = new StoredPath("s3://autotest-docs/replacement.pdf");
+            UUID oldFileId = UUID.randomUUID();
+            Submission failedSubmission = Submission.reconstitute(id, MEMBER_ID, PRODUCT_ID,
+                com.autotest.test_management_service.domain.vo.SubmissionType.PDF,
+                oldPath, "", SubmissionStatus.FAILED, "parse failed", Instant.now());
+            SubmittedDocument failedDocument = submittedDocument(id, oldFileId, oldPath, SubmissionStatus.FAILED, "");
+            byte[] pdf = createPdfContent("Recovered contract scope");
+            when(persistence.findById(id)).thenReturn(java.util.Optional.of(failedSubmission));
+            when(persistence.findDocumentsBySubmissionId(id)).thenReturn(List.of(failedDocument));
+            when(storage.store(any(InputStream.class), eq("replacement.pdf"), eq("application/pdf"))).thenReturn(newPath);
+            when(storage.load(newPath)).thenReturn(new java.io.ByteArrayInputStream(pdf));
+            when(persistence.replaceFailedDocument(eq(oldFileId), eq(oldPath), any(SubmittedDocument.class)))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+            SubmissionService service = new SubmissionService(persistence, storage,
+                new DocumentFileParserFactory(List.of(new PdfFileParser())), new FileTypeResolver());
+
+            SubmittedDocument replacement = service.replaceFailedDocument(id,
+                new MockMultipartFile("file", "replacement.pdf", "application/pdf", pdf),
+                com.autotest.test_management_service.domain.submission.SubmissionType.AGREEMENT, MEMBER_ID);
+
+            assertEquals(SubmissionStatus.PARSED, replacement.status());
+            assertTrue(replacement.extractedText().contains("Recovered contract scope"));
+            verify(persistence).replaceFailedDocument(eq(oldFileId), eq(oldPath), eq(replacement));
+            verify(storage).delete(oldPath);
+            verify(storage, org.mockito.Mockito.never()).delete(newPath);
+            }
+
+            @Test
+            void failedReplacementParsingPreservesExistingDocumentAndDeletesNewObject() throws Exception {
+            SubmissionPersistenceService persistence = mock(SubmissionPersistenceService.class);
+            FileStoragePort storage = mock(FileStoragePort.class);
+            SubmissionId id = SubmissionId.generate();
+            StoredPath oldPath = new StoredPath("s3://autotest-docs/failed.pdf");
+            StoredPath newPath = new StoredPath("s3://autotest-docs/empty.pdf");
+            UUID oldFileId = UUID.randomUUID();
+            Submission failedSubmission = Submission.reconstitute(id, MEMBER_ID, PRODUCT_ID,
+                com.autotest.test_management_service.domain.vo.SubmissionType.PDF,
+                oldPath, "", SubmissionStatus.FAILED, "parse failed", Instant.now());
+            when(persistence.findById(id)).thenReturn(java.util.Optional.of(failedSubmission));
+            when(persistence.findDocumentsBySubmissionId(id)).thenReturn(List.of(
+                submittedDocument(id, oldFileId, oldPath, SubmissionStatus.FAILED, "")));
+            when(storage.store(any(InputStream.class), eq("empty.pdf"), eq("application/pdf"))).thenReturn(newPath);
+            when(storage.load(newPath)).thenReturn(new java.io.ByteArrayInputStream(createPdfContent("")));
+            SubmissionService service = new SubmissionService(persistence, storage,
+                new DocumentFileParserFactory(List.of(new PdfFileParser())), new FileTypeResolver());
+
+            assertThrows(IllegalArgumentException.class, () -> service.replaceFailedDocument(id,
+                new MockMultipartFile("file", "empty.pdf", "application/pdf", createPdfContent("")),
+                com.autotest.test_management_service.domain.submission.SubmissionType.AGREEMENT, MEMBER_ID));
+
+            verify(persistence, org.mockito.Mockito.never())
+                .replaceFailedDocument(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+            verify(storage).delete(newPath);
+            verify(storage, org.mockito.Mockito.never()).delete(oldPath);
+            }
+
+            private SubmittedDocument submittedDocument(
+                SubmissionId id,
+                UUID fileId,
+                StoredPath storedPath,
+                SubmissionStatus status,
+                String extractedText
+            ) {
+            return new SubmittedDocument(fileId, id,
+                com.autotest.test_management_service.domain.submission.SubmissionType.AGREEMENT,
+                SubmissionType.PDF, com.autotest.test_management_service.domain.submission.FileFormat.PDF,
+                "failed.pdf", "application/pdf", storedPath, extractedText, status,
+                status == SubmissionStatus.FAILED ? "parse failed" : null, Instant.now());
+            }
+
+            private byte[] createPdfContent(String text) throws Exception {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            try (org.apache.pdfbox.pdmodel.PDDocument document = new org.apache.pdfbox.pdmodel.PDDocument()) {
+                org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage();
+                document.addPage(page);
+                if (!text.isBlank()) {
+                try (org.apache.pdfbox.pdmodel.PDPageContentStream stream =
+                         new org.apache.pdfbox.pdmodel.PDPageContentStream(document, page)) {
+                    stream.setFont(new org.apache.pdfbox.pdmodel.font.PDType1Font(
+                        org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA), 12);
+                    stream.beginText();
+                    stream.newLineAtOffset(70, 700);
+                    stream.showText(text);
+                    stream.endText();
+                }
+                }
+                document.save(out);
+            }
+            return out.toByteArray();
+            }
 
     private SubmissionId submitWithStoredPath(StoredPath storedPath) throws Exception {
         SubmissionPersistenceService submissionPersistenceService = mock(SubmissionPersistenceService.class);

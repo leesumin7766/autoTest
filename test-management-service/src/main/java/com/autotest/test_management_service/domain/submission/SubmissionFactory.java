@@ -1,10 +1,8 @@
 package com.autotest.test_management_service.domain.submission;
 
 import java.util.Objects;
-import java.util.List;
 
 import com.autotest.test_management_service.domain.vo.MemberId;
-import com.autotest.test_management_service.domain.vo.SubmissionType;
 
 public final class SubmissionFactory {
     private SubmissionFactory() {
@@ -18,14 +16,10 @@ public final class SubmissionFactory {
 
     public static Submission create(
             MemberId memberId,
-            ProductId productId,
-            SubmissionType submissionType,
-            StoredPath storedPath,
-            String extractedText,
-            List<TestCase> testCases
+            ProductId productId
     ) {
         Objects.requireNonNull(memberId, "memberId");
         Objects.requireNonNull(productId, "productId");
-        return Submission.create(memberId, productId, submissionType, storedPath, extractedText, testCases);
+        return Submission.create(memberId, productId);
     }
 }

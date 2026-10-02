@@ -1,23 +1,20 @@
 package com.autotest.test_management_service.infrastructure.persistence;
 
+import java.time.Instant;
+import java.util.UUID;
+
 import com.autotest.test_management_service.domain.submission.ProductId;
-import com.autotest.test_management_service.domain.submission.StoredPath;
 import com.autotest.test_management_service.domain.submission.Submission;
 import com.autotest.test_management_service.domain.submission.SubmissionId;
 import com.autotest.test_management_service.domain.submission.SubmissionStatus;
 import com.autotest.test_management_service.domain.vo.MemberId;
-import com.autotest.test_management_service.domain.vo.SubmissionType;
+
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-
-import java.time.Instant;
-import java.util.UUID;
 
 @Entity
 @Table(name = "submissions")
@@ -34,17 +31,6 @@ public class SubmissionEntity {
     @AttributeOverride(name = "value", column = @Column(name = "product_id", nullable = false))
     private ProductId productId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "submission_type", nullable = false, length = 20)
-    private SubmissionType submissionType;
-
-    @Column(name = "stored_path", nullable = false, columnDefinition = "text")
-    private String storedPath;
-
-    @Column(name = "extracted_text", nullable = false, columnDefinition = "text")
-    private String extractedText;
-
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private SubmissionStatus status;
 
@@ -61,9 +47,6 @@ public class SubmissionEntity {
         this.id = submission.submissionId().value();
         this.memberId = submission.memberId();
         this.productId = submission.productId();
-        this.submissionType = submission.submissionType();
-        this.storedPath = submission.storedPath().value();
-        this.extractedText = submission.extractedText();
         this.status = submission.status();
         this.failureReason = submission.failureReason();
         this.uploadedAt = submission.uploadedAt().orElseGet(Instant::now);
@@ -74,16 +57,7 @@ public class SubmissionEntity {
     }
 
     Submission toDomain() {
-        return Submission.reconstitute(
-                new SubmissionId(id),
-                memberId,
-                productId,
-                submissionType,
-                new StoredPath(storedPath),
-                extractedText,
-                status,
-                failureReason,
-                uploadedAt
-        );
+        return Submission.reconstitute(new SubmissionId(id), memberId, productId,
+                status, failureReason, uploadedAt);
     }
 }
