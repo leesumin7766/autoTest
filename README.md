@@ -1,8 +1,8 @@
 # autoTest - 문서 기반 AI 테스트케이스 자동 생성 및 결함 탐지 플랫폼
 
-> 시험합의서, 기능리스트, 제품 매뉴얼을 접수·추출하고 ai-service에 전달합니다. 향후 제품 설명과 테스트케이스는 LLM으로 생성할 예정이며 Jev(TypeSafe)는 사용하지 않습니다.
+> 시험합의서, 기능리스트, 제품 매뉴얼을 접수·추출하고 ai-service에 전달합니다. 다음 단계에서는 LLM 실행 전에 프로그램 규칙과 Jev(TypeSafe)로 문서 적합성을 판정하고, 통과한 문서로 제품 설명과 테스트케이스를 생성합니다.
 
-현재 문서 업로드, 형식 검증, SeaweedFS 원본 저장·조회, 텍스트 추출, PostgreSQL 저장, AI 문서 접수·재시도까지 구현되어 있습니다. 이번 파이프라인은 LLM/Jev·TC 생성·테스트 실행을 호출하지 않습니다.
+현재 문서 업로드, 형식 검증, SeaweedFS 원본 저장·조회, 텍스트 추출, PostgreSQL 저장, AI 문서 접수·재시도까지 구현되어 있습니다. LLM 전 필터, Jev 판정, 제품 설명·TC 생성, 테스트 실행은 아직 구현되지 않았습니다.
 
 ## 1. 프로젝트 폴더 구조
 
@@ -74,7 +74,7 @@ IDE는 자유롭게 선택할 수 있습니다. Java 서비스는 루트에서 �
 | test-management-service | 8082 | 역할별 업로드·파싱·저장·AI 전달 및 재시도 |
 | test-execution-service | 8083 | 애플리케이션·DB 설정 골격, TC 실행 API 미구현 |
 | report-service | 8084 | 애플리케이션·DB 설정 골격, 리포트 API 미구현 |
-| ai-service | 8005 | 문서 접수·중복 방지 API (LLM 호출 없음) |
+| ai-service | 8005 | 문서 접수·중복 방지 API (현재 LLM 호출 없음) |
 | crawler-service | 8006 | URL 방문 및 HTTP 요청 목록 수집 |
 | PostgreSQL | 5432 | `autotest` DB, pgvector 설치 이미지 |
 | SeaweedFS | 8333 / 8334 / 9333 | S3 API / S3 gRPC / Master |
@@ -98,7 +98,9 @@ Gateway는 서비스 탐색용 `lb://` 대신 다음 고정 HTTP 주소를 사�
 시험합의서 + 기능리스트 + 제품 매뉴얼 (PDF / Excel / HWP / Word)
   → 업로드 및 형식 검증 → SeaweedFS 원본 저장 → 텍스트 추출·DB 저장
   → 세 문서 정상 처리 시 ai-service 문서 접수 API로 전달·수신 확인
-  → 이번 범위에서는 LLM/Jev 호출과 TC 생성·테스트 실행을 하지 않음
+  → [다음 단계] LLM 전 문서 필터: 프로그램 품질 검사 + Jev 의미 판정
+  → BLOCKED는 생성 중단, READY 또는 READY_WITH_WARNINGS는 LLM에 전달
+  → [향후] 제품 설명·TC 생성 → TC 실행 및 결함 판정
 ```
 
 ### 현재 제출 경로
@@ -114,6 +116,26 @@ Gateway는 서비스 탐색용 `lb://` 대신 다음 고정 HTTP 주소를 사�
 - 파싱 실패 문서 교체: `POST /api/submissions/{id}/files/{role}/replace` multipart `file`, 헤더 `X-Member-Id`. 소유자 및 `FAILED` 문서만 교체할 수 있습니다. AI 전달 시도가 시작된 제출, 전달 중 제출, 이미 전달된 제출의 교체는 409입니다. 새 문서 파싱이 실패하면 기존 문서·원본을 유지합니다.
 - AI `PENDING`은 30초가 지나면 `GET /api/submissions/{id}`의 `aiDelivery.retryable`이 `true`가 됩니다. 화면에서 문서 세트를 다시 조회한 뒤 `전달 복구`를 누르면 재업로드 없이 재시도합니다. 30초 이내의 정상 진행 중 요청은 재시도되지 않습니다.
 - 업로드 한도는 파일당 100 MiB이며, 프런트엔드에서 세 문서를 한 번에 선택해 순차 업로드하거나 역할별로 나누어 업로드할 수 있습니다.
+
+### LLM 전 문서 필터 (설계 기준, 현재 미구현)
+
+필터는 “문서가 완벽한가”가 아니라 “LLM이 유용하게 작업할 수 있는가”를 판정합니다. 명확한 입력 오류는 프로그램 규칙으로 확인하고, 문서 역할 및 제품 일치 여부처럼 의미가 필요한 판단은 Jev(TypeSafe)에 맡깁니다.
+
+판정 결과는 다음 세 가지입니다.
+
+| 결과 | 판정 기준 | 처리 |
+|---|---|---|
+| `BLOCKED` | 필수 역할 문서 누락, 파싱 실패·빈 텍스트, 한 문서가 사실상 읽을 수 없을 정도로 손상, 역할과 명백히 다른 문서, 또는 세 문서가 서로 다른 제품이라는 근거가 높음 | LLM 생성을 중단하고 원인과 해당 문서를 사용자에게 표시 |
+| `READY_WITH_WARNINGS` | 일부 문자 손상, 시험코드 미발견, 제한된 페이지·시트의 추출 부족, 제품명·모델명이 없거나 별칭·버전 차이로 동일성 판단이 불확실함 | 경고를 전달하고 LLM 생성 진행 |
+| `READY` | 세 문서 모두 역할에 맞는 내용을 충분히 담고 제품 정보가 대체로 일치함 | 경고 없이 LLM 생성 진행 |
+
+시험코드가 없거나 제품명을 확인할 수 없다는 이유만으로 차단하지 않습니다. 제품이 다르다는 증거가 명확할 때만 차단하고, 표기 차이·버전 차이·불확실한 일치는 경고로 처리합니다.
+
+텍스트 손상 기준은 전체 문서에 일괄 적용하는 문자 비율 하나로 정하지 않습니다. 페이지·시트별 추출량, 대체문자(`�`)와 제어문자, 의미 있는 텍스트 분포를 확인해 심한 손상 여부를 판단합니다. 일부 페이지가 손상됐어도 나머지 내용으로 작업할 수 있으면 경고 후 진행합니다. 수치 임계값은 `sample/` 실제 문서와 경미·심각한 손상 사본의 판정 결과를 비교해 조정합니다. 현재 PDF 파서는 텍스트 추출만 하며 OCR을 수행하지 않으므로, `PARSED` 상태만으로 추출 품질을 보장하지 않습니다.
+
+경고는 문서의 `extractedText`에 섞지 않고 생성 요청의 별도 `preflight` 메타데이터로 전달합니다. 각 경고에는 코드, 역할, 심각도, 짧은 설명과 가능한 경우 페이지·시트 위치를 포함합니다. LLM에는 경고를 근거로 누락된 정보를 지어내지 말고, 확인할 수 없는 값은 미확인으로 표시하도록 지시합니다. 판정 결과와 경고는 생성 결과와 함께 사용자에게도 표시합니다.
+
+현재 문서 접수 API는 위 필터를 실행하지 않습니다. Jev 연동, 필터 API 계약, 수치 임계값은 다음 구현 단계에서 추가·검증해야 합니다.
 
 ### 실제 업로드 검증 기준
 
@@ -139,7 +161,7 @@ Gateway는 서비스 탐색용 `lb://` 대신 다음 고정 HTTP 주소를 사�
 | crawler-service :8006 | GET | `/` | `{"status":"crawler-service running"}` |
 | crawler-service :8006 | POST | `/crawl` | `{"url":"https://example.com"}` → `{"apis":[{"method":"GET","url":"..."}]}` |
 
-AI `/generate`와 `/jev-test`는 이번 범위에 없으며 구현하지 않습니다. AI 문서 접수 API는 LLM을 호출하지 않습니다. 크롤러는 요청 목록을 최대 50개 반환하며, TC 실행·스크린샷·결함 판정은 구현하지 않았습니다.
+AI 문서 접수 API는 현재 LLM이나 Jev를 호출하지 않습니다. LLM 생성 경로와 Jev 사전 필터는 아직 구현되지 않았습니다. 크롤러는 요청 목록을 최대 50개 반환하며, TC 실행·스크린샷·결함 판정도 구현되지 않았습니다.
 
 AI 접수 요청 예시(비민감 합성 데이터, 실제 요청에는 전체 추출 텍스트 전달):
 
@@ -249,7 +271,7 @@ S3_SECRET_KEY=your-secret-key
 
 현재 Compose가 필수로 참조하는 값은 위 두 개입니다. `S3_BUCKET`, `POSTGRES_USER`, `POSTGRES_PASSWORD`는 `.env`에 추가해도 현재 Compose 설정에 반영되지 않습니다. DB 계정은 개발용 `test/test`, DB 이름은 `autotest`로 고정되어 있습니다.
 
-Compose는 `AI_SERVICE_URL=http://ai-service:8005`를 TMS에 전달하고 `AI_DATABASE_URL=postgresql://test:test@db:5432/autotest`로 AI 접수 DB를 설정합니다. LLM/Jev API 키는 이 범위에서 설정하거나 사용하지 않습니다.
+Compose는 `AI_SERVICE_URL=http://ai-service:8005`를 TMS에 전달하고 `AI_DATABASE_URL=postgresql://test:test@db:5432/autotest`로 AI 접수 DB를 설정합니다. 현재 Jev·LLM 연동 설정은 없으며, 사전 필터와 생성 API 구현 시 필요한 자격 증명 및 설정을 별도로 추가해야 합니다.
 
 ```powershell
 docker compose up -d --build
@@ -345,7 +367,9 @@ npm --prefix frontend run build
 - [x] PDF, Excel, HWP/HWPX, Word DOC/DOCX 텍스트 추출
 - [x] 버킷 설정을 목표인 `autotest-docs`와 일치시키기
 - [x] 문서 3종 업로드·구분·frontend UI 및 역할별 파일 영속화
-- [ ] LLM 문서 분석·TC 생성 API 연결 (Jev 미사용)
+- [ ] LLM 전 문서 적합성 필터: 프로그램 기반 추출 품질 검사 + Jev 역할·제품 일치 판정
+- [ ] 필터 판정·경고 메타데이터 계약과 수치 임계값을 샘플 및 손상 문서로 검증
+- [ ] LLM 문서 분석·제품 설명·TC 생성 API 연결
 - [ ] TC 영속 저장 및 제출·TC 조회 API
 - [ ] TC 실행 서비스와 Playwright 연동, 결함 판정
 - [ ] 인증·인가, 결함 리포트 및 결과 화면
