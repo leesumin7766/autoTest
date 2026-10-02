@@ -1,6 +1,7 @@
 package com.autotest.test_management_service.presentation.controller;
 
 import com.autotest.test_management_service.application.service.SubmissionService;
+import com.autotest.test_management_service.application.service.AiDocumentDeliveryService;
 import com.autotest.test_management_service.domain.submission.ProductId;
 import com.autotest.test_management_service.domain.submission.StoredPath;
 import com.autotest.test_management_service.domain.submission.Submission;
@@ -28,6 +29,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,6 +42,9 @@ class SubmissionControllerTest {
 
     @MockBean
     private SubmissionService submissionService;
+
+        @MockBean
+        private AiDocumentDeliveryService aiDocumentDeliveryService;
 
     @Test
     void submitReturns200AndSubmissionId() throws Exception {
@@ -106,6 +112,43 @@ class SubmissionControllerTest {
 
         mockMvc.perform(get("/api/submissions/{id}", id))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void retryAiDeliveryRequiresSubmissionOwner() throws Exception {
+        SubmissionId id = SubmissionId.generate();
+        when(submissionService.findById(id)).thenReturn(Optional.of(
+                submission(id, SubmissionStatus.PARSED, null, "extracted text")));
+        when(aiDocumentDeliveryService.deliverIfReady(id)).thenReturn(
+                new AiDocumentDeliveryService.DeliveryResult("FAILED", 1, "AI service delivery failed", null));
+
+        mockMvc.perform(post("/api/submissions/{id}/ai-delivery/retry", id.value())
+                        .header("X-Member-Id", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"));
+
+        mockMvc.perform(post("/api/submissions/{id}/ai-delivery/retry", id.value())
+                        .header("X-Member-Id", "2"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void failedDocumentReplacementIsRejectedAfterAiDeliveryWasAttempted() throws Exception {
+        SubmissionId id = SubmissionId.generate();
+        when(submissionService.findById(id)).thenReturn(Optional.of(
+                submission(id, SubmissionStatus.PARSED, null, "extracted text")));
+        when(aiDocumentDeliveryService.getStatus(id.value())).thenReturn(
+                new AiDocumentDeliveryService.DeliveryResult("FAILED", 1, "AI service delivery failed", null));
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "replacement.pdf", "application/pdf", "pdf".getBytes(StandardCharsets.UTF_8));
+
+        mockMvc.perform(multipart("/api/submissions/{id}/files/{role}/replace", id.value(), "AGREEMENT")
+                        .file(file)
+                        .header("X-Member-Id", "1"))
+                .andExpect(status().isConflict());
+
+        org.mockito.Mockito.verify(submissionService, org.mockito.Mockito.never())
+                .replaceFailedDocument(any(), any(), any(), any());
     }
 
     @Test

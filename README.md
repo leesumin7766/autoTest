@@ -1,14 +1,15 @@
 # autoTest - 문서 기반 AI 테스트케이스 자동 생성 및 결함 탐지 플랫폼
 
-> 시험합의서, 기능리스트, 제품 매뉴얼을 분석해 JEV(TypeSafe) + LLM으로 제품 설명과 테스트케이스(TC)를 생성하고, Playwright 기반 테스트로 결함을 탐지하는 것을 목표로 하는 프로젝트입니다.
+> 시험합의서, 기능리스트, 제품 매뉴얼을 접수·추출하고 ai-service에 전달합니다. 향후 제품 설명과 테스트케이스는 LLM으로 생성할 예정이며 Jev(TypeSafe)는 사용하지 않습니다.
 
-현재는 서비스 골격, 제출 API, 파일 저장 어댑터와 기초 크롤러가 구현되어 있습니다. 문서 분석부터 TC 생성·실행·리포트까지 이어지는 전체 파이프라인은 아직 구현되지 않았습니다. 아래 내용은 저장소의 소스 코드와 설정을 기준으로 작성했습니다.
+현재 문서 업로드, 형식 검증, SeaweedFS 원본 저장·조회, 텍스트 추출, PostgreSQL 저장, AI 문서 접수·재시도까지 구현되어 있습니다. 이번 파이프라인은 LLM/Jev·TC 생성·테스트 실행을 호출하지 않습니다.
 
 ## 1. 프로젝트 폴더 구조
 
 ```text
 autoTest/
-├── ai-service/                    # FastAPI 상태 확인 API, Python 의존성, Dockerfile
+├── ai-service/                    # FastAPI 문서 수신·중복 방지 API
+├── sample/                        # 업로드 검증 기준 문서 3개 (원본 보존)
 ├── api-gateway/                   # Spring Cloud Gateway 라우팅
 ├── auth-service/                  # Spring Boot 인증 서비스 골격
 ├── common-lib/                    # Gradle 공통 모듈 (현재 Application 클래스)
@@ -70,13 +71,13 @@ IDE는 자유롭게 선택할 수 있습니다. Java 서비스는 루트에서 �
 
 | 구성 요소 | 포트 | 현재 역할 |
 |---|---|---|
-| frontend | 5173 (Vite 기본값) | React 기본 예제 화면, 업로드 UI 미구현 |
+| frontend | 5173 (Vite 기본값) | 역할별 문서 업로드와 상태 조회 |
 | api-gateway | 8080 | Java 서비스 라우팅 |
 | auth-service | 8081 | 애플리케이션·DB 설정 골격, 인증 API 미구현 |
-| test-management-service | 8082 | 단일 파일 제출, 저장, 기존 파서 실행 |
+| test-management-service | 8082 | 역할별 업로드·파싱·저장·AI 전달 및 재시도 |
 | test-execution-service | 8083 | 애플리케이션·DB 설정 골격, TC 실행 API 미구현 |
 | report-service | 8084 | 애플리케이션·DB 설정 골격, 리포트 API 미구현 |
-| ai-service | 8005 | FastAPI 상태 확인 API |
+| ai-service | 8005 | 문서 접수·중복 방지 API (LLM 호출 없음) |
 | crawler-service | 8006 | URL 방문 및 HTTP 요청 목록 수집 |
 | PostgreSQL | 5432 | `autotest` DB, pgvector 설치 이미지 |
 | SeaweedFS | 8333 / 8334 / 9333 | S3 API / S3 gRPC / Master |
@@ -90,7 +91,7 @@ Gateway는 서비스 탐색용 `lb://` 대신 다음 고정 HTTP 주소를 사�
 | `/api/executions/**` | `http://test-execution-service:8083` |
 | `/api/reports/**` | `http://report-service:8084` |
 
-경로 등록 자체가 해당 API의 구현을 의미하지는 않습니다. `/api/ai/**`, `/api/crawl/**` 라우트는 없으며 AI·크롤러는 직접 호출해야 합니다. `frontend/vite.config.ts`에는 `/api` 프록시가 아직 없습니다.
+경로 등록 자체가 해당 API의 구현을 의미하지는 않습니다. `/api/ai/**`, `/api/crawl/**` 라우트는 없으며 AI·크롤러는 직접 호출해야 합니다. `frontend/vite.config.ts`의 `/api` 요청은 `localhost:8080`으로 프록시됩니다.
 
 ## 4. 목표 파이프라인과 현재 구현
 
@@ -98,13 +99,9 @@ Gateway는 서비스 탐색용 `lb://` 대신 다음 고정 HTTP 주소를 사�
 
 ```text
 시험합의서 + 기능리스트 + 제품 매뉴얼 (PDF / Excel / HWP / Word)
-  → 업로드 및 형식 검증
-  → 문서 텍스트 추출
-  → ai-service: JEV(TypeSafe) + LLM 제품 설명·TC 생성
-  → 생성 결과 저장
-  → test-execution-service + crawler-service: 제품 URL 테스트
-  → report-service: 결함 리포트
-  → frontend: 결과 표시
+  → 업로드 및 형식 검증 → SeaweedFS 원본 저장 → 텍스트 추출·DB 저장
+  → 세 문서 정상 처리 시 ai-service 문서 접수 API로 전달·수신 확인
+  → 이번 범위에서는 LLM/Jev 호출과 TC 생성·테스트 실행을 하지 않음
 ```
 
 ### 현재 제출 경로
@@ -114,7 +111,22 @@ Gateway는 서비스 탐색용 `lb://` 대신 다음 고정 HTTP 주소를 사�
 - 첫 파일은 `POST /api/submissions`에 `file`, `productId`, `role`을 보내고, 같은 세트의 추가 파일은 `POST /api/submissions/{id}/files`에 `file`, `role`을 보냅니다.
 - 역할은 `AGREEMENT`, `FUNCTION_LIST`, `MANUAL`이며, PDF/Excel/HWP/Word 확장자와 MIME을 모두 검증합니다.
 - `GET /api/submissions/{id}`는 세트 상태와 함께 각 파일의 역할, 세부 형식, 경로, 추출 텍스트, 처리 상태를 반환합니다.
+- 세 역할의 문서가 모두 정상 파싱되면 `http://ai-service:8005/api/v1/document-intakes`로 제출 ID, 제품 ID, 문서별 식별자·역할·파일명·형식·저장 경로·추출 텍스트를 전달합니다.
+- 응답의 `aiDelivery`는 문서 업로드/파싱 상태와 별도이며 `NOT_READY`, `PENDING`, `FAILED`, `DELIVERED`를 반환합니다. 전달 실패는 원본과 추출 텍스트를 유지합니다.
+- AI 전달 재시도: `POST /api/submissions/{id}/ai-delivery/retry`. 파일을 다시 업로드하지 않으며, 같은 제출 ID의 접수 재요청은 AI 서비스가 중복 처리하지 않습니다.
+- 파싱 실패 문서 교체: `POST /api/submissions/{id}/files/{role}/replace` multipart `file`, 헤더 `X-Member-Id`. 소유자 및 `FAILED` 문서만 교체할 수 있습니다. AI 전달 시도가 시작된 제출, 전달 중 제출, 이미 전달된 제출의 교체는 409입니다. 새 문서 파싱이 실패하면 기존 문서·원본을 유지합니다.
+- AI `PENDING`은 30초가 지나면 `GET /api/submissions/{id}`의 `aiDelivery.retryable`이 `true`가 됩니다. 화면에서 문서 세트를 다시 조회한 뒤 `전달 복구`를 누르면 재업로드 없이 재시도합니다. 30초 이내의 정상 진행 중 요청은 재시도되지 않습니다.
 - 업로드 한도는 파일당 100 MiB이며, 프런트엔드에서 세 문서를 한 번에 선택해 순차 업로드하거나 역할별로 나누어 업로드할 수 있습니다.
+
+### 실제 업로드 검증 기준
+
+`sample/`의 원본 3개를 아래 역할로 사용합니다. 검증 전용 사본은 만들 수 있지만 원본은 수정·삭제하지 않습니다.
+
+| 역할 | 파일 |
+|---|---|
+| `AGREEMENT` | `TTA-26-00872 시험합의서 v1.0.pdf` |
+| `FUNCTION_LIST` | `2. PrintChaser 기능리스트_v0.5_20260304.xlsx` |
+| `MANUAL` | `3. PrintChaser 관리자매뉴얼.pdf` |
 
 ## 5. 현재 API
 
@@ -123,11 +135,51 @@ Gateway는 서비스 탐색용 `lb://` 대신 다음 고정 HTTP 주소를 사�
 | test-management-service :8082 | POST | `/api/submissions` | multipart `file`, `productId`, `role`, 헤더 `X-Member-Id` → submission 및 문서 결과 |
 | test-management-service :8082 | POST | `/api/submissions/{id}/files` | multipart `file`, `role`, 헤더 `X-Member-Id` → 문서 결과 |
 | test-management-service :8082 | GET | `/api/submissions/{id}` | submission 상태 및 역할별 문서·추출 결과 |
+| test-management-service :8082 | POST | `/api/submissions/{id}/ai-delivery/retry` | 소유자 헤더 필요. `FAILED` 또는 만료된 `PENDING` 재시도 → 전달 상태 |
+| test-management-service :8082 | POST | `/api/submissions/{id}/files/{role}/replace` | 실패 역할 문서 교체. `FAILED` 상태이고 AI 전달 시도 전일 때만 허용 |
 | ai-service :8005 | GET | `/` | `{"status":"ai-service running","python":"3.13"}` |
+| ai-service :8005 | POST | `/api/v1/document-intakes` | 문서 3개 검증·접수. 동일 본문 재접수는 영수증 반환, 다른 본문은 409 |
 | crawler-service :8006 | GET | `/` | `{"status":"crawler-service running"}` |
 | crawler-service :8006 | POST | `/crawl` | `{"url":"https://example.com"}` → `{"apis":[{"method":"GET","url":"..."}]}` |
 
-AI `/generate`와 `/jev-test`는 아직 없습니다. 크롤러는 요청 목록을 최대 50개 반환하며, TC 실행·스크린샷·결함 판정은 구현하지 않았습니다.
+AI `/generate`와 `/jev-test`는 이번 범위에 없으며 구현하지 않습니다. AI 문서 접수 API는 LLM을 호출하지 않습니다. 크롤러는 요청 목록을 최대 50개 반환하며, TC 실행·스크린샷·결함 판정은 구현하지 않았습니다.
+
+AI 접수 요청 예시(비민감 합성 데이터, 실제 요청에는 전체 추출 텍스트 전달):
+
+```json
+{
+  "submissionId": "11111111-1111-4111-8111-111111111111",
+  "productId": 1,
+  "documents": [
+    {
+      "fileId": "22222222-2222-4222-8222-222222222222",
+      "role": "AGREEMENT",
+      "originalFilename": "agreement.docx",
+      "format": "DOCX",
+      "storedPath": "s3://autotest-docs/agreement.docx",
+      "extractedText": "Agreement body"
+    },
+    {
+      "fileId": "33333333-3333-4333-8333-333333333333",
+      "role": "FUNCTION_LIST",
+      "originalFilename": "functions.xlsx",
+      "format": "XLSX",
+      "storedPath": "s3://autotest-docs/functions.xlsx",
+      "extractedText": "Function body"
+    },
+    {
+      "fileId": "44444444-4444-4444-8444-444444444444",
+      "role": "MANUAL",
+      "originalFilename": "manual.pdf",
+      "format": "PDF",
+      "storedPath": "s3://autotest-docs/manual.pdf",
+      "extractedText": "Manual body"
+    }
+  ]
+}
+```
+
+정상 응답은 `{"accepted":true,"duplicate":false,"submissionId":"...","documentCount":3,"receivedAt":"..."}`입니다. 같은 제출 ID와 같은 요청 본문은 `duplicate:true`로 같은 접수 결과를 반환합니다. 같은 제출 ID에 다른 요청 본문은 `409 Conflict`입니다. TMS는 응답의 `accepted`, 요청과 같은 `submissionId`, `documentCount: 3`을 모두 확인해야 `DELIVERED`로 기록합니다.
 
 목표 문서 업로드 형식은 다음과 같습니다. **현재 이 요청이 성공하는 상태를 의미하지는 않습니다.**
 
@@ -161,7 +213,9 @@ status          VARCHAR(20) NOT NULL
 uploaded_at     TIMESTAMPTZ NOT NULL
 ```
 
-`submission_files`에는 `submission_id`, 역할, 파일 분류 및 확장자 형식, 원본 파일명, 저장 경로, 추출 텍스트, 처리 상태가 저장됩니다. 한 세트 안에서 같은 역할은 한 번만 등록할 수 있습니다.
+`submission_files`에는 `submission_id`, 역할, 파일 분류 및 확장자 형식, 원본 파일명, 저장 경로, 추출 텍스트, 처리 상태가 저장됩니다. 한 세트 안에서 같은 역할은 한 번만 등록할 수 있습니다. 파싱 실패 파일만 실패 교체 경로로 교체할 수 있습니다.
+
+`submission_ai_deliveries`에는 `NOT_READY`, `PENDING`, `FAILED`, `DELIVERED`, 시도 횟수, 실패 요약, `updated_at`, `delivered_at`이 기록됩니다. 각 전달 결과 반영은 해당 `attempt_count`가 아직 현재 시도와 일치할 때만 수행해 오래된 HTTP 요청이 새 시도를 덮지 못하게 합니다. AI 서비스는 `ai_document_intakes`에 제출 ID당 한 요청 본문만 저장합니다.
 
 `member_id`, `product_id`에 인덱스가 있습니다. 현재 상태 enum은 `DRAFT`, `UPLOADED`, `PARSED`, `VERIFIED`입니다. `created_at`, `TC_GENERATED`, `EXECUTING`, `COMPLETED`는 현재 스키마·enum에 없습니다.
 
@@ -180,7 +234,7 @@ S3_SECRET_KEY=your-secret-key
 
 현재 Compose가 필수로 참조하는 값은 위 두 개입니다. `S3_BUCKET`, `POSTGRES_USER`, `POSTGRES_PASSWORD`는 `.env`에 추가해도 현재 Compose 설정에 반영되지 않습니다. DB 계정은 개발용 `test/test`, DB 이름은 `autotest`로 고정되어 있습니다.
 
-`TYPESAFE_API_KEY`는 현재 Compose에서 빈 값으로 지정되어 있고 AI 코드에서도 사용하지 않습니다. 향후 연동 시 환경변수 전달 설정과 실제 호출 구현이 필요합니다.
+Compose는 `AI_SERVICE_URL=http://ai-service:8005`를 TMS에 전달하고 `AI_DATABASE_URL=postgresql://test:test@db:5432/autotest`로 AI 접수 DB를 설정합니다. LLM/Jev API 키는 이 범위에서 설정하거나 사용하지 않습니다.
 
 ```powershell
 docker compose up -d --build
@@ -246,17 +300,24 @@ curl.exe http://localhost:8006/
 docker compose exec db psql -U test -d autotest -c "SELECT * FROM submissions ORDER BY uploaded_at DESC LIMIT 3;"
 ```
 
-현재 제출 서비스에는 6개 테스트 클래스, 15개의 `@Test` 메서드가 있습니다. 테스트에는 기존 소스코드 파싱 검증도 포함되어 있어, 문서 기반 목표 파이프라인의 검증을 의미하지는 않습니다. 이 README 수정 과정에서는 테스트·컨테이너 실행을 수행하지 않았으며, 기존의 “15 tests passed” 또는 “E2E 검증 완료” 주장을 확인된 사실로 기재하지 않습니다.
+검증 명령:
+
+```powershell
+. \gradlew.bat :test-management-service:test --tests "com.autotest.test_management_service.application.service.AiDocumentDeliveryServiceTest" --tests "com.autotest.test_management_service.application.service.SubmissionServiceTest" --tests "com.autotest.test_management_service.presentation.controller.SubmissionControllerTest"
+python -m unittest discover -s ai-service -p test_main.py
+npm --prefix frontend run build
+```
+
+실제 업로드 검증은 앞의 `sample/` 파일 3개를 Vite 프런트엔드에서 각 역할에 연결하고, 같은 제출 ID의 역할·`PARSED` 상태·추출 내용 키워드·AI 접수 내역을 확인합니다. 운영 DB를 초기화하는 전체 integration suite를 자동 실행하지 않습니다.
 
 ## 9. 남은 구현 작업
 
-- [ ] PDF/Excel/HWP/Word만 허용하도록 업로드 타입·파서 경로 통합
-- [ ] 확장자·MIME 검증 및 오류 응답 처리
-- [ ] 기존 소스코드·ZIP·`@test` 파싱 제거
-- [ ] PDF, Excel, HWP/HWPX, Word DOC/DOCX 텍스트 추출
+- [x] PDF/Excel/HWP/Word만 허용하도록 업로드 타입·파서 경로 통합
+- [x] 확장자·MIME 검증 및 오류 응답 처리
+- [x] PDF, Excel, HWP/HWPX, Word DOC/DOCX 텍스트 추출
 - [x] 버킷 설정을 목표인 `autotest-docs`와 일치시키기
 - [x] 문서 3종 업로드·구분·frontend UI 및 역할별 파일 영속화
-- [ ] AI `/generate` API 및 JEV(TypeSafe) + LLM 연결
+- [ ] LLM 문서 분석·TC 생성 API 연결 (Jev 미사용)
 - [ ] TC 영속 저장 및 제출·TC 조회 API
 - [ ] TC 실행 서비스와 Playwright 연동, 결함 판정
 - [ ] 인증·인가, 결함 리포트 및 결과 화면

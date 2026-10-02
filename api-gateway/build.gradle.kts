@@ -1,8 +1,11 @@
 // Inherit from root
 dependencies {
     implementation(project(":common-lib"))
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    implementation("org.springframework.boot:spring-boot-starter-validation")
-    runtimeOnly("org.postgresql:postgresql")
+    implementation("org.springframework.cloud:spring-cloud-starter-gateway-server-webflux")
+}
+
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.0.0")
+    }
 }

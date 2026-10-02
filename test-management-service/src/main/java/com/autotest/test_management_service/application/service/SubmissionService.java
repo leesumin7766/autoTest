@@ -1,5 +1,17 @@
 package com.autotest.test_management_service.application.service;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.time.Instant;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.autotest.test_management_service.application.storage.FileStoragePort;
 import com.autotest.test_management_service.domain.submission.FileFormat;
 import com.autotest.test_management_service.domain.submission.FileMetadata;
@@ -16,20 +28,13 @@ import com.autotest.test_management_service.domain.vo.MemberId;
 import com.autotest.test_management_service.domain.vo.SubmissionType;
 import com.autotest.test_management_service.infrastructure.parser.DocumentFileParserFactory;
 import com.autotest.test_management_service.infrastructure.parser.DocumentParsingException;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.time.Instant;
-import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 public class SubmissionService {
+    private static final Logger logger = LoggerFactory.getLogger(SubmissionService.class);
     private static final String EMPTY_EXCEL_REASON = "추출할 셀 내용이 없습니다";
     private static final String OCR_REQUIRED_REASON = "텍스트를 추출할 수 없음/OCR 필요";
     private static final String GENERIC_FAILURE_REASON = "문서에서 텍스트를 추출할 수 없습니다";
@@ -52,7 +57,7 @@ public class SubmissionService {
     ) {
         PreparedFile prepared = prepare(file);
         StoredPath storedPath = store(file, prepared);
-        Submission uploadedSubmission = Submission.create(memberId, productId, prepared.fileType(), storedPath, "", List.of());
+        Submission uploadedSubmission = Submission.create(memberId, productId);
         try {
             submissionPersistenceService.saveUploaded(uploadedSubmission);
         } catch (RuntimeException persistenceFailure) {
@@ -61,21 +66,18 @@ public class SubmissionService {
         }
 
         SubmittedDocument document;
-        Submission result;
         try (InputStream parserInput = fileStoragePort.load(storedPath)) {
             ParsedContent parsedContent = prepared.parser().parse(prepared.metadata(), parserInput);
             String extractedText = parsedContent.extractedText();
-            result = submissionPersistenceService.markAsParsed(uploadedSubmission.submissionId(), extractedText);
             document = document(uploadedSubmission.submissionId(), role, prepared, storedPath,
                     extractedText, SubmissionStatus.PARSED, null);
         } catch (Exception extractionFailure) {
             String reason = safeFailureReason(extractionFailure);
-            result = submissionPersistenceService.markAsFailed(uploadedSubmission.submissionId(), reason);
             document = document(uploadedSubmission.submissionId(), role, prepared, storedPath,
                     "", SubmissionStatus.FAILED, reason);
         }
         submissionPersistenceService.saveDocument(document);
-        return result;
+        return submissionPersistenceService.findById(uploadedSubmission.submissionId()).orElseThrow();
     }
 
     public SubmittedDocument uploadAdditional(
@@ -114,6 +116,66 @@ public class SubmissionService {
             cleanupStoredFile(storedPath, persistenceFailure);
             throw persistenceFailure;
         }
+    }
+
+    public SubmittedDocument replaceFailedDocument(
+            SubmissionId submissionId,
+            MultipartFile file,
+            com.autotest.test_management_service.domain.submission.SubmissionType role,
+            MemberId memberId
+    ) {
+        Submission submission = submissionPersistenceService.findById(submissionId)
+                .orElseThrow(() -> new IllegalArgumentException("Submission not found"));
+        if (!submission.memberId().equals(memberId)) {
+            throw new IllegalArgumentException("Submission does not belong to the requested member");
+        }
+        SubmittedDocument failedDocument = submissionPersistenceService.findDocumentsBySubmissionId(submissionId)
+                .stream()
+                .filter(document -> document.role() == role)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("No document exists for submission role: " + role));
+        if (failedDocument.status() != SubmissionStatus.FAILED) {
+            throw new IllegalArgumentException("Only a failed document can be replaced");
+        }
+
+        PreparedFile prepared = prepare(file);
+        StoredPath newStoredPath = store(file, prepared);
+        String extractedText;
+        SubmissionStatus status;
+        String failureReason;
+        try (InputStream parserInput = fileStoragePort.load(newStoredPath)) {
+            extractedText = prepared.parser().parse(prepared.metadata(), parserInput).extractedText();
+            status = SubmissionStatus.PARSED;
+            failureReason = null;
+        } catch (Exception extractionFailure) {
+            extractedText = "";
+            status = SubmissionStatus.FAILED;
+            failureReason = safeFailureReason(extractionFailure);
+        }
+
+        if (status != SubmissionStatus.PARSED || extractedText.isBlank()) {
+            RuntimeException replacementFailure = new IllegalArgumentException(
+                    failureReason == null ? GENERIC_FAILURE_REASON : failureReason);
+            cleanupStoredFile(newStoredPath, replacementFailure);
+            throw replacementFailure;
+        }
+
+        SubmittedDocument replacement = document(submissionId, role, prepared, newStoredPath,
+                extractedText, status, failureReason);
+        try {
+            submissionPersistenceService.replaceFailedDocument(
+                    failedDocument.fileId(), failedDocument.storedPath(), replacement);
+        } catch (RuntimeException persistenceFailure) {
+            cleanupStoredFile(newStoredPath, persistenceFailure);
+            throw persistenceFailure;
+        }
+
+        try {
+            fileStoragePort.delete(failedDocument.storedPath());
+        } catch (RuntimeException cleanupFailure) {
+            logger.warn("Replaced document cleanup failed ({})", cleanupFailure.getClass().getSimpleName());
+        }
+        return replacement;
     }
 
     public List<SubmittedDocument> findDocumentsBySubmissionId(SubmissionId id) {

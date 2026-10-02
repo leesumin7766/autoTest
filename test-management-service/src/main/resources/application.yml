@@ -23,3 +23,5 @@ s3:
   bucket: autotest-docs
   enabled: true
   path-style-access: true
+ai-service:
+  base-url: ${AI_SERVICE_URL:http://localhost:8005}

@@ -5,6 +5,7 @@ type Role = 'AGREEMENT' | 'FUNCTION_LIST' | 'MANUAL'
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
 
 type DocumentResult = {
+  fileId: string
   role: Role
   fileType: string
   format: string
@@ -13,6 +14,16 @@ type DocumentResult = {
   extractedText: string
   status: 'UPLOADED' | 'PARSED' | 'FAILED'
   failureReason: string | null
+  aiDelivery?: AiDeliveryResult
+}
+
+type AiDeliveryResult = {
+  status: 'NOT_READY' | 'PENDING' | 'DELIVERED' | 'FAILED'
+  attempts: number
+  lastError: string | null
+  deliveredAt: string | null
+  updatedAt: string | null
+  retryable: boolean
 }
 
 type SubmissionResponse = {
@@ -20,6 +31,7 @@ type SubmissionResponse = {
   status: string
   failureReason: string | null
   documents: DocumentResult[]
+  aiDelivery: AiDeliveryResult
 }
 
 const roles: { id: Role; title: string; number: string; description: string }[] = [
@@ -34,12 +46,20 @@ function App() {
   const [productId, setProductId] = useState('1')
   const [memberId, setMemberId] = useState('1')
   const [submissionId, setSubmissionId] = useState('')
+  const [fileSelectionGeneration, setFileSelectionGeneration] = useState(0)
   const [files, setFiles] = useState<Partial<Record<Role, File>>>({})
   const [states, setStates] = useState<Partial<Record<Role, UploadState>>>({})
   const [documents, setDocuments] = useState<Partial<Record<Role, DocumentResult>>>({})
   const [errors, setErrors] = useState<Partial<Record<Role, string>>>({})
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [aiDelivery, setAiDelivery] = useState<AiDeliveryResult>({
+    status: 'NOT_READY', attempts: 0, lastError: null, deliveredAt: null, updatedAt: null, retryable: false,
+  })
+
+  const updateAiDelivery = (delivery?: AiDeliveryResult) => {
+    if (delivery) setAiDelivery(delivery)
+  }
 
   const updateDocument = (document: DocumentResult) => {
     setDocuments((current) => ({ ...current, [document.role]: document }))
@@ -56,7 +76,13 @@ function App() {
     form.append('role', role)
 
     let response: Response
-    if (activeSubmissionId) {
+    if (activeSubmissionId && documents[role]?.status === 'FAILED') {
+      response = await fetch(`/api/submissions/${activeSubmissionId}/files/${role}/replace`, {
+        method: 'POST',
+        headers: { 'X-Member-Id': memberId },
+        body: form,
+      })
+    } else if (activeSubmissionId) {
       response = await fetch(`/api/submissions/${activeSubmissionId}/files`, {
         method: 'POST',
         headers: { 'X-Member-Id': memberId },
@@ -78,12 +104,14 @@ function App() {
     if ('submissionId' in payload) {
       const createdSubmissionId = payload.submissionId
       setSubmissionId(createdSubmissionId)
+      updateAiDelivery(payload.aiDelivery)
       const result = payload.documents.find((document) => document.role === role)
       if (result) updateDocument(result)
       return createdSubmissionId
     }
 
     updateDocument(payload)
+    updateAiDelivery(payload.aiDelivery)
     return activeSubmissionId
   }
 
@@ -132,6 +160,7 @@ function App() {
       setStates(nextStates)
       setErrors(nextErrors)
       setSubmissionId(result.submissionId)
+      updateAiDelivery(result.aiDelivery)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '조회에 실패했습니다.')
     } finally {
@@ -139,13 +168,32 @@ function App() {
     }
   }
 
+  const retryAiDelivery = async () => {
+    if (!submissionId) return
+    setBusy(true)
+    try {
+      const response = await fetch(`/api/submissions/${submissionId}/ai-delivery/retry`, {
+        method: 'POST',
+        headers: { 'X-Member-Id': memberId },
+      })
+      if (!response.ok) throw new Error('AI 전달 재시도에 실패했습니다.')
+      updateAiDelivery(await response.json() as AiDeliveryResult)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'AI 전달 재시도에 실패했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const startNewSet = () => {
     setSubmissionId('')
+    setFileSelectionGeneration((generation) => generation + 1)
     setFiles({})
     setStates({})
     setDocuments({})
     setErrors({})
     setNotice('')
+    setAiDelivery({ status: 'NOT_READY', attempts: 0, lastError: null, deliveredAt: null, updatedAt: null, retryable: false })
   }
 
   const selectedCount = roles.filter(({ id }) => files[id]).length
@@ -237,9 +285,10 @@ function App() {
                 <div className="document-actions">
                   <label className={`file-picker ${document ? 'is-complete' : ''}`}>
                     <input
+                      key={`${id}-${fileSelectionGeneration}`}
                       type="file"
                       accept={acceptedFiles}
-                      disabled={busy || Boolean(document)}
+                      disabled={busy || Boolean(document && document.status !== 'FAILED')}
                       onChange={(event) => {
                         const nextFile = event.target.files?.[0]
                         if (nextFile) {
@@ -249,9 +298,9 @@ function App() {
                         }
                       }}
                     />
-                    <span>{selectedFile ? '파일 변경' : document ? '등록 완료' : '파일 선택'}</span>
+                    <span>{selectedFile ? '파일 변경' : document?.status === 'FAILED' ? '실패 문서 교체' : document ? '등록 완료' : '파일 선택'}</span>
                   </label>
-                  {selectedFile && !document && (
+                  {selectedFile && (!document || document.status === 'FAILED') && (
                     <button className="upload-one" type="button" disabled={busy} onClick={() => void uploadRoles([id])}>업로드</button>
                   )}
                 </div>
@@ -273,6 +322,15 @@ function App() {
         </div>
         {notice && <p className="global-notice" role="alert">{notice}</p>}
         {submissionId && <p className="set-confirmation"><span /> 문서 세트 연결됨 <code>{submissionId}</code></p>}
+        {submissionId && (
+          <div className={`ai-delivery ai-delivery-${aiDelivery.status.toLowerCase()}`} role="status">
+            <span>AI 전달: {aiDelivery.status === 'DELIVERED' ? '완료' : aiDelivery.status === 'FAILED' ? '실패' : aiDelivery.status === 'PENDING' ? aiDelivery.retryable ? '중단됨' : '진행 중' : '문서 준비 대기'}</span>
+            {aiDelivery.status === 'FAILED' && <span>{aiDelivery.lastError}</span>}
+            {aiDelivery.status === 'PENDING' && aiDelivery.retryable && <span>오래된 전달 시도를 복구할 수 있습니다.</span>}
+            {aiDelivery.retryable && <button className="quiet-button" type="button" onClick={() => void retryAiDelivery()} disabled={busy}>{aiDelivery.status === 'PENDING' ? '전달 복구' : '전달 재시도'}</button>}
+            {aiDelivery.status === 'DELIVERED' && <span>문서 업로드 완료 · AI 전달 완료</span>}
+          </div>
+        )}
       </section>
       <footer className="page-footer"><span>AUTOTEST DOCUMENT INTAKE</span><span>SECURE FILE VALIDATION · TEXT EXTRACTION</span></footer>
     </main>

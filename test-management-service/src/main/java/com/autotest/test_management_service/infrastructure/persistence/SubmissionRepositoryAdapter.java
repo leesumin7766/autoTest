@@ -1,11 +1,12 @@
 package com.autotest.test_management_service.infrastructure.persistence;
 
+import java.util.Optional;
+
+import org.springframework.stereotype.Repository;
+
 import com.autotest.test_management_service.domain.submission.Submission;
 import com.autotest.test_management_service.domain.submission.SubmissionId;
 import com.autotest.test_management_service.domain.submission.SubmissionRepository;
-import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
 
 @Repository
 public class SubmissionRepositoryAdapter implements SubmissionRepository {
@@ -18,6 +19,11 @@ public class SubmissionRepositoryAdapter implements SubmissionRepository {
     @Override
     public Optional<Submission> findById(SubmissionId id) {
         return repository.findById(id.value()).map(SubmissionEntity::toDomain);
+    }
+
+    @Override
+    public Optional<Submission> findByIdForUpdate(SubmissionId id) {
+        return repository.findByIdForUpdate(id.value()).map(SubmissionEntity::toDomain);
     }
 
     @Override

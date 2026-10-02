@@ -5,5 +5,7 @@ import java.util.Optional;
 public interface SubmissionRepository {
     Optional<Submission> findById(SubmissionId id);
 
+    Optional<Submission> findByIdForUpdate(SubmissionId id);
+
     Submission save(Submission submission);
 }
