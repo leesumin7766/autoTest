@@ -124,6 +124,9 @@
     depends_on:
       db:
         condition: service_healthy
+      # Initialize Flyway before AI creates tables in the shared public schema.
+      test-management-service:
+        condition: service_healthy
 
   crawler-service:
     build: ./crawler-service
