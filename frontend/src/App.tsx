@@ -19,12 +19,18 @@ type DocumentResult = {
 }
 
 type AiDeliveryResult = {
-  status: 'NOT_READY' | 'PENDING' | 'DELIVERED' | 'FAILED'
+  status: 'NOT_READY' | 'PENDING' | 'DELIVERED' | 'FAILED' | 'BLOCKED'
   attempts: number
   lastError: string | null
   deliveredAt: string | null
   updatedAt: string | null
   retryable: boolean
+  preflight: PreflightResult | null
+}
+
+type PreflightResult = {
+  decision: 'BLOCKED' | 'READY_WITH_WARNINGS' | 'READY'
+  warnings: { code: string; role: Role | null; severity: 'BLOCKER' | 'WARNING' | 'INFO'; message: string }[]
 }
 
 type SubmissionResponse = {
@@ -55,7 +61,7 @@ function App() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [aiDelivery, setAiDelivery] = useState<AiDeliveryResult>({
-    status: 'NOT_READY', attempts: 0, lastError: null, deliveredAt: null, updatedAt: null, retryable: false,
+    status: 'NOT_READY', attempts: 0, lastError: null, deliveredAt: null, updatedAt: null, retryable: false, preflight: null,
   })
 
   const updateAiDelivery = (delivery?: AiDeliveryResult) => {
@@ -77,7 +83,7 @@ function App() {
     form.append('role', role)
 
     let response: Response
-    if (activeSubmissionId && documents[role]?.status === 'FAILED') {
+    if (activeSubmissionId && (documents[role]?.status === 'FAILED' || (documents[role] && aiDelivery.status === 'BLOCKED'))) {
       response = await fetch(`/api/submissions/${activeSubmissionId}/files/${role}/replace`, {
         method: 'POST',
         headers: { 'X-Member-Id': memberId },
@@ -194,11 +200,13 @@ function App() {
     setDocuments({})
     setErrors({})
     setNotice('')
-    setAiDelivery({ status: 'NOT_READY', attempts: 0, lastError: null, deliveredAt: null, updatedAt: null, retryable: false })
+    setAiDelivery({ status: 'NOT_READY', attempts: 0, lastError: null, deliveredAt: null, updatedAt: null, retryable: false, preflight: null })
   }
 
   const selectedCount = roles.filter(({ id }) => files[id]).length
   const registeredCount = Object.keys(documents).length
+  const isReplaceable = (document?: DocumentResult) =>
+    Boolean(document && (document.status === 'FAILED' || aiDelivery.status === 'BLOCKED'))
 
   return (
     <main className="workspace">
@@ -289,7 +297,7 @@ function App() {
                       key={`${id}-${fileSelectionGeneration}`}
                       type="file"
                       accept={acceptedFiles}
-                      disabled={busy || Boolean(document && document.status !== 'FAILED')}
+                      disabled={busy || Boolean(document && !isReplaceable(document))}
                       onChange={(event) => {
                         const nextFile = event.target.files?.[0]
                         if (nextFile) {
@@ -299,9 +307,9 @@ function App() {
                         }
                       }}
                     />
-                    <span>{selectedFile ? '파일 변경' : document?.status === 'FAILED' ? '실패 문서 교체' : document ? '등록 완료' : '파일 선택'}</span>
+                    <span>{selectedFile ? '파일 변경' : document?.status === 'FAILED' ? '실패 문서 교체' : document && aiDelivery.status === 'BLOCKED' ? '문서 교체' : document ? '등록 완료' : '파일 선택'}</span>
                   </label>
-                  {selectedFile && (!document || document.status === 'FAILED') && (
+                  {selectedFile && (!document || isReplaceable(document)) && (
                     <button className="upload-one" type="button" disabled={busy} onClick={() => void uploadRoles([id])}>업로드</button>
                   )}
                 </div>
@@ -325,11 +333,20 @@ function App() {
         {submissionId && <p className="set-confirmation"><span /> 문서 세트 연결됨 <code>{submissionId}</code></p>}
         {submissionId && (
           <div className={`ai-delivery ai-delivery-${aiDelivery.status.toLowerCase()}`} role="status">
-            <span>AI 전달: {aiDelivery.status === 'DELIVERED' ? '완료' : aiDelivery.status === 'FAILED' ? '실패' : aiDelivery.status === 'PENDING' ? aiDelivery.retryable ? '중단됨' : '진행 중' : '문서 준비 대기'}</span>
+            <span>AI 전달: {aiDelivery.status === 'DELIVERED' ? '완료' : aiDelivery.status === 'BLOCKED' ? '사전 점검으로 차단됨' : aiDelivery.status === 'FAILED' ? '실패' : aiDelivery.status === 'PENDING' ? aiDelivery.retryable ? '중단됨' : '진행 중' : '문서 준비 대기'}</span>
+            {aiDelivery.status === 'BLOCKED' && <span>문서 원본과 추출 텍스트는 보관됩니다. 아래 사유를 확인하고 문서를 교체하면 같은 세트가 다시 점검됩니다.</span>}
             {aiDelivery.status === 'FAILED' && <span>{aiDelivery.lastError}</span>}
             {aiDelivery.status === 'PENDING' && aiDelivery.retryable && <span>오래된 전달 시도를 복구할 수 있습니다.</span>}
             {aiDelivery.retryable && <button className="quiet-button" type="button" onClick={() => void retryAiDelivery()} disabled={busy}>{aiDelivery.status === 'PENDING' ? '전달 복구' : '전달 재시도'}</button>}
             {aiDelivery.status === 'DELIVERED' && <span>문서 업로드 완료 · AI 전달 완료</span>}
+            {aiDelivery.preflight && (
+              <div className={`preflight-result preflight-${aiDelivery.preflight.decision.toLowerCase()}`}>
+                <strong>LLM 사전 점검: {aiDelivery.preflight.decision === 'BLOCKED' ? '중단 권고' : aiDelivery.preflight.decision === 'READY_WITH_WARNINGS' ? '경고 후 진행' : '통과'}</strong>
+                {aiDelivery.preflight.warnings.map((warning, index) => (
+                  <span key={`${warning.code}-${warning.role ?? 'set'}-${index}`}>{warning.role ? `${warning.role}: ` : ''}{warning.message}</span>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </section>

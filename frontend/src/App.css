@@ -207,6 +207,9 @@
 .ai-delivery-failed { border-color: #b34e3d; color: #9b4436; }
 .ai-delivery-pending { border-color: #a66a1c; color: #8c5a19; }
 .ai-delivery .quiet-button { min-height: 30px; }
+.preflight-result { display: flex; flex-basis: 100%; flex-direction: column; gap: 5px; padding-top: 8px; border-top: 1px solid rgba(80, 100, 85, .18); }
+.preflight-blocked { color: #9b4436; }
+.preflight-ready_with_warnings { color: #8c5a19; }
 .page-footer { display: flex; justify-content: space-between; gap: 15px; margin-top: 45px; padding: 14px 0 22px; border-top: 1px solid var(--line); color: #a0aaa2; font-size: 8px; letter-spacing: .7px; }
 
 @media (max-width: 700px) {

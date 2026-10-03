@@ -134,8 +134,9 @@ public class SubmissionService {
                 .filter(document -> document.role() == role)
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("No document exists for submission role: " + role));
-        if (failedDocument.status() != SubmissionStatus.FAILED) {
-            throw new IllegalArgumentException("Only a failed document can be replaced");
+        if (failedDocument.status() != SubmissionStatus.FAILED
+                && !submissionPersistenceService.isAiDeliveryBlocked(submissionId)) {
+            throw new IllegalArgumentException("Only a failed or AI-blocked document can be replaced");
         }
 
         PreparedFile prepared = prepare(file);

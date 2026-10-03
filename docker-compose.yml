@@ -118,6 +118,7 @@
       - "8005:8005"
     environment:
       AI_DATABASE_URL: postgresql://test:test@db:5432/autotest
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
     volumes:
       - ./ai-service:/app
     depends_on:

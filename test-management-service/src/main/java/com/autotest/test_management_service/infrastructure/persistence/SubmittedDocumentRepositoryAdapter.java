@@ -36,11 +36,19 @@ public class SubmittedDocumentRepositoryAdapter implements SubmittedDocumentRepo
 
     @Override
     public boolean replaceFailedDocument(java.util.UUID previousFileId, SubmittedDocument replacement) {
+        return replaceDocument(previousFileId,
+                com.autotest.test_management_service.domain.submission.SubmissionStatus.FAILED, replacement);
+    }
+
+    @Override
+    public boolean replaceDocument(java.util.UUID previousFileId,
+            com.autotest.test_management_service.domain.submission.SubmissionStatus expectedStatus,
+            SubmittedDocument replacement) {
         int removed = repository.deleteFailedByIdAndRole(
                 previousFileId,
                 replacement.submissionId().value(),
                 replacement.role(),
-                com.autotest.test_management_service.domain.submission.SubmissionStatus.FAILED);
+                expectedStatus);
         if (removed != 1) {
             return false;
         }

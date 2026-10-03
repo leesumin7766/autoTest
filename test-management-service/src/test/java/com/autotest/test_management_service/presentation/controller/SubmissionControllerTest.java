@@ -159,6 +159,30 @@ class SubmissionControllerTest {
     }
 
     @Test
+    void replacementIsAllowedForBlockedOrResetSubmissionsButNotPendingOrDelivered() throws Exception {
+        SubmissionId id = SubmissionId.generate();
+        when(submissionService.findById(id)).thenReturn(Optional.of(
+                submission(id, SubmissionStatus.PARSED)));
+        when(submissionService.replaceFailedDocument(any(), any(), any(), any())).thenReturn(
+                document(id, SubmissionStatus.PARSED, null));
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "replacement.pdf", "application/pdf", "pdf".getBytes(StandardCharsets.UTF_8));
+
+        record Case(String status, int attempts, int expected) { }
+        for (Case replacementCase : List.of(
+                new Case("BLOCKED", 1, 200), new Case("NOT_READY", 1, 200), new Case("NOT_READY", 0, 200),
+                new Case("PENDING", 1, 409), new Case("DELIVERED", 1, 409), new Case("FAILED", 1, 409))) {
+            when(aiDocumentDeliveryService.getStatus(id.value())).thenReturn(
+                    new AiDocumentDeliveryService.DeliveryResult(replacementCase.status(), replacementCase.attempts(), null, null));
+
+            mockMvc.perform(multipart("/api/submissions/{id}/files/{role}/replace", id.value(), "AGREEMENT")
+                            .file(file)
+                            .header("X-Member-Id", "1"))
+                    .andExpect(status().is(replacementCase.expected()));
+        }
+    }
+
+    @Test
     void unsupportedUploadFormatStillReturns400() throws Exception {
         doThrow(new IllegalArgumentException("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다."))
                 .when(submissionService).submit(any(), any(com.autotest.test_management_service.domain.submission.SubmissionType.class), eq(new MemberId(1L)), eq(new ProductId(100L)));
