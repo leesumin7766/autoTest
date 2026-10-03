@@ -119,6 +119,11 @@
     environment:
       AI_DATABASE_URL: postgresql://test:test@db:5432/autotest
       TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      # Development runs in explicit mock mode; set LLM_MODE=real only after a provider is connected.
+      LLM_MODE: ${LLM_MODE:-mock}
+      MOCK_LLM_DELAY_SECONDS: ${MOCK_LLM_DELAY_SECONDS:-3}
+      EX_API: ${EX_API:-}
+      LLM_MODEL: ${LLM_MODEL:-}
     volumes:
       - ./ai-service:/app
     depends_on:

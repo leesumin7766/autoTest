@@ -38,3 +38,6 @@ db_data/
 
 # Env
 .env
+# Python runtime caches
+__pycache__/
+*.py[cod]

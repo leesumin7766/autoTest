@@ -8,6 +8,7 @@
 - LLM 전 문서 적합성 판정에는 결정적인 프로그램 검사와 Jev(TypeSafe) 의미 판정을 사용한다. 제품 설명·TC 생성은 생성형 LLM에 맡긴다.
 - **현재 구현 범위는 업로드, 원본 저장, 텍스트 추출, DB 저장, ai-service 문서 접수 및 실패 복구까지다.**
 - `dev-ai-service`의 다음 구현 범위는 LLM 전 문서 필터다. BLOCKED는 생성을 중단하고, READY_WITH_WARNINGS는 경고를 붙여 진행하며, READY는 정상 진행한다. 생성형 LLM의 제품 설명·TC 생성과 테스트 실행은 별도 범위다.
+- 제품 설명 문서 비동기 생성(PDF)은 구현되어 있다(7절). 실제 LLM 제공업체는 미선정이며 개발은 mock 모드로 한다. TC 생성은 아직 범위 밖이다.
 - 코드 제출/채점 시스템이 아니다. Main.java 및 @test input: 주석 파싱·채점 로직을 도입하지 않는다.
 
 ## 2. 실행 구성
@@ -137,3 +138,15 @@ Gateway 비교 요청은 주소를 http://localhost:8080/api/submissions로 변�
 운영 스키마 변경 전에 custom-format pg_dump 백업을 확보한다. 복구가 필요하면 운영 DB를 바로 덮어쓰지 말고 별도 DB에 백업을 복원해 확인한다.
 
 최종 보고에는 Gateway 404 원인, `sample/` 실제 파일 역할별 업로드 결과, 검증 제출 ID, 실패·PENDING 복구 결과, 다음 LLM 작업이 사용할 수신 API 계약을 정리한다.
+
+## 7. 제품 설명 문서 생성 (비동기, PDF)
+
+- 구조: test-management-service가 작업·상태·소유권·저장을 맡고, ai-service는 상태 없이 내용 생성(`/api/v1/product-descriptions/content`)과 출력(`/render`)만 한다.
+- 생성 조건(서버 검증): 제출 소유자, 세 문서 PARSED, AI 전달 `DELIVERED`, 저장된 사전 점검 `READY`/`READY_WITH_WARNINGS`, 검증 당시 문서 digest(`submission_ai_deliveries.verified_document_digest`)와 현재 문서 일치. 그 외는 409(`PREFLIGHT_BLOCKED`, `PREFLIGHT_NOT_VERIFIED`, `PREFLIGHT_IN_PROGRESS`, `DOCUMENT_VERSION_MISMATCH`, `DOCUMENTS_NOT_READY`).
+- API(헤더 `X-Member-Id`): `POST|GET /api/submissions/{id}/product-description`, `POST .../{jobId}/cancel`, `POST .../{jobId}/rerender`(PDF 출력 실패만), `GET .../{jobId}/download`(완료 건만).
+- 작업 상태: `GENERATING_CONTENT`, `RENDERING`, `COMPLETED`, `CONTENT_FAILED`, `RENDER_FAILED`, `CANCELED`. 제출당 활성 작업 1개를 DB 부분 유니크 인덱스와 제출 행 잠금으로 보장한다. 모든 전이는 (작업, attempt, 기대 상태) 조건부 UPDATE라서 중단·완료 경합에서 먼저 커밋된 쪽만 반영되고 늦은 결과 파일은 정리 outbox로 간다.
+- 복구: 워커가 5초마다 heartbeat. 30초 이상 갱신이 없거나 서버 시작 시 활성 상태로 남은 작업은 `INTERRUPTED`로 닫는다(내용이 저장됐으면 `RENDER_FAILED`). TMS 단일 인스턴스를 가정한다.
+- 결과 PDF는 `generated/product-descriptions/{submissionId}/` 접두사로 저장하며 업로드 원본과 구분한다. 완료 PDF는 다운로드 때 재생성하지 않는다.
+- 템플릿은 `ai-service/doc_templates/product-description/`(버전 있는 패키지)에서만 정의한다. 수정·검증 절차는 `ai-service/doc_templates/README.md`. 작업 행에 템플릿 스냅샷과 구조화 문서를 저장한다.
+- LLM: `LLM_MODE=mock|real`(compose 기본 mock), 실제 키는 `EX_API`. real에서 키가 없거나 `inputlater`면 설정 오류이며 mock으로 대체하지 않는다. 실제 제공업체 연결 지점은 `ai-service/product_description/llm.py`의 `ExternalLlmProvider`.
+- 테스트: `docker compose run --rm --no-deps ai-service python -m unittest test_product_description`, `.\gradlew.bat :test-management-service:test`(격리 DB `autotest_test`). Java 서비스 이미지는 `bootJar` 후 `docker compose up -d --build`로 반영한다.

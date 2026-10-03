@@ -1,0 +1,44 @@
+{
+  "page": {
+    "size": "A4",
+    "marginsMm": { "top": 22, "bottom": 20, "left": 20, "right": 20 }
+  },
+  "fonts": {
+    "regular": {
+      "name": "TemplateRegular",
+      "candidates": [
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        "C:/Windows/Fonts/malgun.ttf"
+      ]
+    },
+    "bold": {
+      "name": "TemplateBold",
+      "candidates": [
+        "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+        "C:/Windows/Fonts/malgunbd.ttf"
+      ]
+    }
+  },
+  "styles": {
+    "title": { "size": 24, "leading": 32, "color": "#111827", "spaceAfter": 6 },
+    "banner": { "size": 11, "leading": 15, "color": "#B91C1C", "spaceAfter": 10 },
+    "heading": { "size": 14, "leading": 20, "color": "#111827", "spaceBefore": 16, "spaceAfter": 6 },
+    "body": { "size": 10, "leading": 16, "color": "#1F2937", "spaceAfter": 6 },
+    "bullet": { "size": 10, "leading": 16, "color": "#1F2937", "indent": 12 },
+    "sources": { "size": 8, "leading": 11, "color": "#6B7280", "spaceAfter": 4 },
+    "tableHeader": { "size": 9.5, "leading": 14, "color": "#111827" },
+    "tableCell": { "size": 9.5, "leading": 14, "color": "#1F2937" }
+  },
+  "table": {
+    "headerBackground": "#E5E7EB",
+    "gridColor": "#9CA3AF",
+    "zebraBackground": "#F9FAFB",
+    "padding": 5
+  },
+  "headingNumbering": true,
+  "showSources": true,
+  "wordWrap": null,
+  "pageBreakAfterSections": ["cover"],
+  "header": { "showTitle": true, "showBanner": true },
+  "footer": { "pageNumberFormat": "{page} / {pages}" }
+}

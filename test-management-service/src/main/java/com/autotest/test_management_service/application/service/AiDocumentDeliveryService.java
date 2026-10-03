@@ -87,9 +87,10 @@ public class AiDocumentDeliveryService {
             }
             jdbcTemplate.update("""
                     UPDATE submission_ai_deliveries
-                    SET preflight_result = ?::jsonb
+                    SET preflight_result = ?::jsonb, verified_document_digest = ?
                     WHERE submission_id = ? AND status = 'PENDING' AND attempt_count = ?
-                    """, objectMapper.writeValueAsString(receipt.preflight()), submissionId.value(), attempt);
+                    """, objectMapper.writeValueAsString(receipt.preflight()), DocumentDigest.of(documents),
+                    submissionId.value(), attempt);
             jdbcTemplate.update("""
                     UPDATE submission_ai_deliveries
                     SET status = 'DELIVERED', last_error = NULL, delivered_at = now(), updated_at = now()

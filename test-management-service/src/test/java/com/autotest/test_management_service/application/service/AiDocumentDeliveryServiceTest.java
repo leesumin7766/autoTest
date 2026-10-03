@@ -317,9 +317,9 @@ class AiDocumentDeliveryServiceTest {
             if (sql.contains("INSERT INTO submission_ai_deliveries")) {
                 return 1;
             }
-            if (sql.contains("SET preflight_result")) {
-                UUID id = (UUID) arguments[1];
-                int expectedAttempt = (Integer) arguments[2];
+            if (sql.contains("SET preflight_result") && sql.contains("verified_document_digest")) {
+                UUID id = (UUID) arguments[2];
+                int expectedAttempt = (Integer) arguments[3];
                 if (submissionId.equals(id) && "PENDING".equals(status) && attempts == expectedAttempt) {
                     try {
                         preflight = new ObjectMapper().readTree((String) arguments[0]);
