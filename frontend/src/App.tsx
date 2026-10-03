@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './App.css'
+import { ProductDescriptionPanel } from './ProductDescriptionPanel'
 
 type Role = 'AGREEMENT' | 'FUNCTION_LIST' | 'MANUAL'
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
@@ -60,6 +61,7 @@ function App() {
   const [errors, setErrors] = useState<Partial<Record<Role, string>>>({})
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [justUploaded, setJustUploaded] = useState(false)
   const [aiDelivery, setAiDelivery] = useState<AiDeliveryResult>({
     status: 'NOT_READY', attempts: 0, lastError: null, deliveredAt: null, updatedAt: null, retryable: false, preflight: null,
   })
@@ -129,6 +131,7 @@ function App() {
     }
     setBusy(true)
     setNotice('')
+    setJustUploaded(true)
     let activeSubmissionId = submissionId
     for (const role of selectedRoles) {
       const file = files[role]
@@ -151,6 +154,7 @@ function App() {
     if (!submissionId.trim()) return
     setBusy(true)
     setNotice('')
+    setJustUploaded(false)
     try {
       const response = await fetch(`/api/submissions/${submissionId.trim()}`)
       if (!response.ok) throw new Error(response.status === 404 ? '문서 세트를 찾을 수 없습니다.' : '조회에 실패했습니다.')
@@ -194,6 +198,7 @@ function App() {
 
   const startNewSet = () => {
     setSubmissionId('')
+    setJustUploaded(false)
     setFileSelectionGeneration((generation) => generation + 1)
     setFiles({})
     setStates({})
@@ -348,6 +353,16 @@ function App() {
               </div>
             )}
           </div>
+        )}
+        {submissionId && (
+          <ProductDescriptionPanel
+            submissionId={submissionId}
+            memberId={memberId}
+            deliveryStatus={aiDelivery.status}
+            preflight={aiDelivery.preflight}
+            autoStart={justUploaded}
+            onAutoStarted={() => setJustUploaded(false)}
+          />
         )}
       </section>
       <footer className="page-footer"><span>AUTOTEST DOCUMENT INTAKE</span><span>SECURE FILE VALIDATION · TEXT EXTRACTION</span></footer>

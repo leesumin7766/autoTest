@@ -13,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -51,6 +53,23 @@ class S3FileStorageAdapterTest {
 
         try (var storedFiles = Files.walk(temporaryDirectory)) {
             assertTrue(storedFiles.noneMatch(Files::isRegularFile));
+        }
+    }
+
+    @Test
+    void keepsGeneratedFilesUnderTheirOwnPrefixAndRejectsUnsafePrefixes() throws Exception {
+        S3FileStorageAdapter adapter = new S3FileStorageAdapter(
+                mock(S3Client.class), "autotest-docs", false, temporaryDirectory);
+
+        StoredPath generated = adapter.storeUnderPrefix("generated/product-descriptions/abc",
+                new ByteArrayInputStream(new byte[]{1}), "result.pdf", "application/pdf");
+        StoredPath upload = adapter.store(new ByteArrayInputStream(new byte[]{2}), "result.pdf", "application/pdf");
+
+        assertTrue(generated.value().replace('\\', '/').contains("/generated/product-descriptions/abc/"));
+        assertFalse(upload.value().replace('\\', '/').contains("/generated/"));
+        for (String unsafe : new String[]{"../escape", "/abs", "a//b", "trailing/", "UPPER"}) {
+            assertThrows(IllegalArgumentException.class, () -> adapter.storeUnderPrefix(
+                    unsafe, new ByteArrayInputStream(new byte[]{1}), "x.pdf", "application/pdf"));
         }
     }
 }

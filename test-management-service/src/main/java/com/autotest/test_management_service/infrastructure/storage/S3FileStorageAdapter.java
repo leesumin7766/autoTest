@@ -55,12 +55,23 @@ public final class S3FileStorageAdapter implements FileStoragePort {
 
     @Override
     public StoredPath store(InputStream content, String originalName, String contentType) {
+        return storeWithKey(content, createObjectKey(originalName), contentType);
+    }
+
+    @Override
+    public StoredPath storeUnderPrefix(String keyPrefix, InputStream content, String fileName, String contentType) {
+        Objects.requireNonNull(keyPrefix, "keyPrefix");
+        if (!keyPrefix.matches("[a-z0-9][a-z0-9/_-]*") || keyPrefix.contains("//") || keyPrefix.endsWith("/")) {
+            throw new IllegalArgumentException("Invalid storage key prefix");
+        }
+        return storeWithKey(content, keyPrefix + "/" + createObjectKey(fileName), contentType);
+    }
+
+    private StoredPath storeWithKey(InputStream content, String objectKey, String contentType) {
         Objects.requireNonNull(content, "content");
-        Objects.requireNonNull(originalName, "originalName");
         Objects.requireNonNull(contentType, "contentType");
 
         byte[] bytes = readContent(content);
-        String objectKey = createObjectKey(originalName);
         if (!enabled) {
             return storeLocally(objectKey, bytes);
         }
