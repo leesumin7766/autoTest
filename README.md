@@ -281,6 +281,8 @@ docker compose logs -f test-management-service seaweedfs
 
 Compose에는 서비스 정의 9개가 있으며 frontend는 포함되지 않습니다. crawler 컨테이너는 `node:24.21.0-slim`을 기반으로 빌드됩니다. 실행 성공 여부는 실제 컨테이너 상태와 로그로 확인해야 합니다.
 
+새 DB에서는 `test-management-service`가 Flyway 마이그레이션을 완료하고 healthy가 된 뒤 `ai-service`를 시작합니다. 두 서비스가 같은 `public` 스키마를 사용하므로 AI 테이블이 먼저 생성되면 Flyway가 `Found non-empty schema(s) "public" but no schema history table` 오류로 중단됩니다. 이미 이 오류가 발생했다면 볼륨을 삭제하지 말고 DB 백업과 테이블 구성을 먼저 확인합니다. AI 테이블만 있고 제출 테이블이 없는 경우에 한해 일회성 `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true`, `SPRING_FLYWAY_BASELINE_VERSION=0`으로 V1부터 적용한 뒤 두 설정을 제거합니다. 기존 제출 테이블이 있는 DB에는 이 복구 방법을 그대로 적용하지 않습니다.
+
 ### 개별 서비스 개발
 
 다음 명령은 Windows PowerShell 기준이며 각 블록은 프로젝트 루트의 별도 터미널에서 시작합니다.
