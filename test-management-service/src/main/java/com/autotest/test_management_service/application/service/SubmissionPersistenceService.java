@@ -22,6 +22,8 @@ import com.autotest.test_management_service.infrastructure.persistence.S3Cleanup
 
 @Service
 public class SubmissionPersistenceService {
+    // Longer than the AI HTTP read timeout so a live attempt is never claimed twice.
+    public static final java.time.Duration AI_DELIVERY_LEASE = java.time.Duration.ofSeconds(45);
     private static final List<SubmissionType> REQUIRED_ROLES = List.of(
             SubmissionType.AGREEMENT, SubmissionType.FUNCTION_LIST, SubmissionType.MANUAL);
 
@@ -67,12 +69,27 @@ public class SubmissionPersistenceService {
         ) {
             Submission submission = submissionRepository.findByIdForUpdate(replacement.submissionId())
                     .orElseThrow(() -> new IllegalArgumentException("Submission not found"));
-            if (hasStartedAiDelivery(replacement.submissionId())) {
+            if (isReplacementClosed(replacement.submissionId())) {
                 throw new IllegalStateException("Document replacement is closed after AI delivery starts");
             }
-        if (!submittedDocumentRepository.replaceFailedDocument(previousFileId, replacement)) {
-            throw new IllegalStateException("Failed document changed before replacement");
-        }
+            boolean blocked = isAiDeliveryBlocked(replacement.submissionId());
+            SubmissionStatus expectedStatus = submittedDocumentRepository
+                    .findBySubmissionId(replacement.submissionId()).stream()
+                    .filter(document -> document.fileId().equals(previousFileId))
+                    .map(SubmittedDocument::status)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Document changed before replacement"));
+            if (!submittedDocumentRepository.replaceDocument(previousFileId, expectedStatus, replacement)) {
+                throw new IllegalStateException("Document changed before replacement");
+            }
+            if (blocked) {
+                jdbcTemplate.update("""
+                        UPDATE submission_ai_deliveries
+                        SET status = 'NOT_READY', preflight_result = NULL, block_reasons = NULL,
+                            blocked_at = NULL, last_error = NULL, updated_at = now()
+                        WHERE submission_id = ? AND status = 'BLOCKED'
+                        """, replacement.submissionId().value());
+            }
             refreshSetStatus(submission, replacement.submissionId());
         cleanupOutboxRepository.schedule(previousStoredPath);
         return replacement;
@@ -116,10 +133,10 @@ public class SubmissionPersistenceService {
         List<Integer> attempts = jdbcTemplate.query("""
                 UPDATE submission_ai_deliveries
                 SET status = 'PENDING', attempt_count = attempt_count + 1, last_error = NULL, updated_at = now()
-                WHERE submission_id = ? AND status <> 'DELIVERED'
-                  AND (status <> 'PENDING' OR updated_at < now() - interval '30 seconds')
+                WHERE submission_id = ? AND status NOT IN ('DELIVERED', 'BLOCKED')
+                  AND (status <> 'PENDING' OR updated_at < now() - (?::double precision * interval '1 second'))
                 RETURNING attempt_count
-                """, (resultSet, rowNumber) -> resultSet.getInt(1), id.value());
+                """, (resultSet, rowNumber) -> resultSet.getInt(1), id.value(), (double) AI_DELIVERY_LEASE.toSeconds());
         if (attempts.isEmpty()) {
             return Optional.empty();
         }
@@ -158,14 +175,24 @@ public class SubmissionPersistenceService {
         return roles.containsAll(REQUIRED_ROLES);
     }
 
-    private boolean hasStartedAiDelivery(SubmissionId id) {
-        Boolean started = jdbcTemplate.queryForObject("""
+    @Transactional(readOnly = true)
+    public boolean isAiDeliveryBlocked(SubmissionId id) {
+        Boolean blocked = jdbcTemplate.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM submission_ai_deliveries WHERE submission_id = ? AND status = 'BLOCKED')
+                """, Boolean.class, id.value());
+        return Boolean.TRUE.equals(blocked);
+    }
+
+    // BLOCKED and the NOT_READY state left by a blocked replacement stay replaceable; a live or finished delivery does not.
+    private boolean isReplacementClosed(SubmissionId id) {
+        Boolean closed = jdbcTemplate.queryForObject("""
                 SELECT EXISTS (
                     SELECT 1 FROM submission_ai_deliveries
-                    WHERE submission_id = ? AND (attempt_count > 0 OR status IN ('PENDING', 'DELIVERED'))
+                    WHERE submission_id = ? AND (status IN ('PENDING', 'DELIVERED')
+                        OR (attempt_count > 0 AND status NOT IN ('BLOCKED', 'NOT_READY')))
                 )
                 """, Boolean.class, id.value());
-        return Boolean.TRUE.equals(started);
+        return Boolean.TRUE.equals(closed);
     }
 
     public record DeliveryClaim(Submission submission, List<SubmittedDocument> documents, int attempt) {

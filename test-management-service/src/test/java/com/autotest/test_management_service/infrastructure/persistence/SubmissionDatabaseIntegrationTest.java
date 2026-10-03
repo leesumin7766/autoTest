@@ -260,8 +260,67 @@ class SubmissionDatabaseIntegrationTest {
         org.mockito.Mockito.verify(fileStoragePort, org.mockito.Mockito.times(2)).delete(oldPath);
         }
 
-        @Test
-        void concurrentReplacementOfSameFailedFileCommitsExactlyOneNewDocument() throws Exception {
+    @Test
+    void blockedSubmissionAllowsReplacementAfterFailedReplacementAndIsRevalidated() throws Exception {
+        stubStorage();
+        byte[] workbook = createWorkbook(true);
+        UUID id = UUID.fromString(upload("agreement.xlsx", workbook).get("submissionId").asText());
+        submissionIds.add(id);
+        uploadAdditional(id, "FUNCTION_LIST", "functions.xlsx", workbook);
+        uploadAdditional(id, "MANUAL", "manual.xlsx", workbook);
+        SubmissionId submissionId = SubmissionId.of(id);
+
+        assertTrue(submissionPersistenceService.claimAiDelivery(submissionId).isPresent());
+        jdbcTemplate.update("""
+                UPDATE submission_ai_deliveries
+                SET status = 'BLOCKED', preflight_result = '{"decision":"BLOCKED"}'::jsonb,
+                    block_reasons = '[{"code":"PRODUCT_MISMATCH"}]'::jsonb, blocked_at = now()
+                WHERE submission_id = ?
+                """, id);
+        assertTrue(submissionPersistenceService.claimAiDelivery(submissionId).isEmpty());
+        assertTrue(submissionPersistenceService.isAiDeliveryBlocked(submissionId));
+
+        when(aiDocumentDeliveryService.getStatus(id)).thenReturn(
+            new AiDocumentDeliveryService.DeliveryResult("BLOCKED", 1, null, null));
+        int failedReplacement = replace(id, "empty.xlsx", XLSX_CONTENT_TYPE, createWorkbook(false));
+        assertTrue(failedReplacement >= 400);
+        assertEquals("agreement.xlsx", jdbcTemplate.queryForObject(
+            "SELECT original_filename FROM submission_files WHERE submission_id = ? AND role = 'AGREEMENT'",
+            String.class, id));
+        assertEquals("BLOCKED", jdbcTemplate.queryForObject(
+            "SELECT status FROM submission_ai_deliveries WHERE submission_id = ?", String.class, id));
+
+        assertEquals(200, replace(id, "corrected.pdf", "application/pdf", createPdf("Corrected agreement")));
+        assertEquals("corrected.pdf", jdbcTemplate.queryForObject(
+            "SELECT original_filename FROM submission_files WHERE submission_id = ? AND role = 'AGREEMENT'",
+            String.class, id));
+        Map<String, Object> delivery = jdbcTemplate.queryForMap(
+            "SELECT status, attempt_count, preflight_result, block_reasons, blocked_at "
+                + "FROM submission_ai_deliveries WHERE submission_id = ?", id);
+        assertEquals("NOT_READY", delivery.get("status"));
+        assertEquals(1, delivery.get("attempt_count"));
+        assertEquals(null, delivery.get("preflight_result"));
+        assertEquals(null, delivery.get("block_reasons"));
+        assertEquals(null, delivery.get("blocked_at"));
+
+        assertEquals(2, submissionPersistenceService.claimAiDelivery(submissionId).orElseThrow().attempt());
+    }
+
+    @Test
+    void replacementIsRejectedWhileDeliveryIsPendingOrDelivered() throws Exception {
+        stubStorage();
+        UUID id = UUID.fromString(upload("empty.xlsx", createWorkbook(false)).get("submissionId").asText());
+        submissionIds.add(id);
+
+        for (String closedStatus : List.of("PENDING", "DELIVERED")) {
+            when(aiDocumentDeliveryService.getStatus(id)).thenReturn(
+                new AiDocumentDeliveryService.DeliveryResult(closedStatus, 1, null, null));
+            assertEquals(409, replace(id, "replacement.pdf", "application/pdf", createPdf("text")));
+        }
+    }
+
+    @Test
+    void concurrentReplacementOfSameFailedFileCommitsExactlyOneNewDocument() throws Exception {
         stubStorage();
         JsonNode failed = upload("empty.xlsx", createWorkbook(false));
         UUID id = UUID.fromString(failed.get("submissionId").asText());

@@ -45,7 +45,7 @@ docker-compose.yml이 서비스 구성의 기준이다. 사용자 제공 Docker 
 - 문서 역할 AGREEMENT, FUNCTION_LIST, MANUAL은 파일 형식과 구분한다.
 - 첫 문서: POST /api/submissions, multipart file, productId, role, 헤더 X-Member-Id.
 - 추가 문서: POST /api/submissions/{id}/files, multipart file, role, 헤더 X-Member-Id.
-- 실패 문서 교체: POST /api/submissions/{id}/files/{role}/replace, multipart file, 헤더 X-Member-Id. `FAILED` 파싱 결과만 교체한다.
+- 실패 문서 교체: POST /api/submissions/{id}/files/{role}/replace, multipart file, 헤더 X-Member-Id. `FAILED` 파싱 결과 또는 AI 전달 상태가 `BLOCKED`인 제출의 문서를 교체한다.
 - 조회: GET /api/submissions/{id}.
 - AI 전달 재시도: POST /api/submissions/{id}/ai-delivery/retry, 헤더 X-Member-Id.
 - 세 문서를 한 번에 선택해도 현재 프런트엔드는 순차 요청한다. 같은 제출 ID 아래 역할별 문서를 저장한다.
@@ -72,10 +72,11 @@ docker-compose.yml이 서비스 구성의 기준이다. 사용자 제공 Docker 
 - 필수 역할 누락·중복 및 빈 추출 텍스트를 검증한다. ai-service는 이번에는 접수 결과만 반환한다.
 - AI 전달 상태는 업로드·파싱 상태와 구분한다.
 - 전달 실패 시 원본·추출 결과를 보존하고 재업로드 없이 전달을 재시도할 수 있게 한다.
-- FAILED 또는 30초 이상 갱신되지 않은 PENDING은 조회 응답의 `aiDelivery.retryable=true`로 나타내고 프런트에서 재시도할 수 있다. 새로고침 후에도 조회로 복구한다.
+- FAILED 또는 45초(전달 lease) 이상 갱신되지 않은 PENDING은 조회 응답의 `aiDelivery.retryable=true`로 나타내고 프런트에서 재시도할 수 있다. 새로고침 후에도 조회로 복구한다. `BLOCKED`는 사전 점검 차단이며 재시도 대상이 아니다.
 - PENDING 시도는 attempt_count로 fence한다. 이전 요청이 늦게 끝나도 최신 시도의 상태를 덮어쓰지 않는다.
 - 교체와 AI 전달 시작은 같은 제출 행 비관적 잠금을 사용한다. AI 전달 claim은 문서 준비 여부와 attempt를 확정한 뒤 트랜잭션을 끝내며 잠금 해제 후 HTTP를 호출한다.
-- 실패 문서 교체는 AI 전달 시도 전인 경우만 허용한다. 새 파싱 실패 또는 동시 교체 패배 시 기존 DB 문서와 원본을 보존한다.
+- 문서 교체는 `FAILED` 파싱 문서이거나 AI 전달이 `BLOCKED`인 경우 허용한다. `BLOCKED` 교체 성공 시 전달 상태는 `NOT_READY`로 돌아가 같은 요청에서 재검증하며, 교체 파싱이 실패하면 기존 문서·상태를 보존하고 다시 교체할 수 있다. `PENDING`·`DELIVERED`와 통신 실패(`FAILED`) 후 시도 이력이 있는 제출은 교체를 거부한다. 새 파싱 실패 또는 동시 교체 패배 시 기존 DB 문서와 원본을 보존한다.
+- `BLOCKED` 판정은 ai-service가 문서 본문을 저장하지 않고 TMS가 판정·차단 사유만 저장한다. 같은 제출 ID·본문 해시의 Jev 호출은 ai-service DB(`ai_preflight_attempts`, 본문 없음)의 선점·lease(30초)로 중복 방지한다. 시간 계층: Jev 마감 13초 < 대기 15초 < TMS 읽기 20초 < ai lease 30초 < TMS 전달 lease 45초.
 - 교체 전 원본 및 DB 반영 실패로 남은 새 원본은 트랜잭션 안에서 s3_cleanup_outbox에 예약한다. 커밋 후 worker가 삭제하며 실패는 재시도한다. 현재 submission_files가 참조하는 원본은 삭제하지 않는다.
 - 기존 Flyway 파일을 수정하지 않는다. V5는 legacy 파일 정보를 archive에 보존하고 중복 컬럼을 제거한다. V6는 legacy 실패 이유를 보존하고 문서 행으로 세트 상태를 재계산한 뒤 submissions의 중복 failure_reason을 제거한다. Hibernate는 ddl-auto=validate만 사용한다.
 - AI 접수 응답의 `accepted=true`, 제출 ID 일치, 문서 수 3을 확인한 경우에만 DELIVERED로 기록한다.
@@ -87,7 +88,7 @@ docker-compose.yml이 서비스 구성의 기준이다. 사용자 제공 Docker 
 
 - 업로드 컨트롤러, 역할별 문서 저장, 문서별 파서 코드, Vite 프록시가 존재한다.
 - 파서의 실제 지원 범위·추출 품질은 문서로 검증한다. 기존 파서를 일괄 교체하지 않는다.
-- ai-service는 문서 접수·중복 방지 API를 제공한다. Jev 필터와 생성형 LLM 연동은 미구현이다.
+- ai-service는 문서 접수·중복 방지·LLM 전 사전 점검 API를 제공한다. 생성형 LLM 연동은 미구현이다.
 - Jev 필터는 출력 형식이 구조화되어도 판정 정확성이 자동으로 보장되는 것은 아니므로 실제 샘플과 손상 문서로 확인한다.
 - 과거 `/api/submissions` 404 원인은 Gateway 모듈에 Spring Cloud Gateway 의존성이 없고 실행 이미지도 오래된 MVC 이미지였던 것이다. WebFlux Gateway 의존성과 라우트 설정을 적용했고, 최신 컨테이너에서 Vite→Gateway→TMS 요청이 415 multipart 검증 응답까지 도달하는 것을 확인했다.
 - 과거 `Failed to fetch`는 HTTP 응답이 아닌 연결 실패다. 당시 상세 브라우저 오류 기록은 보존되지 않아 최초 원인은 단정하지 않는다. Vite 5173 및 프록시 경로는 현재 정상 동작한다.
@@ -110,7 +111,7 @@ docker-compose.yml이 서비스 구성의 기준이다. 사용자 제공 Docker 
 
 - 프런트엔드에서 실제 문서 3개 업로드 및 동일 제출 ID 아래 세 역할 저장 확인.
 - SeaweedFS 원본 저장·조회와 DB 추출 텍스트 확인.
-- 필수 문서 미준비·파싱 실패 시 AI 전달하지 않음. 파싱 실패 문서는 AI 전달 전 같은 역할 교체 가능.
+- 필수 문서 미준비·파싱 실패 시 AI 전달하지 않음. 파싱 실패 문서는 AI 전달 전 또는 `BLOCKED` 상태에서 같은 역할 교체 가능.
 - ai-service의 세 문서 역할·식별자·추출 텍스트 수신 확인.
 - 프런트엔드에서 업로드 상태와 AI 전달 상태를 구분해 표시.
 - ai-service 중단 시 문서 보존 및 전달 재시도 확인.

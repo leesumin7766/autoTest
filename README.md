@@ -1,8 +1,8 @@
 # autoTest - 문서 기반 AI 테스트케이스 자동 생성 및 결함 탐지 플랫폼
 
-> 시험합의서, 기능리스트, 제품 매뉴얼을 접수·추출하고 ai-service에 전달합니다. 다음 단계에서는 LLM 실행 전에 프로그램 규칙과 Jev(TypeSafe)로 문서 적합성을 판정하고, 통과한 문서로 제품 설명과 테스트케이스를 생성합니다.
+> 시험합의서, 기능리스트, 제품 매뉴얼을 접수·추출하고 ai-service에 전달합니다. LLM 실행 전에 프로그램 규칙과 Jev(TypeSafe)로 문서 적합성을 사전 점검하며, 다음 단계에서 통과한 문서로 제품 설명과 테스트케이스를 생성합니다.
 
-현재 문서 업로드, 형식 검증, SeaweedFS 원본 저장·조회, 텍스트 추출, PostgreSQL 저장, AI 문서 접수·재시도까지 구현되어 있습니다. LLM 전 필터, Jev 판정, 제품 설명·TC 생성, 테스트 실행은 아직 구현되지 않았습니다.
+현재 문서 업로드, 형식 검증, SeaweedFS 원본 저장·조회, 텍스트 추출, PostgreSQL 저장, AI 문서 접수·재시도, LLM 전 문서 사전 점검까지 구현되어 있습니다. 제품 설명·TC 생성과 테스트 실행은 아직 구현되지 않았습니다.
 
 ## 1. 프로젝트 폴더 구조
 
@@ -111,13 +111,13 @@ Gateway는 서비스 탐색용 `lb://` 대신 다음 고정 HTTP 주소를 사�
 - 역할은 `AGREEMENT`, `FUNCTION_LIST`, `MANUAL`이며, PDF/Excel/HWP/Word 확장자와 MIME을 모두 검증합니다.
 - `GET /api/submissions/{id}`는 세트 상태와 함께 각 파일의 역할, 세부 형식, 경로, 추출 텍스트, 처리 상태를 반환합니다.
 - 세 역할의 문서가 모두 정상 파싱되면 `http://ai-service:8005/api/v1/document-intakes`로 제출 ID, 제품 ID, 문서별 식별자·역할·파일명·형식·저장 경로·추출 텍스트를 전달합니다.
-- 응답의 `aiDelivery`는 문서 업로드/파싱 상태와 별도이며 `NOT_READY`, `PENDING`, `FAILED`, `DELIVERED`를 반환합니다. 전달 실패는 원본과 추출 텍스트를 유지합니다.
+- 응답의 `aiDelivery`는 문서 업로드/파싱 상태와 별도이며 `NOT_READY`, `PENDING`, `FAILED`, `DELIVERED`, `BLOCKED`를 반환합니다. 전달 실패(`FAILED`)와 사전 점검 차단(`BLOCKED`)은 구별되며 둘 다 원본과 추출 텍스트를 유지합니다.
 - AI 전달 재시도: `POST /api/submissions/{id}/ai-delivery/retry`. 파일을 다시 업로드하지 않으며, 같은 제출 ID의 접수 재요청은 AI 서비스가 중복 처리하지 않습니다.
-- 파싱 실패 문서 교체: `POST /api/submissions/{id}/files/{role}/replace` multipart `file`, 헤더 `X-Member-Id`. 소유자 및 `FAILED` 문서만 교체할 수 있습니다. AI 전달 시도가 시작된 제출, 전달 중 제출, 이미 전달된 제출의 교체는 409입니다. 새 문서 파싱이 실패하면 기존 문서·원본을 유지합니다.
-- AI `PENDING`은 30초가 지나면 `GET /api/submissions/{id}`의 `aiDelivery.retryable`이 `true`가 됩니다. 화면에서 문서 세트를 다시 조회한 뒤 `전달 복구`를 누르면 재업로드 없이 재시도합니다. 30초 이내의 정상 진행 중 요청은 재시도되지 않습니다.
+- 문서 교체: `POST /api/submissions/{id}/files/{role}/replace` multipart `file`, 헤더 `X-Member-Id`. 소유자만 호출할 수 있고 `FAILED` 파싱 문서 또는 AI 전달 상태가 `BLOCKED`인 제출의 문서를 교체합니다. 전달 상태가 `PENDING`·`DELIVERED`이거나 통신 실패(`FAILED`)로 전달이 시도된 제출은 409입니다. `BLOCKED` 제출은 교체가 성공하면 전달 상태가 `NOT_READY`로 돌아가고 같은 요청에서 다시 사전 점검합니다. 교체 파일 파싱이 실패하면 기존 문서·원본과 `BLOCKED` 상태를 유지하며, `BLOCKED`/`NOT_READY`(시도 이력 포함) 상태에서는 다시 교체할 수 있습니다.
+- AI `PENDING`은 45초(전달 lease)가 지나면 `GET /api/submissions/{id}`의 `aiDelivery.retryable`이 `true`가 됩니다. 화면에서 문서 세트를 다시 조회한 뒤 `전달 복구`를 누르면 재업로드 없이 재시도합니다. 45초 이내의 정상 진행 중 요청은 재시도되지 않습니다. `BLOCKED`는 자동 재시도 대상이 아니며 문서 교체로만 다시 점검됩니다.
 - 업로드 한도는 파일당 100 MiB이며, 프런트엔드에서 세 문서를 한 번에 선택해 순차 업로드하거나 역할별로 나누어 업로드할 수 있습니다.
 
-### LLM 전 문서 필터 (설계 기준, 현재 미구현)
+### LLM 전 문서 필터
 
 필터는 “문서가 완벽한가”가 아니라 “LLM이 유용하게 작업할 수 있는가”를 판정합니다. 명확한 입력 오류는 프로그램 규칙으로 확인하고, 문서 역할 및 제품 일치 여부처럼 의미가 필요한 판단은 Jev(TypeSafe)에 맡깁니다.
 
@@ -131,11 +131,11 @@ Gateway는 서비스 탐색용 `lb://` 대신 다음 고정 HTTP 주소를 사�
 
 시험코드가 없거나 제품명을 확인할 수 없다는 이유만으로 차단하지 않습니다. 제품이 다르다는 증거가 명확할 때만 차단하고, 표기 차이·버전 차이·불확실한 일치는 경고로 처리합니다.
 
-텍스트 손상 기준은 전체 문서에 일괄 적용하는 문자 비율 하나로 정하지 않습니다. 페이지·시트별 추출량, 대체문자(`�`)와 제어문자, 의미 있는 텍스트 분포를 확인해 심한 손상 여부를 판단합니다. 일부 페이지가 손상됐어도 나머지 내용으로 작업할 수 있으면 경고 후 진행합니다. 수치 임계값은 `sample/` 실제 문서와 경미·심각한 손상 사본의 판정 결과를 비교해 조정합니다. 현재 PDF 파서는 텍스트 추출만 하며 OCR을 수행하지 않으므로, `PARSED` 상태만으로 추출 품질을 보장하지 않습니다.
+현재 초기 구현은 문서별 의미 문자 수와 대체·제어 문자 비율을 검사합니다. 의미 문자가 12개 미만이거나 의심 문자가 10% 이상이면 차단하고, 의미 문자가 80개 미만이거나 의심 문자가 1% 이상이면 경고합니다. 이 값은 초기값이며 `sample/` 실제 문서와 경미·심각한 손상 사본으로 조정해야 합니다. 파서는 페이지·시트별 추출 품질을 제공하지 않아 현재 위치별 검사는 하지 않습니다. 현재 PDF 파서는 텍스트 추출만 하며 OCR을 수행하지 않으므로, `PARSED` 상태만으로 추출 품질을 보장하지 않습니다.
 
-경고는 문서의 `extractedText`에 섞지 않고 생성 요청의 별도 `preflight` 메타데이터로 전달합니다. 각 경고에는 코드, 역할, 심각도, 짧은 설명과 가능한 경우 페이지·시트 위치를 포함합니다. LLM에는 경고를 근거로 누락된 정보를 지어내지 말고, 확인할 수 없는 값은 미확인으로 표시하도록 지시합니다. 판정 결과와 경고는 생성 결과와 함께 사용자에게도 표시합니다.
+경고는 문서의 `extractedText`와 분리된 `preflight` 메타데이터로 반환·저장하며 화면에 표시합니다. 각 경고에는 코드, 역할, 심각도, 짧은 설명이 포함됩니다. 현재 파서가 페이지·시트 위치를 제공하지 않아 위치 정보는 포함하지 않습니다. 향후 생성 경로에는 경고를 근거로 누락 정보를 지어내지 말고, 확인할 수 없는 값은 미확인으로 표시하도록 전달해야 합니다.
 
-현재 문서 접수 API는 위 필터를 실행하지 않습니다. Jev 연동, 필터 API 계약, 수치 임계값은 다음 구현 단계에서 추가·검증해야 합니다.
+AI 문서 접수 API는 `preflight`에 판정·경고·진단을 포함해 반환하고, TMS가 이를 저장해 제출 조회 응답과 화면에 표시합니다. `BLOCKED`는 사전 점검 결과상 차단 판정입니다. ai-service는 이때 문서 본문을 접수 테이블에 저장하지 않고 `accepted:false, blocked:true`와 `preflight`만 반환하며, TMS는 업로드 원본·추출 텍스트를 유지한 채 상태 `BLOCKED`와 판정·차단 사유(`block_reasons`)를 저장합니다. `BLOCKED`는 통신 오류 `FAILED`와 구별되고 자동 재호출되지 않으며, 문서를 교체하면 같은 제출이 다시 검증됩니다. 같은 제출·같은 본문 해시의 Jev 호출은 ai-service DB lease로 한 번만 수행합니다. 시간 계층은 Jev 전체 마감 13초 < 대기 15초 < TMS HTTP 읽기 20초 < ai-service lease 30초 < TMS 전달 lease 45초입니다. Jev 요청은 단계별(connect 2·read 5·write 2·pool 1초) 제한과 재시도 1회(예산 8초)를 쓰며, 마감으로 호출을 반환해도 SDK 요청은 취소되지 않고 최대 18초(재시도 예산 8초 + 시도 10초)까지 살아 있을 수 있습니다. 이 요청은 이미 저장된 판정을 바꾸지 못하고 lease 안에서 끝납니다. Jev API 키가 없거나 Jev 호출에 실패하면 시스템 검사를 유지하고 경고와 함께 진행 허용 결과를 반환합니다. Compose에서 `TYPESAFE_API_KEY`를 설정하면 Jev의 역할·가독성·제품 일치 판정을 사용합니다.
 
 ### 실제 업로드 검증 기준
 
@@ -155,13 +155,13 @@ Gateway는 서비스 탐색용 `lb://` 대신 다음 고정 HTTP 주소를 사�
 | test-management-service :8082 | POST | `/api/submissions/{id}/files` | multipart `file`, `role`, 헤더 `X-Member-Id` → 문서 결과 |
 | test-management-service :8082 | GET | `/api/submissions/{id}` | submission 상태 및 역할별 문서·추출 결과 |
 | test-management-service :8082 | POST | `/api/submissions/{id}/ai-delivery/retry` | 소유자 헤더 필요. `FAILED` 또는 만료된 `PENDING` 재시도 → 전달 상태 |
-| test-management-service :8082 | POST | `/api/submissions/{id}/files/{role}/replace` | 실패 역할 문서 교체. `FAILED` 상태이고 AI 전달 시도 전일 때만 허용 |
+| test-management-service :8082 | POST | `/api/submissions/{id}/files/{role}/replace` | 실패·차단 문서 교체 | 소유자 헤더 필요. `FAILED` 문서이거나 AI 전달이 `BLOCKED`일 때 허용. `PENDING`·`DELIVERED`·통신 실패 후 시도 이력이 있는 제출은 409 |
 | ai-service :8005 | GET | `/` | `{"status":"ai-service running","python":"3.13"}` |
 | ai-service :8005 | POST | `/api/v1/document-intakes` | 문서 3개 검증·접수. 동일 본문 재접수는 영수증 반환, 다른 본문은 409 |
 | crawler-service :8006 | GET | `/` | `{"status":"crawler-service running"}` |
 | crawler-service :8006 | POST | `/crawl` | `{"url":"https://example.com"}` → `{"apis":[{"method":"GET","url":"..."}]}` |
 
-AI 문서 접수 API는 현재 LLM이나 Jev를 호출하지 않습니다. LLM 생성 경로와 Jev 사전 필터는 아직 구현되지 않았습니다. 크롤러는 요청 목록을 최대 50개 반환하며, TC 실행·스크린샷·결함 판정도 구현되지 않았습니다.
+AI 문서 접수 API는 Jev 사전 점검을 선택적으로 호출하지만 생성형 LLM은 호출하지 않습니다. LLM 생성 경로는 아직 구현되지 않았습니다. 크롤러는 요청 목록을 최대 50개 반환하며, TC 실행·스크린샷·결함 판정도 구현되지 않았습니다.
 
 AI 접수 요청 예시(비민감 합성 데이터, 실제 요청에는 전체 추출 텍스트 전달):
 
@@ -198,7 +198,7 @@ AI 접수 요청 예시(비민감 합성 데이터, 실제 요청에는 전체 �
 }
 ```
 
-정상 응답은 `{"accepted":true,"duplicate":false,"submissionId":"...","documentCount":3,"receivedAt":"..."}`입니다. 같은 제출 ID와 같은 요청 본문은 `duplicate:true`로 같은 접수 결과를 반환합니다. 같은 제출 ID에 다른 요청 본문은 `409 Conflict`입니다. TMS는 응답의 `accepted`, 요청과 같은 `submissionId`, `documentCount: 3`을 모두 확인해야 `DELIVERED`로 기록합니다.
+정상 응답에는 `accepted`, `blocked`, `duplicate`, `submissionId`, `documentCount`, `receivedAt`과 `preflight` 판정 객체가 포함됩니다. 사전 점검이 `BLOCKED`이면 본문을 저장하지 않고 `accepted:false, blocked:true, receivedAt:null`과 `preflight`만 200으로 반환합니다. 같은 제출 ID와 같은 요청 본문은 `duplicate:true`로 같은 접수 결과를 반환합니다. 같은 제출 ID에 다른 요청 본문은 `409 Conflict`이며, `BLOCKED`로 저장되지 않은 제출은 본문이 바뀌어도 새 해시로 다시 평가합니다. 같은 해시의 사전 점검이 다른 요청에서 진행 중이어서 15초 안에 끝나지 않으면 `503`입니다. TMS는 접수 필드와 `preflight`를 확인·저장한 뒤 `DELIVERED`(또는 차단 시 `BLOCKED`)로 기록합니다.
 
 목표 문서 업로드 형식은 다음과 같습니다. **현재 이 요청이 성공하는 상태를 의미하지는 않습니다.**
 
@@ -229,14 +229,14 @@ status          VARCHAR(20) NOT NULL
 uploaded_at     TIMESTAMPTZ NOT NULL
 ```
 
-`submission_files`가 문서 정보의 유일한 기준입니다. 역할, 파일 분류 및 확장자 형식, 원본 파일명, MIME, 저장 경로, 추출 텍스트, 문서 파싱 상태와 실패 이유를 보관합니다. 한 세트 안에서 같은 역할은 한 번만 등록할 수 있습니다. 파싱 실패 파일만 실패 교체 경로로 교체할 수 있습니다.
+`submission_files`가 문서 정보의 유일한 기준입니다. 역할, 파일 분류 및 확장자 형식, 원본 파일명, MIME, 저장 경로, 추출 텍스트, 문서 파싱 상태와 실패 이유를 보관합니다. 한 세트 안에서 같은 역할은 한 번만 등록할 수 있습니다. 파싱 실패 파일이나 AI 사전 점검으로 `BLOCKED`된 제출의 파일을 교체 경로로 교체할 수 있습니다.
 
 세트 상태 규칙은 다음과 같습니다.
 
 - 필수 역할 중 하나라도 누락됐고 실패가 없으면 `UPLOADED`입니다. 첫 문서만 `PARSED`여도 세트는 준비 완료가 아닙니다.
 - 하나라도 문서 파싱이 실패하면 `FAILED`입니다. 실패 이유는 해당 `submission_files` 문서에서 응답합니다.
 - `AGREEMENT`, `FUNCTION_LIST`, `MANUAL` 각 한 행이 모두 `PARSED`이고 추출 텍스트가 비어 있지 않을 때만 세트가 `PARSED`입니다.
-- AI 전달 상태(`NOT_READY`, `PENDING`, `FAILED`, `DELIVERED`)는 문서 준비 상태와 별도로 `submission_ai_deliveries`에 저장합니다.
+- AI 전달 상태(`NOT_READY`, `PENDING`, `FAILED`, `DELIVERED`, `BLOCKED`)는 문서 준비 상태와 별도로 `submission_ai_deliveries`에 저장합니다.
 
 V5는 submissions의 legacy 파일 사본을 `submission_legacy_file_archive`에 보존한 뒤 `submission_type`, `stored_path`, `extracted_text`를 제거합니다. 문서 행이 없는 제출은 역할·형식·식별자를 추정하지 않고 legacy 값과 보존 사유만 archive에 남깁니다. V6는 기존 세트 실패 사유도 archive에 보존하고 세트 상태를 문서 행에서 재계산한 뒤 parent의 중복 `failure_reason`을 제거합니다. 기존 Flyway migration은 수정하지 않습니다. Hibernate는 `ddl-auto=validate`로 스키마만 확인합니다.
 
@@ -250,7 +250,7 @@ docker compose exec -T db pg_restore -U test -d autotest_restore_check /tmp/auto
 
 복원 결과를 별도 DB에서 확인한 뒤 운영 복구 여부를 결정합니다. 위 명령은 `autotest`를 변경하지 않습니다.
 
-`submission_ai_deliveries`에는 `NOT_READY`, `PENDING`, `FAILED`, `DELIVERED`, 시도 횟수, 실패 요약, `updated_at`, `delivered_at`이 기록됩니다. 각 전달 결과 반영은 해당 `attempt_count`가 아직 현재 시도와 일치할 때만 수행해 오래된 HTTP 요청이 새 시도를 덮지 못하게 합니다. AI 서비스는 `ai_document_intakes`에 제출 ID당 한 요청 본문만 저장합니다.
+`submission_ai_deliveries`에는 `NOT_READY`, `PENDING`, `FAILED`, `DELIVERED`, `BLOCKED`, 시도 횟수, 실패 요약, 사전 점검 결과(`preflight_result`), 차단 사유(`block_reasons`), `blocked_at`, `updated_at`, `delivered_at`이 기록됩니다. `BLOCKED` 문서 교체 시 상태는 `NOT_READY`로 돌아가고 판정·차단 사유는 비워지며 시도 횟수는 유지됩니다. 각 전달 결과 반영은 해당 `attempt_count`가 아직 현재 시도와 일치할 때만 수행해 오래된 HTTP 요청이 새 시도를 덮지 못하게 합니다. AI 서비스는 `ai_document_intakes`에 제출 ID당 한 요청 본문만 저장하며, `BLOCKED` 문서 본문은 저장하지 않습니다. 사전 점검 시도는 본문 없이 판정만 `ai_preflight_attempts`(제출 ID + 본문 해시 키, 7일 보관)에 DB lease(30초)로 선점·기록하므로 프로세스 재시작이나 여러 인스턴스에서도 같은 해시의 Jev 호출은 한 번입니다. 진행 중이면 최대 15초 대기 후 503(TMS는 `FAILED`로 기록)을 반환하고, 완료된 판정은 재사용합니다. 소유권은 lease 만료가 아니라 토큰 교체(재선점)로 잃습니다. 만료만 됐고 아직 재선점되지 않았다면 같은 소유자가 저장할 수 있고, 재선점된 뒤 이전 소유자는 완료 저장이 거부되고(`complete()`가 소유권을 확인해 결과를 반환) 자기 판정을 버린 채 저장된 최신 판정을 다시 읽으므로, 이전 `READY`가 새 `BLOCKED`를 덮거나 본문을 저장하지 않습니다. 마감 뒤에도 남는 SDK 요청은 프로세스당 동시 4개까지만 허용하며 슬롯은 요청이 실제로 끝날 때 반환됩니다. 초과분은 1초 대기 후 `JEV_UNAVAILABLE` 경고로 진행(fail-open)합니다.
 
 교체와 AI 전달 시작은 같은 제출 행 잠금으로 직렬화됩니다. 문서 준비 상태와 시도 번호를 DB에서 확정하고 트랜잭션을 종료한 뒤 AI HTTP를 호출하므로 네트워크 응답을 기다리며 DB 잠금을 유지하지 않습니다. 기존 원본 삭제와 DB 반영 실패 후 남은 새 원본은 `s3_cleanup_outbox`에 영속 예약하고 worker가 재시도합니다. 삭제 직전에 현재 문서 참조를 확인합니다.
 
@@ -271,7 +271,7 @@ S3_SECRET_KEY=your-secret-key
 
 현재 Compose가 필수로 참조하는 값은 위 두 개입니다. `S3_BUCKET`, `POSTGRES_USER`, `POSTGRES_PASSWORD`는 `.env`에 추가해도 현재 Compose 설정에 반영되지 않습니다. DB 계정은 개발용 `test/test`, DB 이름은 `autotest`로 고정되어 있습니다.
 
-Compose는 `AI_SERVICE_URL=http://ai-service:8005`를 TMS에 전달하고 `AI_DATABASE_URL=postgresql://test:test@db:5432/autotest`로 AI 접수 DB를 설정합니다. 현재 Jev·LLM 연동 설정은 없으며, 사전 필터와 생성 API 구현 시 필요한 자격 증명 및 설정을 별도로 추가해야 합니다.
+Compose는 `AI_SERVICE_URL=http://ai-service:8005`를 TMS에 전달하고 `AI_DATABASE_URL=postgresql://test:test@db:5432/autotest`로 AI 접수 DB를 설정합니다. Jev 의미 판정에는 선택 설정 `TYPESAFE_API_KEY`를 `.env`에 지정합니다. 키가 없으면 결정적 검사만 수행하고 경고를 반환합니다.
 
 ```powershell
 docker compose up -d --build
@@ -367,8 +367,8 @@ npm --prefix frontend run build
 - [x] PDF, Excel, HWP/HWPX, Word DOC/DOCX 텍스트 추출
 - [x] 버킷 설정을 목표인 `autotest-docs`와 일치시키기
 - [x] 문서 3종 업로드·구분·frontend UI 및 역할별 파일 영속화
-- [ ] LLM 전 문서 적합성 필터: 프로그램 기반 추출 품질 검사 + Jev 역할·제품 일치 판정
-- [ ] 필터 판정·경고 메타데이터 계약과 수치 임계값을 샘플 및 손상 문서로 검증
+- [x] LLM 전 문서 적합성 사전 점검: 프로그램 기반 추출 품질 검사 + 선택적 Jev 역할·제품 일치 판정
+- [ ] 초기 필터 임계값과 Jev 판정을 샘플 및 손상 문서로 보정·검증
 - [ ] LLM 문서 분석·제품 설명·TC 생성 API 연결
 - [ ] TC 영속 저장 및 제출·TC 조회 API
 - [ ] TC 실행 서비스와 Playwright 연동, 결함 판정

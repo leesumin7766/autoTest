@@ -105,6 +105,7 @@ class AiDocumentDeliveryServiceTest {
         assertEquals(Set.of("AGREEMENT", "FUNCTION_LIST", "MANUAL"), roles(sent));
         assertTrue(sent.path("documents").get(0).hasNonNull("fileId"));
         assertTrue(sent.path("documents").get(0).hasNonNull("extractedText"));
+        assertEquals("READY_WITH_WARNINGS", result.preflight().path("decision").asText());
     }
 
     @Test
@@ -160,7 +161,7 @@ class AiDocumentDeliveryServiceTest {
         assertFalse(freshPending.retryable());
         assertEquals(0, requests.get());
 
-        jdbcTemplate.setPendingAt(Instant.now().minusSeconds(31));
+        jdbcTemplate.setPendingAt(Instant.now().minusSeconds(46));
         assertTrue(service().getStatus(submissionId.value()).retryable());
         AiDocumentDeliveryService.DeliveryResult recovered = service().deliverIfReady(submissionId);
 
@@ -181,7 +182,7 @@ class AiDocumentDeliveryServiceTest {
                     () -> service().deliverIfReady(submissionId));
             assertTrue(firstRequestReceived.await(5, TimeUnit.SECONDS));
 
-            jdbcTemplate.setPendingAt(Instant.now().minusSeconds(31));
+            jdbcTemplate.setPendingAt(Instant.now().minusSeconds(46));
             AiDocumentDeliveryService.DeliveryResult second = service().deliverIfReady(submissionId);
             assertEquals("DELIVERED", second.status());
             assertEquals(2, second.attempts());
@@ -195,6 +196,47 @@ class AiDocumentDeliveryServiceTest {
             releaseFirstRequest.countDown();
             callers.shutdownNow();
         }
+    }
+
+    @Test
+    void storesBlockedDecisionWithReasonsAndDoesNotReclaimBlockedSubmission() {
+        responseBody = "{\"accepted\":false,\"blocked\":true,\"duplicate\":false,\"submissionId\":\""
+            + submissionId.value() + "\",\"documentCount\":3,\"receivedAt\":null,"
+            + "\"preflight\":{\"decision\":\"BLOCKED\",\"warnings\":["
+            + "{\"code\":\"PRODUCT_MISMATCH\",\"role\":null,\"severity\":\"BLOCKER\",\"message\":\"m\"},"
+            + "{\"code\":\"SPARSE_EXTRACTED_TEXT\",\"role\":\"MANUAL\",\"severity\":\"WARNING\",\"message\":\"w\"}],"
+            + "\"diagnostics\":{}}}";
+
+        AiDocumentDeliveryService.DeliveryResult blocked = service().deliverIfReady(submissionId);
+
+        assertEquals("BLOCKED", blocked.status());
+        assertFalse(blocked.retryable());
+        assertEquals("BLOCKED", blocked.preflight().path("decision").asText());
+        assertEquals(1, jdbcTemplate.blockReasons().size());
+        assertEquals("PRODUCT_MISMATCH", jdbcTemplate.blockReasons().get(0).path("code").asText());
+
+        AiDocumentDeliveryService.DeliveryResult again = service().deliverIfReady(submissionId);
+
+        assertEquals("BLOCKED", again.status());
+        assertEquals(1, requests.get());
+    }
+
+    @Test
+    void blockedDecisionOnAcceptedReceiptIsTreatedAsFailure() {
+        responseBody = receipt(false, submissionId.value(), 3)
+            .replace("READY_WITH_WARNINGS", "BLOCKED");
+
+        assertEquals("FAILED", service().deliverIfReady(submissionId).status());
+    }
+
+    @Test
+    void timeoutsAndLeaseDoNotOverlap() {
+        assertTrue(AiDocumentDeliveryService.HTTP_CONNECT_TIMEOUT.plus(AiDocumentDeliveryService.HTTP_READ_TIMEOUT)
+            .compareTo(SubmissionPersistenceService.AI_DELIVERY_LEASE) < 0);
+        // ai-service: Jev deadline 13s < preflight wait 15s < TMS read 20s < ai lease 30s < TMS lease 45s.
+        assertTrue(AiDocumentDeliveryService.HTTP_READ_TIMEOUT.toSeconds() > 15);
+        assertTrue(AiDocumentDeliveryService.HTTP_READ_TIMEOUT.toSeconds() < 30);
+        assertEquals(45, SubmissionPersistenceService.AI_DELIVERY_LEASE.toSeconds());
     }
 
     private AiDocumentDeliveryService service() {
@@ -225,7 +267,8 @@ class AiDocumentDeliveryServiceTest {
 
     private String receipt(boolean duplicate, UUID id, int count) {
         return "{\"accepted\":true,\"duplicate\":" + duplicate + ",\"submissionId\":\"" + id
-                + "\",\"documentCount\":" + count + ",\"receivedAt\":\"2026-10-02T00:00:00Z\"}";
+                + "\",\"documentCount\":" + count + ",\"receivedAt\":\"2026-10-02T00:00:00Z\","
+                + "\"preflight\":{\"decision\":\"READY_WITH_WARNINGS\",\"warnings\":[],\"diagnostics\":{}}}";
     }
 
     private List<SubmittedDocument> documents(boolean ready) {
@@ -260,6 +303,8 @@ class AiDocumentDeliveryServiceTest {
         private String lastError;
         private Instant updatedAt = Instant.now();
         private Instant deliveredAt;
+        private JsonNode preflight;
+        private JsonNode blockReasons;
         private int attempts;
         private int claims;
 
@@ -272,7 +317,36 @@ class AiDocumentDeliveryServiceTest {
             if (sql.contains("INSERT INTO submission_ai_deliveries")) {
                 return 1;
             }
-            String expectedStatus = sql.contains("SET status = 'DELIVERED'") ? "DELIVERED" : "FAILED";
+            if (sql.contains("SET preflight_result")) {
+                UUID id = (UUID) arguments[1];
+                int expectedAttempt = (Integer) arguments[2];
+                if (submissionId.equals(id) && "PENDING".equals(status) && attempts == expectedAttempt) {
+                    try {
+                        preflight = new ObjectMapper().readTree((String) arguments[0]);
+                    } catch (IOException exception) {
+                        throw new IllegalArgumentException(exception);
+                    }
+                    return 1;
+                }
+                return 0;
+            }
+            String expectedStatus = sql.contains("SET status = 'DELIVERED'") ? "DELIVERED"
+                    : sql.contains("SET status = 'BLOCKED'") ? "BLOCKED" : "FAILED";
+            if ("BLOCKED".equals(expectedStatus)) {
+                if (submissionId.equals(arguments[2]) && "PENDING".equals(status) && attempts == (Integer) arguments[3]) {
+                    try {
+                        preflight = new ObjectMapper().readTree((String) arguments[0]);
+                        blockReasons = new ObjectMapper().readTree((String) arguments[1]);
+                    } catch (IOException exception) {
+                        throw new IllegalArgumentException(exception);
+                    }
+                    status = "BLOCKED";
+                    lastError = null;
+                    updatedAt = Instant.now();
+                    return 1;
+                }
+                return 0;
+            }
             int expectedAttempt = (Integer) arguments[1];
             if (submissionId.equals(arguments[0]) && "PENDING".equals(status) && attempts == expectedAttempt) {
                 status = expectedStatus;
@@ -288,7 +362,7 @@ class AiDocumentDeliveryServiceTest {
         @SuppressWarnings("unchecked")
         public <T> List<T> query(String sql, RowMapper<T> rowMapper, Object... arguments) {
             return (List<T>) List.of(new AiDocumentDeliveryService.DeliveryResult(
-                    status, attempts, lastError, deliveredAt, updatedAt, false));
+                    status, attempts, lastError, deliveredAt, updatedAt, false, preflight));
         }
 
         private java.util.Optional<SubmissionPersistenceService.DeliveryClaim> claim(
@@ -301,8 +375,8 @@ class AiDocumentDeliveryServiceTest {
                 return java.util.Optional.empty();
             }
             boolean freshPending = "PENDING".equals(status)
-                    && updatedAt.isAfter(Instant.now().minusSeconds(30));
-            if ("DELIVERED".equals(status) || freshPending) {
+                    && updatedAt.isAfter(Instant.now().minusSeconds(45));
+            if ("DELIVERED".equals(status) || "BLOCKED".equals(status) || freshPending) {
                 return java.util.Optional.empty();
             }
             status = "PENDING";
@@ -315,6 +389,10 @@ class AiDocumentDeliveryServiceTest {
 
         private int claims() {
             return claims;
+        }
+
+        private JsonNode blockReasons() {
+            return blockReasons;
         }
 
         private int attempts() {

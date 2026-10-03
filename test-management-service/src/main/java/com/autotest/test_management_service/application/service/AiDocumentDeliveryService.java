@@ -20,12 +20,16 @@ import com.autotest.test_management_service.domain.submission.Submission;
 import com.autotest.test_management_service.domain.submission.SubmissionId;
 import com.autotest.test_management_service.domain.submission.SubmittedDocument;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class AiDocumentDeliveryService {
     private static final Logger logger = LoggerFactory.getLogger(AiDocumentDeliveryService.class);
-    private static final Duration PENDING_TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration PENDING_TIMEOUT = SubmissionPersistenceService.AI_DELIVERY_LEASE;
+    // Must stay above the ai-service Jev deadline (13s) and below the lease.
+    static final Duration HTTP_CONNECT_TIMEOUT = Duration.ofSeconds(3);
+    static final Duration HTTP_READ_TIMEOUT = Duration.ofSeconds(20);
         private static final int REQUIRED_DOCUMENT_COUNT = 3;
 
         private final SubmissionPersistenceService submissionPersistenceService;
@@ -44,8 +48,8 @@ public class AiDocumentDeliveryService {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(3));
-        requestFactory.setReadTimeout(Duration.ofSeconds(25));
+        requestFactory.setConnectTimeout(HTTP_CONNECT_TIMEOUT);
+        requestFactory.setReadTimeout(HTTP_READ_TIMEOUT);
         this.restClient = restClientBuilder.baseUrl(aiServiceBaseUrl).requestFactory(requestFactory).build();
     }
 
@@ -70,11 +74,22 @@ public class AiDocumentDeliveryService {
                 .body(requestBody)
                     .retrieve()
                     .body(AiDocumentReceipt.class);
+            if (receipt != null && receipt.blocked()) {
+                recordBlocked(submissionId, attempt, receipt);
+                return getStatus(submissionId.value());
+            }
             if (receipt == null || !receipt.accepted()
                     || !Objects.equals(receipt.submissionId(), submissionId.value())
-                    || receipt.documentCount() != REQUIRED_DOCUMENT_COUNT) {
+                    || receipt.documentCount() != REQUIRED_DOCUMENT_COUNT
+                    || receipt.preflight() == null
+                    || "BLOCKED".equals(receipt.preflight().path("decision").asText())) {
                 throw new IllegalStateException("AI service did not confirm document intake");
             }
+            jdbcTemplate.update("""
+                    UPDATE submission_ai_deliveries
+                    SET preflight_result = ?::jsonb
+                    WHERE submission_id = ? AND status = 'PENDING' AND attempt_count = ?
+                    """, objectMapper.writeValueAsString(receipt.preflight()), submissionId.value(), attempt);
             jdbcTemplate.update("""
                     UPDATE submission_ai_deliveries
                     SET status = 'DELIVERED', last_error = NULL, delivered_at = now(), updated_at = now()
@@ -100,7 +115,7 @@ public class AiDocumentDeliveryService {
 
     public DeliveryResult getStatus(UUID submissionId) {
         List<DeliveryResult> results = jdbcTemplate.query("""
-                SELECT status, attempt_count, last_error, delivered_at, updated_at
+                SELECT status, attempt_count, last_error, delivered_at, updated_at, preflight_result::text
                 FROM submission_ai_deliveries WHERE submission_id = ?
                 """, (resultSet, rowNumber) -> new DeliveryResult(
                 resultSet.getString("status"),
@@ -108,7 +123,8 @@ public class AiDocumentDeliveryService {
                 resultSet.getString("last_error"),
                 resultSet.getTimestamp("delivered_at") == null
                     ? null : resultSet.getTimestamp("delivered_at").toInstant(),
-                resultSet.getTimestamp("updated_at").toInstant(), false), submissionId);
+                resultSet.getTimestamp("updated_at").toInstant(), false,
+                parsePreflight(resultSet.getString("preflight_result"))), submissionId);
             if (results.isEmpty()) {
                 return new DeliveryResult("NOT_READY", 0, null, null, null, false);
             }
@@ -117,7 +133,7 @@ public class AiDocumentDeliveryService {
                 || ("PENDING".equals(result.status()) && result.updatedAt() != null
                 && result.updatedAt().isBefore(Instant.now().minus(PENDING_TIMEOUT)));
             return new DeliveryResult(result.status(), result.attempts(), result.lastError(), result.deliveredAt(),
-                result.updatedAt(), retryable);
+                result.updatedAt(), retryable, result.preflight());
     }
 
     public record DeliveryResult(
@@ -126,10 +142,16 @@ public class AiDocumentDeliveryService {
             String lastError,
             Instant deliveredAt,
             Instant updatedAt,
-            boolean retryable
+            boolean retryable,
+            JsonNode preflight
     ) {
+        public DeliveryResult(String status, int attempts, String lastError, Instant deliveredAt,
+                              Instant updatedAt, boolean retryable) {
+            this(status, attempts, lastError, deliveredAt, updatedAt, retryable, null);
+        }
+
         public DeliveryResult(String status, int attempts, String lastError, Instant deliveredAt) {
-            this(status, attempts, lastError, deliveredAt, null, "FAILED".equals(status));
+            this(status, attempts, lastError, deliveredAt, null, "FAILED".equals(status), null);
         }
     }
 
@@ -144,7 +166,42 @@ public class AiDocumentDeliveryService {
         }
     }
 
-    public record AiDocumentReceipt(boolean accepted, boolean duplicate, UUID submissionId,
-                                    int documentCount, Instant receivedAt) {
+    public record AiDocumentReceipt(boolean accepted, boolean blocked, boolean duplicate, UUID submissionId,
+                                    int documentCount, Instant receivedAt, JsonNode preflight) {
+    }
+
+    private void recordBlocked(SubmissionId submissionId, int attempt, AiDocumentReceipt receipt)
+            throws JsonProcessingException {
+        JsonNode preflight = receipt.preflight();
+        if (receipt.accepted() || !Objects.equals(receipt.submissionId(), submissionId.value())
+                || receipt.documentCount() != REQUIRED_DOCUMENT_COUNT || preflight == null
+                || !"BLOCKED".equals(preflight.path("decision").asText())) {
+            throw new IllegalStateException("AI service returned an inconsistent blocked receipt");
+        }
+        var reasons = objectMapper.createArrayNode();
+        preflight.path("warnings").forEach(warning -> {
+            if ("BLOCKER".equals(warning.path("severity").asText())) {
+                reasons.add(warning);
+            }
+        });
+        jdbcTemplate.update("""
+                UPDATE submission_ai_deliveries
+                SET status = 'BLOCKED', preflight_result = ?::jsonb, block_reasons = ?::jsonb,
+                    blocked_at = now(), last_error = NULL, delivered_at = NULL, updated_at = now()
+                WHERE submission_id = ? AND status = 'PENDING' AND attempt_count = ?
+                """, objectMapper.writeValueAsString(preflight), objectMapper.writeValueAsString(reasons),
+                submissionId.value(), attempt);
+    }
+
+    private JsonNode parsePreflight(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(value);
+        } catch (JsonProcessingException exception) {
+            logger.warn("Stored AI preflight result could not be parsed");
+            return null;
+        }
     }
 }

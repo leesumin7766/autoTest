@@ -126,6 +126,76 @@ class SubmissionServiceTest {
             }
 
             @Test
+            void replacesParsedDocumentOnlyWhenAiDeliveryIsBlocked() throws Exception {
+            SubmissionPersistenceService persistence = mock(SubmissionPersistenceService.class);
+            FileStoragePort storage = mock(FileStoragePort.class);
+            SubmissionId id = SubmissionId.generate();
+            StoredPath oldPath = new StoredPath("s3://autotest-docs/parsed.xlsx");
+            StoredPath newPath = new StoredPath("s3://autotest-docs/replacement.pdf");
+            UUID oldFileId = UUID.randomUUID();
+            byte[] pdf = createPdfContent("Corrected manual");
+            when(persistence.findById(id)).thenReturn(java.util.Optional.of(
+                Submission.reconstitute(id, MEMBER_ID, PRODUCT_ID, SubmissionStatus.PARSED, Instant.now())));
+            when(persistence.findDocumentsBySubmissionId(id)).thenReturn(List.of(
+                submittedDocument(id, oldFileId, oldPath, SubmissionStatus.PARSED, "old text")));
+            when(storage.store(any(InputStream.class), eq("replacement.pdf"), eq("application/pdf"))).thenReturn(newPath);
+            when(storage.load(newPath)).thenReturn(new java.io.ByteArrayInputStream(pdf));
+            when(persistence.replaceFailedDocument(eq(oldFileId), eq(oldPath), any(SubmittedDocument.class)))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+            SubmissionService service = new SubmissionService(persistence, storage,
+                new DocumentFileParserFactory(List.of(new PdfFileParser())), new FileTypeResolver());
+            MockMultipartFile replacementFile = new MockMultipartFile("file", "replacement.pdf", "application/pdf", pdf);
+            var role = com.autotest.test_management_service.domain.submission.SubmissionType.AGREEMENT;
+
+            assertThrows(IllegalArgumentException.class,
+                () -> service.replaceFailedDocument(id, replacementFile, role, MEMBER_ID));
+
+            when(persistence.isAiDeliveryBlocked(id)).thenReturn(true);
+            SubmittedDocument replacement = service.replaceFailedDocument(id, replacementFile, role, MEMBER_ID);
+
+            assertEquals(SubmissionStatus.PARSED, replacement.status());
+            verify(persistence).replaceFailedDocument(eq(oldFileId), eq(oldPath), eq(replacement));
+            }
+
+            @Test
+            void blockedSubmissionCanBeReplacedAgainAfterAReplacementFailsToParse() throws Exception {
+            SubmissionPersistenceService persistence = mock(SubmissionPersistenceService.class);
+            FileStoragePort storage = mock(FileStoragePort.class);
+            SubmissionId id = SubmissionId.generate();
+            StoredPath oldPath = new StoredPath("s3://autotest-docs/parsed.xlsx");
+            StoredPath emptyPath = new StoredPath("s3://autotest-docs/empty.pdf");
+            StoredPath goodPath = new StoredPath("s3://autotest-docs/good.pdf");
+            UUID oldFileId = UUID.randomUUID();
+            when(persistence.findById(id)).thenReturn(java.util.Optional.of(
+                Submission.reconstitute(id, MEMBER_ID, PRODUCT_ID, SubmissionStatus.PARSED, Instant.now())));
+            when(persistence.findDocumentsBySubmissionId(id)).thenReturn(List.of(
+                submittedDocument(id, oldFileId, oldPath, SubmissionStatus.PARSED, "old text")));
+            when(persistence.isAiDeliveryBlocked(id)).thenReturn(true);
+            when(storage.store(any(InputStream.class), eq("empty.pdf"), eq("application/pdf"))).thenReturn(emptyPath);
+            when(storage.load(emptyPath)).thenReturn(new java.io.ByteArrayInputStream(createPdfContent("")));
+            when(storage.store(any(InputStream.class), eq("good.pdf"), eq("application/pdf"))).thenReturn(goodPath);
+            when(storage.load(goodPath)).thenReturn(new java.io.ByteArrayInputStream(createPdfContent("Corrected")));
+            when(persistence.replaceFailedDocument(eq(oldFileId), eq(oldPath), any(SubmittedDocument.class)))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+            SubmissionService service = new SubmissionService(persistence, storage,
+                new DocumentFileParserFactory(List.of(new PdfFileParser())), new FileTypeResolver());
+            var role = com.autotest.test_management_service.domain.submission.SubmissionType.AGREEMENT;
+
+            assertThrows(IllegalArgumentException.class, () -> service.replaceFailedDocument(id,
+                new MockMultipartFile("file", "empty.pdf", "application/pdf", createPdfContent("")), role, MEMBER_ID));
+            verify(persistence).scheduleCleanup(emptyPath);
+            verify(persistence, org.mockito.Mockito.never())
+                .replaceFailedDocument(any(), any(), any());
+
+            SubmittedDocument replacement = service.replaceFailedDocument(id,
+                new MockMultipartFile("file", "good.pdf", "application/pdf", createPdfContent("Corrected")),
+                role, MEMBER_ID);
+
+            assertEquals(SubmissionStatus.PARSED, replacement.status());
+            verify(persistence).replaceFailedDocument(eq(oldFileId), eq(oldPath), eq(replacement));
+            }
+
+            @Test
             void failedReplacementParsingPreservesExistingDocumentAndSchedulesNewObjectCleanup() throws Exception {
             SubmissionPersistenceService persistence = mock(SubmissionPersistenceService.class);
             FileStoragePort storage = mock(FileStoragePort.class);

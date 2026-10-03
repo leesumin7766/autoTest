@@ -11,4 +11,6 @@ public interface SubmittedDocumentRepository {
     boolean existsBySubmissionIdAndRole(SubmissionId submissionId, SubmissionType role);
 
     boolean replaceFailedDocument(UUID previousFileId, SubmittedDocument replacement);
+
+    boolean replaceDocument(UUID previousFileId, SubmissionStatus expectedStatus, SubmittedDocument replacement);
 }

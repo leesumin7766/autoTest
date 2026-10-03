@@ -84,7 +84,10 @@ public class SubmissionController {
             return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build();
         }
         AiDocumentDeliveryService.DeliveryResult delivery = aiDocumentDeliveryService.getStatus(id);
-        if (delivery.attempts() > 0 || "PENDING".equals(delivery.status()) || "DELIVERED".equals(delivery.status())) {
+        boolean closed = "PENDING".equals(delivery.status()) || "DELIVERED".equals(delivery.status())
+                || (delivery.attempts() > 0 && !"BLOCKED".equals(delivery.status())
+                    && !"NOT_READY".equals(delivery.status()));
+        if (closed) {
             return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
         }
         SubmittedDocument document = submissionService.replaceFailedDocument(
