@@ -55,6 +55,33 @@ def _validate(snapshot: dict, template_id: str) -> None:
             raise TemplateError(f"content.{key} is required")
     if not isinstance(content.get("llmInstructions"), list) or not content["llmInstructions"]:
         raise TemplateError("content.llmInstructions is required")
+    pipeline = content.get("pipeline")
+    if not isinstance(pipeline, dict) or not isinstance(pipeline.get("extract"), str) or not pipeline["extract"].strip() \
+            or not isinstance(pipeline.get("write"), str) or not pipeline["write"].strip():
+        raise TemplateError("content.pipeline.extract and content.pipeline.write are required")
+    quality = content.get("quality")
+    if not isinstance(quality, dict) or not isinstance(quality.get("evidence"), dict):
+        raise TemplateError("content.quality.evidence is required")
+    evidence = quality["evidence"]
+    if not isinstance(evidence.get("requireExactQuote"), bool) or type(evidence.get("minimumQuoteCharacters")) is not int \
+            or evidence["minimumQuoteCharacters"] < 1:
+        raise TemplateError("content.quality.evidence settings are invalid")
+    limits = quality.get("chunking")
+    if not isinstance(limits, dict) or type(limits.get("overlapCharacters")) is not int \
+            or limits["overlapCharacters"] < 0:
+        raise TemplateError("content.quality.chunking.overlapCharacters must be non-negative")
+    max_chunk = limits.get("maxChunkBytes")
+    if type(max_chunk) is not int or max_chunk < 256:
+        raise TemplateError("content.quality.chunking.maxChunkBytes must be at least 256")
+    retries = quality.get("output", {}).get("validationRetries")
+    if type(retries) is not int or retries < 0 or retries > 3:
+        raise TemplateError("content.quality.output.validationRetries must be between 0 and 3")
+    generation_tokens = quality.get("output", {}).get("generationTokens")
+    if type(generation_tokens) is not int or generation_tokens < 128:
+        raise TemplateError("content.quality.output.generationTokens must be at least 128")
+    extraction_tokens = quality.get("output", {}).get("extractionTokens")
+    if type(extraction_tokens) is not int or extraction_tokens < 128:
+        raise TemplateError("content.quality.output.extractionTokens must be at least 128")
     sections = content.get("sections")
     if not isinstance(sections, list) or not sections:
         raise TemplateError("content.sections must be a non-empty list")

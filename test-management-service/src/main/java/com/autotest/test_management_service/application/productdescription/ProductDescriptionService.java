@@ -78,17 +78,34 @@ public class ProductDescriptionService {
 
     public StartResult start(UUID submissionId, long memberId) {
         jobs.recoverStale(lease);
-        StartResult result = transactions.execute(status -> {
-            Submission submission = lockOwned(submissionId, memberId);
-            Optional<ProductDescriptionJob> active = jobs.findActive(submissionId);
-            if (active.isPresent()) {
-                return new StartResult(active.get(), false);
-            }
-            Verified verified = verify(submission);
-            UUID jobId = UUID.randomUUID();
-            jobs.insert(jobId, submissionId, memberId, verified.digest(), verified.decision());
-            return new StartResult(jobs.find(jobId).orElseThrow(), true);
-        });
+        StartResult result;
+        try {
+            result = transactions.execute(status -> {
+                Submission submission = lockOwned(submissionId, memberId);
+                Optional<ProductDescriptionJob> active = jobs.findActive(submissionId);
+                if (active.isPresent()) {
+                    return new StartResult(active.get(), false);
+                }
+                Optional<ProductDescriptionJob> memberActive = jobs.findActiveForMember(memberId);
+                if (memberActive.isPresent()) {
+                    throw new ProductDescriptionException(HttpStatus.CONFLICT, "MEMBER_JOB_ALREADY_ACTIVE",
+                            "이미 제품 설명 문서를 생성 중입니다. 진행 중인 작업을 마친 뒤 새 작업을 시작해 주세요.");
+                }
+                Verified verified = verify(submission);
+                Optional<ProductDescriptionJob> resumable = jobs.findResumable(submissionId, memberId);
+                if (resumable.isPresent() && resumable.get().inputDigest().equals(verified.digest())) {
+                    ProductDescriptionJob previous = resumable.get();
+                    jobs.resumeContent(previous.jobId()).orElseThrow();
+                    return new StartResult(jobs.find(previous.jobId()).orElseThrow(), true);
+                }
+                UUID jobId = UUID.randomUUID();
+                jobs.insert(jobId, submissionId, memberId, verified.digest(), verified.decision());
+                return new StartResult(jobs.find(jobId).orElseThrow(), true);
+            });
+        } catch (DuplicateKeyException memberAlreadyRunning) {
+            throw new ProductDescriptionException(HttpStatus.CONFLICT, "MEMBER_JOB_ALREADY_ACTIVE",
+                    "이미 제품 설명 문서를 생성 중입니다. 진행 중인 작업을 마친 뒤 새 작업을 시작해 주세요.");
+        }
         if (result.created()) {
             worker.submit(result.job());
         }
@@ -99,6 +116,11 @@ public class ProductDescriptionService {
         authorize(submissionId, memberId);
         jobs.recoverStale(lease);
         return view(submissionId);
+    }
+
+    public JobView activeForMember(long memberId) {
+        jobs.recoverStale(lease);
+        return jobs.findActiveForMember(memberId).map(JobView::from).orElse(null);
     }
 
     public StatusView cancel(UUID submissionId, UUID jobId, long memberId) {
@@ -243,7 +265,8 @@ public class ProductDescriptionService {
     public record StatusView(JobView job, JobView lastCompleted) {
     }
 
-    public record JobView(UUID jobId, String status, String stage, boolean active, String errorCode,
+    public record JobView(UUID jobId, String status, String stage, boolean active, boolean resumable,
+                          int completedChunks, int totalChunks, String errorCode,
                           String errorMessage, String generationMode, String generationLabel, String templateId,
                           String templateVersion, String outputFormat, boolean downloadable, boolean canRerender,
                           Instant createdAt, Instant updatedAt, Instant completedAt) {
@@ -253,7 +276,8 @@ public class ProductDescriptionService {
                 case ProductDescriptionJob.RENDERING -> "OUTPUT";
                 default -> "DONE";
             };
-            return new JobView(job.jobId(), job.status(), stage, job.active(), job.errorCode(), job.errorMessage(),
+            return new JobView(job.jobId(), job.status(), stage, job.active(), job.resumable(),
+                    job.completedChunks(), job.totalChunks(), job.errorCode(), job.errorMessage(),
                     job.generationMode(), job.generationLabel(), job.templateId(), job.templateVersion(),
                     job.outputFormat(), ProductDescriptionJob.COMPLETED.equals(job.status()),
                     ProductDescriptionJob.RENDER_FAILED.equals(job.status()) && job.hasContent(),

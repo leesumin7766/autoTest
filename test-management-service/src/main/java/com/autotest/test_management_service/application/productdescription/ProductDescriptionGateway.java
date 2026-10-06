@@ -10,6 +10,8 @@ public interface ProductDescriptionGateway {
 
     ContentResult generateContent(ContentCall call) throws GatewayException, InterruptedException;
 
+    ChunkProgress contentProgress(ContentCall call) throws GatewayException, InterruptedException;
+
     byte[] render(String format, JsonNode document, JsonNode presentation) throws GatewayException, InterruptedException;
 
     record SourceDocument(UUID fileId, String role, String originalFilename, String format, String extractedText) {
@@ -21,6 +23,9 @@ public interface ProductDescriptionGateway {
 
     record ContentResult(JsonNode template, JsonNode document, String mode, String label, String templateId,
                          String templateVersion) {
+    }
+
+    record ChunkProgress(int completedChunks, int totalChunks) {
     }
 
     class GatewayException extends Exception {

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import './App.css'
 import { ProductDescriptionPanel } from './ProductDescriptionPanel'
+import { PreflightWarningDetails, type PreflightDiagnostics, type PreflightWarning } from './PreflightWarningDetails'
 
 type Role = 'AGREEMENT' | 'FUNCTION_LIST' | 'MANUAL'
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
@@ -31,7 +32,8 @@ type AiDeliveryResult = {
 
 type PreflightResult = {
   decision: 'BLOCKED' | 'READY_WITH_WARNINGS' | 'READY'
-  warnings: { code: string; role: Role | null; severity: 'BLOCKER' | 'WARNING' | 'INFO'; message: string }[]
+  warnings: PreflightWarning[]
+  diagnostics?: PreflightDiagnostics
 }
 
 type SubmissionResponse = {
@@ -347,9 +349,8 @@ function App() {
             {aiDelivery.preflight && (
               <div className={`preflight-result preflight-${aiDelivery.preflight.decision.toLowerCase()}`}>
                 <strong>LLM 사전 점검: {aiDelivery.preflight.decision === 'BLOCKED' ? '중단 권고' : aiDelivery.preflight.decision === 'READY_WITH_WARNINGS' ? '경고 후 진행' : '통과'}</strong>
-                {aiDelivery.preflight.warnings.map((warning, index) => (
-                  <span key={`${warning.code}-${warning.role ?? 'set'}-${index}`}>{warning.role ? `${warning.role}: ` : ''}{warning.message}</span>
-                ))}
+                <PreflightWarningDetails warnings={aiDelivery.preflight.warnings}
+                  diagnostics={aiDelivery.preflight.diagnostics} />
               </div>
             )}
           </div>

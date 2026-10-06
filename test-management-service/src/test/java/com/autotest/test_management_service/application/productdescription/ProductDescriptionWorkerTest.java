@@ -17,7 +17,7 @@ class ProductDescriptionWorkerTest {
         var jobs = mock(ProductDescriptionJobRepository.class);
         var gateway = mock(ProductDescriptionGateway.class);
         var worker = new ProductDescriptionWorker(jobs, gateway, mock(SubmissionPersistenceService.class),
-                mock(FileStoragePort.class), new ObjectMapper(), 1, 2, 1);
+                mock(FileStoragePort.class), new ObjectMapper(), 1, 2, 1, 10);
         var entered = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         var first = mock(ProductDescriptionJob.class);

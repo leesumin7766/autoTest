@@ -61,6 +61,7 @@ def evaluate_preflight(documents: list[dict[str, Any]]) -> dict[str, Any]:
             "meaningfulCharacterCount": meaningful_count,
             "suspiciousCharacterCount": damaged_count,
             "suspiciousCharacterRatio": round(damaged_ratio, 6),
+            "extractedCharacterCount": len(text),
         })
 
         if meaningful_count < MIN_MEANINGFUL_CHARACTERS:
@@ -85,6 +86,9 @@ def evaluate_preflight(documents: list[dict[str, Any]]) -> dict[str, Any]:
             warnings.append(_warning(
                 "TEXT_DAMAGE_SUSPECTED", role, "WARNING",
                 "일부 대체·제어 문자가 있습니다. 손상된 부분은 추정하지 않도록 LLM에 알립니다.",
+                {"type": "text_damage", "suspiciousCharacterCount": damaged_count,
+                 "extractedCharacterCount": len(text), "suspiciousCharacterRatio": round(damaged_ratio, 6),
+                 "warningThreshold": WARNING_DAMAGE_RATIO, "blockThreshold": BLOCK_DAMAGE_RATIO},
             ))
 
         if role == "AGREEMENT" and not TEST_CODE_PATTERN.search(text):
@@ -99,11 +103,13 @@ def evaluate_preflight(documents: list[dict[str, Any]]) -> dict[str, Any]:
         jev_state_documents.append({"role": role, "text": excerpt})
 
     diagnostics_by_role = {item["role"]: item for item in diagnostics}
+    jev_decisions: dict[str, dict[str, Any]] = {}
     jev_configured = bool(os.environ.get("TYPESAFE_API_KEY", "").strip())
     if jev_configured:
         try:
             answers = _evaluate_with_jev({"documents": jev_state_documents})
             jev_available = True
+            jev_decisions = answers
             for role in ROLES:
                 readability = answers[f"readability_{role}"]
                 role_match = answers[f"role_match_{role}"]
@@ -117,6 +123,11 @@ def evaluate_preflight(documents: list[dict[str, Any]]) -> dict[str, Any]:
                     warnings.append(_warning(
                         "DOCUMENT_PARTIALLY_READABLE", role, "WARNING",
                         "문서에 손상되었거나 불확실한 추출 내용이 있을 수 있습니다.",
+                        {"type": "readability", "choice": readability["choice"],
+                         "confidence": readability["confidence"], "warningConfidenceThreshold": BLOCK_CONFIDENCE,
+                         "suspiciousCharacterCount": diagnostics_by_role[role]["suspiciousCharacterCount"],
+                         "extractedCharacterCount": len(next(d["extractedText"] for d in documents if d["role"] == role)),
+                         "explanationCaptured": False},
                     ))
                 if role_match["choice"] == "mismatch" and role_match["confidence"] >= BLOCK_CONFIDENCE:
                     blocked = True
@@ -146,6 +157,9 @@ def evaluate_preflight(documents: list[dict[str, Any]]) -> dict[str, Any]:
                     warnings.append(_warning(
                         "PRODUCT_IDENTITY_UNCERTAIN", None, "WARNING",
                         f"{pair[0]} 문서와 {pair[1]} 문서의 제품 일치 여부가 불확실합니다.",
+                        {"type": "product_identity", "leftRole": pair[0], "rightRole": pair[1],
+                         "choice": answer["choice"], "confidence": answer["confidence"],
+                         "warningConfidenceThreshold": BLOCK_CONFIDENCE, "explanationCaptured": False},
                     ))
         except Exception:
             logger.warning("Jev preflight evaluation failed")
@@ -163,9 +177,17 @@ def evaluate_preflight(documents: list[dict[str, Any]]) -> dict[str, Any]:
 
     for role in (truncated_roles if jev_configured else ()):
         diagnostics_by_role[role]["jevInputTruncated"] = True
+        diagnostics_by_role[role]["jevSelectedCharacterCount"] = MAX_JEV_TEXT_CHARACTERS
+        diagnostics_by_role[role]["jevOmittedCharacterCount"] = max(
+            0, diagnostics_by_role[role]["extractedCharacterCount"] - MAX_JEV_TEXT_CHARACTERS)
         warnings.append(_warning(
             "JEV_INPUT_TRUNCATED", role, "WARNING",
             "긴 문서의 앞부분과 뒷부분만 Jev 판정에 사용했습니다.",
+            {"type": "truncation", "role": role,
+             "extractedCharacterCount": diagnostics_by_role[role]["extractedCharacterCount"],
+             "jevSelectedCharacterCount": MAX_JEV_TEXT_CHARACTERS,
+             "jevOmittedCharacterCount": diagnostics_by_role[role]["jevOmittedCharacterCount"],
+             "selection": "앞부분과 뒷부분을 각각 절반씩 사용하고 중간은 생략"},
         ))
 
     return {
@@ -173,6 +195,7 @@ def evaluate_preflight(documents: list[dict[str, Any]]) -> dict[str, Any]:
         "warnings": warnings,
         "diagnostics": {
             "jevEvaluated": jev_available,
+            "jevDecisions": jev_decisions,
             "documents": diagnostics,
         },
 }
@@ -282,5 +305,9 @@ def _is_suspicious_character(character: str) -> bool:
     return character == "\ufffd" or (category in {"Cc", "Cs", "Co"} and not character.isspace())
 
 
-def _warning(code: str, role: str | None, severity: str, message: str) -> dict[str, Any]:
-    return {"code": code, "role": role, "severity": severity, "message": message}
+def _warning(code: str, role: str | None, severity: str, message: str,
+             evidence: dict[str, Any] | None = None) -> dict[str, Any]:
+    warning = {"code": code, "role": role, "severity": severity, "message": message}
+    if evidence is not None:
+        warning["evidence"] = evidence
+    return warning

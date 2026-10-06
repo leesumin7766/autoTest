@@ -49,13 +49,20 @@ public class ProductDescriptionWorker {
     private final FileStoragePort storage;
     private final ObjectMapper objectMapper;
     private final long heartbeatSeconds;
+    private final long progressPollSeconds;
     private final ThreadPoolExecutor executor;
     private final ScheduledExecutorService heartbeats = Executors.newSingleThreadScheduledExecutor(task -> {
         Thread thread = new Thread(task, "product-description-heartbeat");
         thread.setDaemon(true);
         return thread;
     });
+    private final ScheduledExecutorService progressPoller = Executors.newScheduledThreadPool(2, task -> {
+        Thread thread = new Thread(task, "product-description-progress");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final Map<UUID, Future<?>> running = new ConcurrentHashMap<>();
+    private final Map<UUID, ScheduledFuture<?>> progressTasks = new ConcurrentHashMap<>();
 
     public ProductDescriptionWorker(
             ProductDescriptionJobRepository jobs,
@@ -65,7 +72,8 @@ public class ProductDescriptionWorker {
             ObjectMapper objectMapper,
             @Value("${product-description.worker-threads:2}") int workerThreads,
             @Value("${product-description.queue-capacity:20}") int queueCapacity,
-            @Value("${product-description.heartbeat-seconds:5}") long heartbeatSeconds
+            @Value("${product-description.heartbeat-seconds:5}") long heartbeatSeconds,
+            @Value("${product-description.progress-poll-seconds:10}") long progressPollSeconds
     ) {
         this.jobs = jobs;
         this.gateway = gateway;
@@ -73,6 +81,7 @@ public class ProductDescriptionWorker {
         this.storage = storage;
         this.objectMapper = objectMapper;
         this.heartbeatSeconds = heartbeatSeconds;
+        this.progressPollSeconds = progressPollSeconds;
         this.executor = new ThreadPoolExecutor(workerThreads, workerThreads, 0L, TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<>(queueCapacity), task -> {
                     Thread thread = new Thread(task, "product-description-worker");
@@ -93,17 +102,37 @@ public class ProductDescriptionWorker {
                 logger.warn("Could not heartbeat product description job {}", jobId);
             }
         }, 0, heartbeatSeconds, TimeUnit.SECONDS);
+        ScheduledFuture<?> progressTask = progressPoller.scheduleAtFixedRate(() -> {
+            try {
+                ProductDescriptionJob current = jobs.find(jobId).orElse(null);
+                if (current != null && current.attempt() == attempt
+                        && ProductDescriptionJob.GENERATING_CONTENT.equals(current.status())) {
+                    var progress = gateway.contentProgress(contentCall(current));
+                    jobs.updateProgress(jobId, attempt, progress.completedChunks(), progress.totalChunks());
+                }
+            } catch (GatewayException failure) {
+                // Progress is advisory; the generation request owns the actual failure state.
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } catch (RuntimeException failure) {
+                logger.debug("Could not read chunk progress for product description job {}", jobId);
+            }
+        }, progressPollSeconds, progressPollSeconds, TimeUnit.SECONDS);
         FutureTask<Void> future = new FutureTask<>(() -> { run(jobId, attempt); return null; }) {
             @Override protected void done() {
                 heartbeat.cancel(false);
+                progressTask.cancel(false);
+                progressTasks.remove(jobId, progressTask);
                 running.remove(jobId, this);
             }
         };
         try {
+            progressTasks.put(jobId, progressTask);
             running.put(jobId, future);
             executor.execute(future);
         } catch (RejectedExecutionException rejected) {
             future.cancel(false);
+            progressTask.cancel(false);
             fail(jobId, attempt, stage, "QUEUE_FULL", "생성 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
         }
     }
@@ -120,6 +149,7 @@ public class ProductDescriptionWorker {
     void shutdown() {
         executor.shutdownNow();
         heartbeats.shutdownNow();
+        progressPoller.shutdownNow();
     }
 
     void run(UUID jobId, int attempt) {
@@ -182,14 +212,19 @@ public class ProductDescriptionWorker {
                     "검증 이후 문서가 변경되어 생성을 중단했습니다.");
             return null;
         }
+        return gateway.generateContent(contentCall(job));
+    }
+
+    private ContentCall contentCall(ProductDescriptionJob job) {
+        List<SubmittedDocument> documents = submissions.findDocumentsBySubmissionId(SubmissionId.of(job.submissionId()));
         JsonNode warnings = preflightWarnings(job.submissionId());
-        return gateway.generateContent(new ContentCall(
+        return new ContentCall(
                 job.submissionId(), submissions.findById(SubmissionId.of(job.submissionId())).orElseThrow()
                         .productId().value(),
                 job.preflightDecision(), warnings,
                 documents.stream().map(document -> new ProductDescriptionGateway.SourceDocument(
                         document.fileId(), document.role().name(), document.originalFilename(),
-                        document.format().name(), document.extractedText())).toList()));
+                        document.format().name(), document.extractedText())).toList());
     }
 
     private JsonNode preflightWarnings(UUID submissionId) {

@@ -22,6 +22,8 @@ public record ProductDescriptionJob(
         String outputPath,
         String outputFilename,
         boolean hasContent,
+        int completedChunks,
+        int totalChunks,
         Instant createdAt,
         Instant updatedAt,
         Instant completedAt
@@ -30,10 +32,15 @@ public record ProductDescriptionJob(
     public static final String RENDERING = "RENDERING";
     public static final String COMPLETED = "COMPLETED";
     public static final String CONTENT_FAILED = "CONTENT_FAILED";
+    public static final String CONTENT_PAUSED = "CONTENT_PAUSED";
     public static final String RENDER_FAILED = "RENDER_FAILED";
     public static final String CANCELED = "CANCELED";
 
     public boolean active() {
         return GENERATING_CONTENT.equals(status) || RENDERING.equals(status);
+    }
+
+    public boolean resumable() {
+        return CONTENT_PAUSED.equals(status) || (CONTENT_FAILED.equals(status) && !hasContent);
     }
 }

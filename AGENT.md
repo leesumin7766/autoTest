@@ -6,9 +6,9 @@
 
 - 최종 목표: 시험합의서·기능리스트·제품 매뉴얼 업로드 → LLM으로 제품 설명과 TC 생성 → 테스트 자동화와 결함 리포트.
 - LLM 전 문서 적합성 판정에는 결정적인 프로그램 검사와 Jev(TypeSafe) 의미 판정을 사용한다. 제품 설명·TC 생성은 생성형 LLM에 맡긴다.
-- **현재 구현 범위는 업로드, 원본 저장, 텍스트 추출, DB 저장, ai-service 문서 접수 및 실패 복구까지다.**
-- `dev-ai-service`의 다음 구현 범위는 LLM 전 문서 필터다. BLOCKED는 생성을 중단하고, READY_WITH_WARNINGS는 경고를 붙여 진행하며, READY는 정상 진행한다. 생성형 LLM의 제품 설명·TC 생성과 테스트 실행은 별도 범위다.
-- 제품 설명 문서 비동기 생성(PDF)은 구현되어 있다(7절). 실제 LLM 제공업체는 미선정이며 개발은 mock 모드로 한다. TC 생성은 아직 범위 밖이다.
+- **현재 구현 범위는 업로드·사전 점검·비동기 제품 설명 PDF 생성과 청크 체크포인트 재개까지다.**
+- 제품 설명 생성은 READY/READY_WITH_WARNINGS만 허용한다. 작업 상태와 청크 진행률, 중단·재개, 회원별 동시 생성 제한은 test-management-service가 담당한다. 실제 계정 인증·역할 권한은 아직 별도 개발 범위다.
+- Ollama는 로컬 LLM 제공자로 연결할 수 있고 Compose 기본 모드는 mock이다. TC 생성과 테스트 실행은 아직 범위 밖이다.
 - 코드 제출/채점 시스템이 아니다. Main.java 및 @test input: 주석 파싱·채점 로직을 도입하지 않는다.
 
 ## 2. 실행 구성
@@ -148,5 +148,5 @@ Gateway 비교 요청은 주소를 http://localhost:8080/api/submissions로 변�
 - 복구: 워커가 5초마다 heartbeat. 30초 이상 갱신이 없거나 서버 시작 시 활성 상태로 남은 작업은 `INTERRUPTED`로 닫는다(내용이 저장됐으면 `RENDER_FAILED`). TMS 단일 인스턴스를 가정한다.
 - 결과 PDF는 `generated/product-descriptions/{submissionId}/` 접두사로 저장하며 업로드 원본과 구분한다. 완료 PDF는 다운로드 때 재생성하지 않는다.
 - 템플릿은 `ai-service/doc_templates/product-description/`(버전 있는 패키지)에서만 정의한다. 수정·검증 절차는 `ai-service/doc_templates/README.md`. 작업 행에 템플릿 스냅샷과 구조화 문서를 저장한다.
-- LLM: `LLM_MODE=mock|real`(compose 기본 mock), 실제 키는 `EX_API`. real에서 키가 없거나 `inputlater`면 설정 오류이며 mock으로 대체하지 않는다. 실제 제공업체 연결 지점은 `ai-service/product_description/llm.py`의 `ExternalLlmProvider`.
+- LLM: `LLM_MODE=mock|real`(compose 기본 mock), Ollama는 `LLM_PROVIDER=ollama`, `LLM_MODEL=qwen3:4b` 및 `OLLAMA_BASE_URL=http://ollama:11434`로 선택한다. 새 제공업체는 `ai-service/product_description/llm.py`의 `LlmProvider` 어댑터로 연결한다. 품질 지침·근거 검증·청크 중첩은 `ai-service/doc_templates/product-description/content.json`에서 관리하고 템플릿 버전 스냅샷과 체크포인트 digest에 반영한다.
 - 테스트: `docker compose run --rm --no-deps ai-service python -m unittest test_product_description`, `.\gradlew.bat :test-management-service:test`(격리 DB `autotest_test`). Java 서비스 이미지는 `bootJar` 후 `docker compose up -d --build`로 반영한다.

@@ -90,6 +90,8 @@ async def generate_content(body: ContentRequest, request: Request):
 
     documents = [d.model_dump() for d in body.documents]
     warnings = [w.model_dump() for w in body.warnings]
+    if hasattr(provider, "configure_quality"):
+        provider.configure_quality(snapshot["content"].get("quality", {}))
     llm_request = build_llm_request(snapshot, documents, warnings)
     task = asyncio.create_task(provider.generate(llm_request))
     try:
@@ -105,8 +107,9 @@ async def generate_content(body: ContentRequest, request: Request):
     except LlmProviderNotImplemented as error:
         return _error(503, error.code, str(error))
     except Exception as error:
-        logger.warning("LLM call failed (%s)", type(error).__name__)
-        return _error(502, "LLM_CALL_FAILED", "LLM 호출에 실패했습니다.")
+        code = str(error) if str(error).startswith("LLM_") else "LLM_CALL_FAILED"
+        logger.warning("LLM call failed (%s)", code)
+        return _error(502, code, "LLM 호출 또는 응답 검증에 실패했습니다.")
 
     context = {"documents": documents, "warnings": warnings, "decision": body.decision,
                "productId": body.productId, "submissionId": body.submissionId, "generatedAt": now_utc()}
@@ -115,6 +118,26 @@ async def generate_content(body: ContentRequest, request: Request):
     except InvalidLlmOutput as error:
         return _error(502, error.code, str(error))
     return {"template": snapshot, "document": document, "generation": document["generation"]}
+
+
+@router.post("/content/progress")
+async def content_progress(body: ContentRequest):
+    """Return checkpoint counts only; intermediate document facts remain private."""
+    try:
+        provider = provider_from_env()
+        snapshot = load_template(body.templateId)
+    except LlmConfigurationError as error:
+        return _error(503, error.code, str(error))
+    except TemplateError as error:
+        return _error(500, "TEMPLATE_INVALID", str(error))
+    documents = [d.model_dump() for d in body.documents]
+    warnings = [w.model_dump() for w in body.warnings]
+    if hasattr(provider, "configure_quality"):
+        provider.configure_quality(snapshot["content"].get("quality", {}))
+    llm_request = build_llm_request(snapshot, documents, warnings)
+    if hasattr(provider, "progress"):
+        return await provider.progress(llm_request)
+    return {"completedChunks": 0, "totalChunks": 0}
 
 
 @router.post("/render")
