@@ -31,6 +31,7 @@ def build_llm_request(snapshot: dict, documents: list[dict], warnings: list[dict
                     "text": d["extractedText"]} for d in documents],
         warnings=warnings,
         unknown_text=unknown,
+        pipeline=content.get("pipeline"),
     )
 
 
