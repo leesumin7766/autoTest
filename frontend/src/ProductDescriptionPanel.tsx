@@ -25,6 +25,7 @@ type Preflight = {
   decision: 'BLOCKED' | 'READY_WITH_WARNINGS' | 'READY'
   warnings: PreflightWarning[]
   diagnostics?: PreflightDiagnostics
+  generationGate?: { allowed: boolean; reasons: { code: string; role: string | null; message: string }[] }
 } | null
 
 type Props = {
@@ -32,8 +33,6 @@ type Props = {
   memberId: string
   deliveryStatus: string
   preflight: Preflight
-  autoStart: boolean
-  onAutoStarted: () => void
 }
 
 const POLL_MS = 2000
@@ -49,7 +48,7 @@ async function readError(response: Response, fallback: string): Promise<string> 
   }
 }
 
-export function ProductDescriptionPanel({ submissionId, memberId, deliveryStatus, preflight, autoStart, onAutoStarted }: Props) {
+export function ProductDescriptionPanel({ submissionId, memberId, deliveryStatus, preflight }: Props) {
   const [view, setView] = useState<StatusView | null>(null)
   const [popupOpen, setPopupOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -58,7 +57,6 @@ export function ProductDescriptionPanel({ submissionId, memberId, deliveryStatus
   const [memberHasActiveJob, setMemberHasActiveJob] = useState(false)
   const [memberActiveChecked, setMemberActiveChecked] = useState(false)
   const [error, setError] = useState('')
-  const autoStartedFor = useRef('')
   const autoOpenedFor = useRef('')
   const base = `/api/submissions/${submissionId}/product-description`
   const headers = { 'X-Member-Id': memberId }
@@ -76,7 +74,10 @@ export function ProductDescriptionPanel({ submissionId, memberId, deliveryStatus
   }, [refresh])
 
   const active = view?.job?.active === true
-  const ready = deliveryStatus === 'DELIVERED' && (preflight?.decision === 'READY' || preflight?.decision === 'READY_WITH_WARNINGS')
+  const eligibleDecision = preflight?.decision === 'READY' || preflight?.decision === 'READY_WITH_WARNINGS'
+  const gateAllows = preflight?.generationGate?.allowed !== false
+  const ready = deliveryStatus === 'DELIVERED' && eligibleDecision && gateAllows
+  const blocked = deliveryStatus === 'BLOCKED' || preflight?.decision === 'BLOCKED' || !gateAllows
   useEffect(() => {
     if (active && view?.job && autoOpenedFor.current !== view.job.jobId) {
       autoOpenedFor.current = view.job.jobId
@@ -101,6 +102,7 @@ export function ProductDescriptionPanel({ submissionId, memberId, deliveryStatus
   useEffect(() => {
     if (!ready) { setMemberHasActiveJob(false); setMemberActiveChecked(true); return }
     let alive = true
+    setMemberActiveChecked(false)
     const check = async () => {
       try {
         const response = await fetch('/api/product-descriptions/active', { headers })
@@ -138,15 +140,6 @@ export function ProductDescriptionPanel({ submissionId, memberId, deliveryStatus
     await post('', '제품 설명 문서 생성을 시작하지 못했습니다.')
   }
 
-  useEffect(() => {
-    if (!autoStart || !ready || !memberActiveChecked || memberHasActiveJob || autoStartedFor.current === submissionId) return
-    autoStartedFor.current = submissionId
-    onAutoStarted()
-    void start()
-    // start depends only on stable inputs for this submission.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart, ready, memberActiveChecked, memberHasActiveJob, submissionId])
-
   const download = async (job: ProductDescriptionJob) => {
     setBusy(true)
     setError('')
@@ -168,7 +161,7 @@ export function ProductDescriptionPanel({ submissionId, memberId, deliveryStatus
 
   const job = view?.job ?? null
   const lastCompleted = view?.lastCompleted ?? null
-  if (!ready && !job) return null
+  if (!ready && !blocked && !job) return null
 
   const stageText = job?.stage === 'OUTPUT' ? 'PDF 파일을 만드는 중' : '문서 내용을 생성하는 중'
   const chunkProgress = job && job.totalChunks > 0
@@ -185,13 +178,17 @@ export function ProductDescriptionPanel({ submissionId, memberId, deliveryStatus
       <div className="description-panel" role="status">
         <strong>제품 설명 문서</strong>
         <span>
-          {!job ? '아직 생성하지 않았습니다.' : job.active ? `생성 중 · ${stageText}`
+          {!job ? blocked ? '사전 점검 결과로 AI 문서 생성을 차단했습니다.' : '사전 점검 완료 · AI 문서 생성 전' : job.active ? `생성 중 · ${stageText}`
             : job.status === 'COMPLETED' ? '생성 완료' : job.status === 'CANCELED' || job.status === 'CONTENT_PAUSED' ? '중단됨 · 이어서 가능' : '생성 실패'}
         </span>
         {mockLabel && <span className="mock-badge">{mockLabel}</span>}
         {job && <button className="quiet-button" type="button" onClick={() => setPopupOpen(true)}>상태 보기</button>}
-        {!job && ready && <button className="quiet-button" type="button" disabled={busy || active || memberHasActiveJob} onClick={() => void start()}>제품 설명 문서 생성</button>}
+        {!job && preflight && <button className="primary-button" type="button"
+          disabled={busy || !ready || !memberActiveChecked || memberHasActiveJob} onClick={() => void start()}>AI 문서 생성</button>}
         {memberHasActiveJob && <span>다른 제품 설명 문서 생성 작업이 진행 중입니다.</span>}
+        {blocked && preflight?.generationGate?.reasons.map((reason, index) => (
+          <span className="error-copy" key={`${reason.code}-${index}`}>{reason.message}</span>
+        ))}
         {lastCompleted && !job?.active && (
           <button className="quiet-button" type="button" disabled={busy} onClick={() => void download(lastCompleted)}>PDF 다운로드</button>
         )}
@@ -232,7 +229,7 @@ export function ProductDescriptionPanel({ submissionId, memberId, deliveryStatus
               </div>
             )}
 
-            {preflight?.decision === 'READY_WITH_WARNINGS' && preflight.warnings.length > 0 && (
+            {preflight && preflight.decision !== 'READY' && preflight.warnings.length > 0 && (
               <details className="dialog-warnings">
                 <summary>경고 상세 {preflight.warnings.length}건</summary>
                 <PreflightWarningDetails warnings={preflight.warnings} diagnostics={preflight.diagnostics} />

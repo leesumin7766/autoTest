@@ -62,6 +62,24 @@ function detailsFor(warning: PreflightWarning, diagnostics?: PreflightDiagnostic
       <>Jev가 비교에 사용한 제품명이나 근거 문장은 저장되지 않아 구체적인 불일치 지점을 제시할 수 없습니다.</>,
     ]
   }
+  if (evidence?.type === 'role_match') {
+    const choice = String(evidence.choice ?? 'unknown')
+    const confidence = Number(evidence.confidence)
+    const threshold = Number(evidence.blockConfidenceThreshold)
+    return [
+      <>Jev 역할 판정: <strong>{choiceLabel[choice] ?? choice}</strong>{Number.isFinite(confidence) ? ` (신뢰도 ${(confidence * 100).toFixed(0)}%)` : ''}.</>,
+      Number.isFinite(threshold) ? <>단일 문서 차단 기준: 불일치 신뢰도 {(threshold * 100).toFixed(0)}% 이상.</> : null,
+      <>Jev는 선택과 신뢰도만 반환합니다. 비교한 원문 문구는 저장되지 않았습니다.</>,
+    ]
+  }
+  if (evidence?.type === 'multiple_role_mismatches') {
+    const roles = Array.isArray(evidence.roles) ? evidence.roles as { role: string; confidence: number }[] : []
+    return [
+      <>역할 불일치 판정 {Number(evidence.count)}건(기준: {Number(evidence.minimumCount)}건 이상), 각 신뢰도 {(Number(evidence.minimumConfidence) * 100).toFixed(0)}% 이상.</>,
+      ...roles.map((item) => <span key={item.role}>{roleLabel[item.role] ?? item.role}: 불일치 (신뢰도 {(item.confidence * 100).toFixed(0)}%)</span>),
+      <>여러 문서에서 같은 유형의 역할 불일치가 겹쳐 차단했습니다. Jev가 비교한 구체 문구는 저장되지 않았습니다.</>,
+    ]
+  }
   if (evidence?.type === 'truncation' || warning.code === 'JEV_INPUT_TRUNCATED') {
     const diagnostic = diagnosticFor(warning.role, diagnostics)
     const total = Number(evidence?.extractedCharacterCount ?? diagnostic?.extractedCharacterCount)
