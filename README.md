@@ -32,7 +32,7 @@ autoTest/
 ├── gradlew / gradlew.bat
 ├── build.gradle.kts               # Spring Boot 3.5.6, Java 21 toolchain
 ├── settings.gradle.kts            # Java 모듈 6개 등록
-├── docker-compose.yml            # 인프라와 백엔드 서비스 9개 (frontend 제외)
+├── docker-compose.yml            # 인프라와 백엔드 서비스 10개 (frontend 제외)
 ├── docker-compose.yml.bak        # 이전 설정 백업
 ├── setup.ps1                     # 과거 초기화 스크립트
 ├── Main.java                     # 기존 코드 제출 예제 잔재
@@ -74,7 +74,8 @@ IDE는 자유롭게 선택할 수 있습니다. Java 서비스는 루트에서 �
 | test-management-service | 8082 | 역할별 업로드·파싱·저장·AI 전달 및 재시도 |
 | test-execution-service | 8083 | 애플리케이션·DB 설정 골격, TC 실행 API 미구현 |
 | report-service | 8084 | 애플리케이션·DB 설정 골격, 리포트 API 미구현 |
-| ai-service | 8005 | 문서 접수·중복 방지 API (현재 LLM 호출 없음) |
+| ai-service | 8005 | 문서 접수·사전 점검·제품 설명 PDF 생성 |
+| Ollama 컨테이너 | `21434:11434` | 로컬 LLM API (`qwen3:4b` 등) |
 | crawler-service | 8006 | URL 방문 및 HTTP 요청 목록 수집 |
 | PostgreSQL | 5432 | `autotest` DB, pgvector 설치 이미지 |
 | SeaweedFS | 8333 / 8334 / 9333 | S3 API / S3 gRPC / Master |
@@ -269,9 +270,35 @@ S3_ACCESS_KEY=your-access-key
 S3_SECRET_KEY=your-secret-key
 ```
 
-현재 Compose가 필수로 참조하는 값은 위 두 개입니다. `S3_BUCKET`, `POSTGRES_USER`, `POSTGRES_PASSWORD`는 `.env`에 추가해도 현재 Compose 설정에 반영되지 않습니다. DB 계정은 개발용 `test/test`, DB 이름은 `autotest`로 고정되어 있습니다.
+Compose가 필수로 참조하는 값은 `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `PRODUCT_DESCRIPTION_INTERNAL_TOKEN`입니다. 내부 토큰은 32바이트 이상의 임의 값으로 정하고 `.env`에 보관합니다. `S3_BUCKET`, `POSTGRES_USER`, `POSTGRES_PASSWORD`는 `.env`에 추가해도 현재 Compose 설정에 반영되지 않습니다. DB 계정은 개발용 `test/test`, DB 이름은 `autotest`로 고정되어 있습니다.
 
 Compose는 `AI_SERVICE_URL=http://ai-service:8005`를 TMS에 전달하고 `AI_DATABASE_URL=postgresql://test:test@db:5432/autotest`로 AI 접수 DB를 설정합니다. Jev 의미 판정에는 선택 설정 `TYPESAFE_API_KEY`를 `.env`에 지정합니다. 키가 없으면 결정적 검사만 수행하고 경고를 반환합니다.
+
+Compose의 `ollama` 서비스는 Ollama API 컨테이너 포트 `11434`를 Windows 호스트의 `127.0.0.1:21434`에 연결합니다. Windows에 설치된 Ollama가 기본 포트 `11434`를 쓰거나 Windows 예약 포트와 충돌할 수 있어 호스트 포트를 별도로 사용합니다. 두 포트를 혼동하지 마세요.
+
+```powershell
+# Ollama 컨테이너 시작 및 모델 다운로드 (모델 데이터는 ollama_data 볼륨에 보존)
+docker compose up -d ollama
+docker compose exec ollama ollama pull qwen3:4b
+docker compose exec ollama ollama list
+
+# Windows 호스트에서 컨테이너 API 확인
+Invoke-RestMethod http://127.0.0.1:21434/api/tags
+```
+
+Docker 네트워크 안의 `ai-service`는 호스트 포트가 아닌 `http://ollama:11434`로 Ollama에 연결합니다. 실제 Ollama 생성을 사용하려면 `.env`에 아래 설정을 추가한 뒤 ai-service를 재생성합니다. 기본 설정은 테스트용 `LLM_MODE=mock`입니다.
+
+```dotenv
+LLM_MODE=real
+LLM_PROVIDER=ollama
+LLM_MODEL=qwen3:4b
+```
+
+```powershell
+docker compose up -d --force-recreate ai-service
+```
+
+Ollama는 로컬 CPU/GPU와 메모리로 추론하며 외부 API 호출 한도는 없습니다. 이 노트북의 컨테이너 모델은 CPU로 실행되는 것을 확인했습니다. 첫 모델 다운로드는 약 2.5 GB입니다. `ollama_data` 볼륨을 지우면 모델을 다시 받아야 합니다. 기존 Windows Ollama는 `localhost:11434`에서 별도로 실행될 수 있습니다.
 
 ```powershell
 docker compose up -d --build
@@ -279,7 +306,7 @@ docker compose ps
 docker compose logs -f test-management-service seaweedfs
 ```
 
-Compose에는 서비스 정의 9개가 있으며 frontend는 포함되지 않습니다. crawler 컨테이너는 `node:24.21.0-slim`을 기반으로 빌드됩니다. 실행 성공 여부는 실제 컨테이너 상태와 로그로 확인해야 합니다.
+Compose에는 서비스 정의 10개가 있으며 frontend는 포함되지 않습니다. crawler 컨테이너는 `node:24.21.0-slim`을 기반으로 빌드됩니다. 실행 성공 여부는 실제 컨테이너 상태와 로그로 확인해야 합니다.
 
 새 DB에서는 `test-management-service`가 Flyway 마이그레이션을 완료하고 healthy가 된 뒤 `ai-service`를 시작합니다. 두 서비스가 같은 `public` 스키마를 사용하므로 AI 테이블이 먼저 생성되면 Flyway가 `Found non-empty schema(s) "public" but no schema history table` 오류로 중단됩니다. 이미 이 오류가 발생했다면 볼륨을 삭제하지 말고 DB 백업과 테이블 구성을 먼저 확인합니다. AI 테이블만 있고 제출 테이블이 없는 경우에 한해 일회성 `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true`, `SPRING_FLYWAY_BASELINE_VERSION=0`으로 V1부터 적용한 뒤 두 설정을 제거합니다. 기존 제출 테이블이 있는 DB에는 이 복구 방법을 그대로 적용하지 않습니다.
 

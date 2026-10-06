@@ -146,7 +146,8 @@
   ollama:
     image: ollama/ollama:latest
     ports:
-      - "127.0.0.1:11434:11434"
+      # Keep the Windows Ollama service on 11434; expose this container separately.
+      - "127.0.0.1:21434:11434"
     volumes:
       - ollama_data:/root/.ollama
     environment:
