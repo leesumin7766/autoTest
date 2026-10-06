@@ -20,6 +20,7 @@ class LlmRequest:
     documents: list[dict]  # fileId, role, originalFilename, text (analysis data only)
     warnings: list[dict]
     unknown_text: str
+    pipeline: dict | None = None
 
     def input_payload(self) -> dict:
         return {"sections": self.sections, "documents": self.documents, "preflightWarnings": self.warnings}
@@ -92,6 +93,9 @@ def provider_from_env(env=None) -> LlmProvider:
             raise LlmConfigurationError("MOCK_LLM_DELAY_SECONDS must be a number") from error
         return MockLlmProvider(delay)
     if mode == "real":
+        if env.get("LLM_PROVIDER", "external").lower() == "ollama":
+            from .ollama_provider import OllamaLlmProvider
+            return OllamaLlmProvider(env)
         api_key = (env.get("EX_API") or "").strip()
         if not api_key or api_key.lower() == "inputlater":
             raise LlmConfigurationError("LLM_MODE=real 이지만 EX_API 키가 설정되지 않았습니다.")

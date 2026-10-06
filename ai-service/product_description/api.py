@@ -1,9 +1,11 @@
 """HTTP contract for product description generation. This service keeps no document text or job state."""
 import asyncio
 import logging
+import os
+import secrets
 from typing import Literal
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -12,7 +14,16 @@ from .llm import LlmConfigurationError, LlmProviderNotImplemented, provider_from
 from .rendering import RenderError, get_renderer
 from .template_store import DEFAULT_TEMPLATE_ID, TemplateError, load_template
 
-router = APIRouter(prefix="/api/v1/product-descriptions")
+def require_internal_token(request: Request):
+    expected = os.environ.get("PRODUCT_DESCRIPTION_INTERNAL_TOKEN", "")
+    if not expected:
+        raise HTTPException(503, "Internal authentication is not configured")
+    supplied = request.headers.get("X-Internal-Token", "")
+    if not secrets.compare_digest(supplied.encode(), expected.encode()):
+        raise HTTPException(403, "Internal authentication required")
+
+
+router = APIRouter(prefix="/api/v1/product-descriptions", dependencies=[Depends(require_internal_token)])
 logger = logging.getLogger(__name__)
 
 

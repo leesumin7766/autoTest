@@ -32,6 +32,8 @@ public class AiServiceProductDescriptionGateway implements ProductDescriptionGat
     private final String baseUrl;
     private final Duration contentTimeout;
     private final Duration renderTimeout;
+    @Value("${product-description.internal-token:}")
+    private String internalToken;
 
     public AiServiceProductDescriptionGateway(
             ObjectMapper objectMapper,
@@ -93,10 +95,14 @@ public class AiServiceProductDescriptionGateway implements ProductDescriptionGat
     private HttpResponse<byte[]> post(String path, ObjectNode body, Duration timeout)
             throws GatewayException, InterruptedException {
         HttpRequest request;
+        if (internalToken == null || internalToken.isBlank()) {
+            throw new GatewayException("INTERNAL_AUTH_NOT_CONFIGURED", "생성 서비스 인증 설정이 없습니다.");
+        }
         try {
             request = HttpRequest.newBuilder(URI.create(baseUrl + path))
                     .timeout(timeout)
                     .header("Content-Type", "application/json")
+                    .header("X-Internal-Token", internalToken)
                     .POST(HttpRequest.BodyPublishers.ofByteArray(objectMapper.writeValueAsBytes(body)))
                     .build();
         } catch (JsonProcessingException exception) {

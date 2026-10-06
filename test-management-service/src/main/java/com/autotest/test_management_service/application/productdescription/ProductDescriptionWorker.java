@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -84,13 +85,25 @@ public class ProductDescriptionWorker {
         UUID jobId = job.jobId();
         int attempt = job.attempt();
         String stage = job.status();
-        try {
-            Future<?> future = executor.submit(() -> run(jobId, attempt));
-            running.put(jobId, future);
-            if (future.isDone()) {
-                running.remove(jobId);
+        // A queued task is still owned by this process and must not expire while waiting.
+        ScheduledFuture<?> heartbeat = heartbeats.scheduleAtFixedRate(() -> {
+            try {
+                jobs.touch(jobId, attempt);
+            } catch (RuntimeException failure) {
+                logger.warn("Could not heartbeat product description job {}", jobId);
             }
+        }, 0, heartbeatSeconds, TimeUnit.SECONDS);
+        FutureTask<Void> future = new FutureTask<>(() -> { run(jobId, attempt); return null; }) {
+            @Override protected void done() {
+                heartbeat.cancel(false);
+                running.remove(jobId, this);
+            }
+        };
+        try {
+            running.put(jobId, future);
+            executor.execute(future);
         } catch (RejectedExecutionException rejected) {
+            future.cancel(false);
             fail(jobId, attempt, stage, "QUEUE_FULL", "생성 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
         }
     }
@@ -112,12 +125,9 @@ public class ProductDescriptionWorker {
     void run(UUID jobId, int attempt) {
         Optional<ProductDescriptionJob> loaded = jobs.find(jobId);
         if (loaded.isEmpty() || loaded.get().attempt() != attempt || !loaded.get().active()) {
-            running.remove(jobId);
             return;
         }
         ProductDescriptionJob job = loaded.get();
-        ScheduledFuture<?> heartbeat = heartbeats.scheduleAtFixedRate(
-                () -> jobs.touch(jobId, attempt), heartbeatSeconds, heartbeatSeconds, TimeUnit.SECONDS);
         String stage = job.status();
         try {
             JsonNode snapshot;
@@ -162,9 +172,6 @@ public class ProductDescriptionWorker {
         } catch (RuntimeException failure) {
             logger.warn("Product description job {} failed ({})", jobId, failure.getClass().getSimpleName());
             fail(jobId, attempt, stage, "INTERNAL_ERROR", "문서 생성 중 내부 오류가 발생했습니다.");
-        } finally {
-            heartbeat.cancel(false);
-            running.remove(jobId);
         }
     }
 

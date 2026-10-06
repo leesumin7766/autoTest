@@ -156,7 +156,7 @@ export function ProductDescriptionPanel({ submissionId, memberId, deliveryStatus
             <h2 id="description-dialog-title">제품 설명 문서</h2>
             {mockLabel && <p><span className="mock-badge">{mockLabel}</span></p>}
 
-            {(!job || job.active) && (
+            {((!job && busy) || job?.active) && (
               <>
                 <p>{preflight?.decision === 'READY_WITH_WARNINGS' ? WARNING_MESSAGE : READY_MESSAGE}</p>
                 <div className="dialog-progress" aria-live="polite">
@@ -197,7 +197,7 @@ export function ProductDescriptionPanel({ submissionId, memberId, deliveryStatus
                 <button className="quiet-button" type="button" disabled={busy}
                   onClick={() => void post(`/${job.jobId}/rerender`, 'PDF를 다시 출력하지 못했습니다.')}>PDF 다시 출력</button>
               )}
-              {job && !job.active && (
+              {((job && !job.active) || (!job && !busy && error)) && (
                 <button className="quiet-button" type="button" disabled={busy} onClick={() => void start()}>다시 생성</button>
               )}
               <button className="text-button" type="button" onClick={() => setPopupOpen(false)}>

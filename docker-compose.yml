@@ -66,6 +66,8 @@
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in .env}
       S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in .env}
       AI_SERVICE_URL: http://ai-service:8005
+      PRODUCT_DESCRIPTION_INTERNAL_TOKEN: ${PRODUCT_DESCRIPTION_INTERNAL_TOKEN:?Set internal token}
+      PRODUCT_DESCRIPTION_WORKER_THREADS: 1
 
   test-execution-service:
     build:
@@ -124,14 +126,34 @@
       MOCK_LLM_DELAY_SECONDS: ${MOCK_LLM_DELAY_SECONDS:-3}
       EX_API: ${EX_API:-}
       LLM_MODEL: ${LLM_MODEL:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-external}
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
+      OLLAMA_NUM_PREDICT: ${OLLAMA_NUM_PREDICT:-1024}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-270}
+      GENERATION_CACHE_DIR: /generation-cache
+      PRODUCT_DESCRIPTION_INTERNAL_TOKEN: ${PRODUCT_DESCRIPTION_INTERNAL_TOKEN:?Set internal token}
     volumes:
       - ./ai-service:/app
+      - generation_cache:/generation-cache
     depends_on:
       db:
         condition: service_healthy
       # Initialize Flyway before AI creates tables in the shared public schema.
       test-management-service:
         condition: service_healthy
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+    restart: unless-stopped
 
   crawler-service:
     build: ./crawler-service
@@ -142,5 +164,7 @@
       - ./crawler-service:/app
 
 volumes:
+  generation_cache:
+  ollama_data:
   db_data:
   seaweed-data:
