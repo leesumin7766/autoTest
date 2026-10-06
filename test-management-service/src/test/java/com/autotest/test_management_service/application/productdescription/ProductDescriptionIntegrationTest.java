@@ -284,6 +284,23 @@ class ProductDescriptionIntegrationTest {
     }
 
     @Test
+    void memberCannotStartAnotherSubmissionWhileGenerationIsActive() throws Exception {
+        UUID firstSubmission = ready("READY");
+        UUID secondSubmission = ready("READY");
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        contentBehavior = () -> { entered.countDown(); release.await(); return cannedContent(); };
+        UUID jobId = service.start(firstSubmission, OWNER).job().jobId();
+        assertTrue(entered.await(10, TimeUnit.SECONDS));
+        assertEquals(jobId, service.activeForMember(OWNER).jobId());
+        ProductDescriptionException failure = assertThrows(ProductDescriptionException.class,
+                () -> service.start(secondSubmission, OWNER));
+        assertEquals("MEMBER_JOB_ALREADY_ACTIVE", failure.code());
+        release.countDown();
+        await(jobId, "COMPLETED");
+    }
+
+    @Test
     void cancelWinsOverAnUncancellableLateContentResult() throws Exception {
         UUID submissionId = ready("READY");
         CountDownLatch entered = new CountDownLatch(1);
@@ -301,11 +318,11 @@ class ProductDescriptionIntegrationTest {
         };
         UUID jobId = service.start(submissionId, OWNER).job().jobId();
         assertTrue(entered.await(10, TimeUnit.SECONDS));
-        assertEquals("CANCELED", service.cancel(submissionId, jobId, OWNER).job().status());
+        assertEquals("CONTENT_PAUSED", service.cancel(submissionId, jobId, OWNER).job().status());
         release.countDown();
         Thread.sleep(500);
         ProductDescriptionJob job = jobs.find(jobId).orElseThrow();
-        assertEquals("CANCELED", job.status());
+        assertEquals("CONTENT_PAUSED", job.status());
         assertNull(job.outputPath());
         assertFalse(job.hasContent());
         verify(gateway, times(0)).render(anyString(), any(), any());
@@ -334,7 +351,7 @@ class ProductDescriptionIntegrationTest {
             Thread.sleep(20);
         }
         assertTrue(interrupted.get());
-        assertEquals("CANCELED", jobs.find(jobId).orElseThrow().status());
+        assertEquals("CONTENT_PAUSED", jobs.find(jobId).orElseThrow().status());
     }
 
     @Test
@@ -416,7 +433,7 @@ class ProductDescriptionIntegrationTest {
 
         fail.set(false);
         UUID retryId = service.start(submissionId, OWNER).job().jobId();
-        assertNotEquals(failedId, retryId);
+        assertEquals(failedId, retryId);
         await(retryId, "COMPLETED");
     }
 
@@ -447,7 +464,7 @@ class ProductDescriptionIntegrationTest {
         UUID contentJob = UUID.randomUUID();
         UUID outputJob = UUID.randomUUID();
         jobs.insert(contentJob, contentStage, OWNER, "d".repeat(64), "READY");
-        jobs.insert(outputJob, outputStage, OWNER, "d".repeat(64), "READY");
+        jobs.insert(outputJob, outputStage, OWNER + 1, "d".repeat(64), "READY");
         assertTrue(jobs.markContentReady(outputJob, 1, "{\"presentation\":{}}", "{}", "MOCK", "l", "t", "1"));
 
         service.recoverAfterRestart();
@@ -467,7 +484,7 @@ class ProductDescriptionIntegrationTest {
         UUID staleJob = UUID.randomUUID();
         UUID freshJob = UUID.randomUUID();
         jobs.insert(staleJob, stale, OWNER, "d".repeat(64), "READY");
-        jobs.insert(freshJob, fresh, OWNER, "d".repeat(64), "READY");
+        jobs.insert(freshJob, fresh, OWNER + 1, "d".repeat(64), "READY");
         jdbc.update("UPDATE product_description_jobs SET updated_at = ? WHERE job_id = ?",
                 Timestamp.from(Instant.now().minusSeconds(120)), staleJob);
 

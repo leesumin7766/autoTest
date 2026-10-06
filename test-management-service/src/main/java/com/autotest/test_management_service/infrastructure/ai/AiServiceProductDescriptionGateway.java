@@ -38,7 +38,7 @@ public class AiServiceProductDescriptionGateway implements ProductDescriptionGat
     public AiServiceProductDescriptionGateway(
             ObjectMapper objectMapper,
             @Value("${ai-service.base-url:http://localhost:8005}") String baseUrl,
-            @Value("${product-description.content-timeout-seconds:300}") long contentTimeoutSeconds,
+            @Value("${ai-service.product-description.content-timeout-seconds:1200}") long contentTimeoutSeconds,
             @Value("${product-description.render-timeout-seconds:60}") long renderTimeoutSeconds
     ) {
         this.objectMapper = objectMapper;
@@ -49,19 +49,7 @@ public class AiServiceProductDescriptionGateway implements ProductDescriptionGat
 
     @Override
     public ContentResult generateContent(ContentCall call) throws GatewayException, InterruptedException {
-        ObjectNode body = objectMapper.createObjectNode();
-        body.put("submissionId", call.submissionId().toString());
-        body.put("productId", call.productId());
-        body.put("decision", call.decision());
-        body.set("warnings", call.warnings() == null ? objectMapper.createArrayNode() : call.warnings());
-        var documents = body.putArray("documents");
-        call.documents().forEach(document -> documents.addObject()
-                .put("fileId", document.fileId().toString())
-                .put("role", document.role())
-                .put("originalFilename", document.originalFilename())
-                .put("format", document.format())
-                .put("extractedText", document.extractedText()));
-
+        ObjectNode body = contentBody(call);
         HttpResponse<byte[]> response = post(BASE_PATH + "/content", body, contentTimeout);
         JsonNode payload = parse(response.body());
         JsonNode template = payload.path("template");
@@ -75,6 +63,31 @@ public class AiServiceProductDescriptionGateway implements ProductDescriptionGat
         return new ContentResult(template, document, mode, label.isTextual() ? label.asText() : null,
                 template.path("manifest").path("templateId").asText(),
                 template.path("manifest").path("version").asText());
+    }
+
+    @Override
+    public ChunkProgress contentProgress(ContentCall call) throws GatewayException, InterruptedException {
+        ObjectNode body = contentBody(call);
+        HttpResponse<byte[]> response = post(BASE_PATH + "/content/progress", body, Duration.ofSeconds(30));
+        JsonNode payload = parse(response.body());
+        return new ChunkProgress(Math.max(0, payload.path("completedChunks").asInt()),
+                Math.max(0, payload.path("totalChunks").asInt()));
+    }
+
+    private ObjectNode contentBody(ContentCall call) {
+        ObjectNode body = objectMapper.createObjectNode();
+        body.put("submissionId", call.submissionId().toString());
+        body.put("productId", call.productId());
+        body.put("decision", call.decision());
+        body.set("warnings", call.warnings() == null ? objectMapper.createArrayNode() : call.warnings());
+        var documents = body.putArray("documents");
+        call.documents().forEach(document -> documents.addObject()
+                .put("fileId", document.fileId().toString())
+                .put("role", document.role())
+                .put("originalFilename", document.originalFilename())
+                .put("format", document.format())
+                .put("extractedText", document.extractedText()));
+        return body;
     }
 
     @Override

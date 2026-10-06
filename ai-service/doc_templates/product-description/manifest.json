@@ -1,6 +1,6 @@
 {
   "templateId": "product-description",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "제품 설명 문서 템플릿",
   "outputFormats": ["PDF"]
 }

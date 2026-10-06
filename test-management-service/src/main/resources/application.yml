@@ -25,3 +25,5 @@ s3:
   path-style-access: true
 ai-service:
   base-url: ${AI_SERVICE_URL:http://localhost:8005}
+  product-description:
+    content-timeout-seconds: ${AI_SERVICE_PRODUCT_DESCRIPTION_CONTENT_TIMEOUT_SECONDS:21600}

@@ -30,6 +30,9 @@ class PreflightTests(unittest.TestCase):
 
         self.assertNotEqual("BLOCKED", result["decision"])
         self.assertIn("TEXT_DAMAGE_SUSPECTED", self.warning_codes(result))
+        warning = next(w for w in result["warnings"] if w["code"] == "TEXT_DAMAGE_SUSPECTED")
+        self.assertEqual(1, warning["evidence"]["suspiciousCharacterCount"])
+        self.assertEqual(0.01, warning["evidence"]["warningThreshold"])
 
     def test_heavy_unreadable_characters_block(self):
         damaged = self.documents.copy()
@@ -71,6 +74,21 @@ class PreflightTests(unittest.TestCase):
 
         self.assertEqual("READY_WITH_WARNINGS", result["decision"])
         self.assertIn("PRODUCT_IDENTITY_UNCERTAIN", self.warning_codes(result))
+        warning = next(w for w in result["warnings"] if w["code"] == "PRODUCT_IDENTITY_UNCERTAIN")
+        self.assertEqual("uncertain", warning["evidence"]["choice"])
+        self.assertEqual(0.55, warning["evidence"]["confidence"])
+        self.assertFalse(warning["evidence"]["explanationCaptured"])
+
+    def test_partial_readability_warning_keeps_jev_label_and_confidence(self):
+        answers = self.jev_answers()
+        answers["readability_MANUAL"] = {"choice": "partially_readable", "confidence": 0.74}
+        with patch.dict(os.environ, {"TYPESAFE_API_KEY": "test-key"}), \
+             patch("preflight._evaluate_with_jev", return_value=answers):
+            result = evaluate_preflight(self.documents)
+        warning = next(w for w in result["warnings"] if w["code"] == "DOCUMENT_PARTIALLY_READABLE")
+        self.assertEqual("partially_readable", warning["evidence"]["choice"])
+        self.assertEqual(0.74, warning["evidence"]["confidence"])
+        self.assertEqual(0.8, warning["evidence"]["warningConfidenceThreshold"])
 
     def test_confident_wrong_role_blocks(self):
         answers = self.jev_answers()
@@ -100,6 +118,9 @@ class PreflightTests(unittest.TestCase):
             result = evaluate_preflight(documents)
 
         self.assertIn("JEV_INPUT_TRUNCATED", self.warning_codes(result))
+        warning = next(w for w in result["warnings"] if w["code"] == "JEV_INPUT_TRUNCATED")
+        self.assertGreater(warning["evidence"]["jevOmittedCharacterCount"], 0)
+        self.assertEqual(12_000, warning["evidence"]["jevSelectedCharacterCount"])
         agreement_diagnostics = next(
             item for item in result["diagnostics"]["documents"] if item["role"] == "AGREEMENT")
         self.assertTrue(agreement_diagnostics["jevInputTruncated"])

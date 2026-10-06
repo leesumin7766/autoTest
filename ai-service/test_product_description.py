@@ -52,6 +52,17 @@ class TemplateTest(unittest.TestCase):
         self.assertEqual(["표지 및 문서 정보", "제품 개요", "주요 기능", "구성 및 동작 흐름", "설치·운영 조건",
                           "확인 필요 사항", "참고 문서"], titles)
         self.assertEqual(64, len(snapshot["digest"]))
+        self.assertEqual(80, snapshot["content"]["quality"]["chunking"]["overlapCharacters"])
+
+    def test_quality_configuration_is_required_and_validated(self):
+        with tempfile.TemporaryDirectory() as root:
+            target = Path(root) / "product-description"
+            shutil.copytree(template_store.TEMPLATE_ROOT / "product-description", target)
+            content = json.loads((target / "content.json").read_text(encoding="utf-8"))
+            del content["quality"]["evidence"]["requireExactQuote"]
+            (target / "content.json").write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
+            with self.assertRaises(template_store.TemplateError):
+                template_store.load_template(root=Path(root))
 
     def test_invalid_template_is_rejected(self):
         with tempfile.TemporaryDirectory() as root:
@@ -222,12 +233,12 @@ class EndpointTest(unittest.TestCase):
 
     def test_real_mode_without_key_returns_configuration_error(self):
         for key in ("", "inputlater"):
-            response = self.call(content_body(), {"LLM_MODE": "real", "EX_API": key})
+            response = self.call(content_body(), {"LLM_MODE": "real", "LLM_PROVIDER": "external", "EX_API": key})
             self.assertEqual(503, response.status_code)
             self.assertIn(b"LLM_NOT_CONFIGURED", response.body)
 
     def test_real_mode_with_key_reports_unimplemented_provider(self):
-        response = self.call(content_body(), {"LLM_MODE": "real", "EX_API": "dummy-key"})
+        response = self.call(content_body(), {"LLM_MODE": "real", "LLM_PROVIDER": "external", "EX_API": "dummy-key"})
         self.assertEqual(503, response.status_code)
         self.assertIn(b"LLM_PROVIDER_NOT_IMPLEMENTED", response.body)
 

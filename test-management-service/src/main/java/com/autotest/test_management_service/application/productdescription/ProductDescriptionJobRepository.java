@@ -16,10 +16,12 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class ProductDescriptionJobRepository {
     private static final String ACTIVE = "('GENERATING_CONTENT', 'RENDERING')";
+    private static final String RESUMABLE = "('CONTENT_PAUSED', 'CONTENT_FAILED', 'CANCELED')";
     private static final String COLUMNS = """
             job_id, submission_id, member_id, status, attempt, error_code, error_message, input_digest,
             preflight_decision, generation_mode, generation_label, template_id, template_version, output_format,
-            output_path, output_filename, (content IS NOT NULL) AS has_content, created_at, updated_at, completed_at
+            output_path, output_filename, (content IS NOT NULL) AS has_content, completed_chunks, total_chunks,
+            created_at, updated_at, completed_at
             """;
     private static final RowMapper<ProductDescriptionJob> MAPPER = (rs, row) -> new ProductDescriptionJob(
             rs.getObject("job_id", UUID.class), rs.getObject("submission_id", UUID.class), rs.getLong("member_id"),
@@ -27,7 +29,8 @@ public class ProductDescriptionJobRepository {
             rs.getString("input_digest").trim(), rs.getString("preflight_decision"), rs.getString("generation_mode"),
             rs.getString("generation_label"), rs.getString("template_id"), rs.getString("template_version"),
             rs.getString("output_format"), rs.getString("output_path"), rs.getString("output_filename"),
-            rs.getBoolean("has_content"), rs.getTimestamp("created_at").toInstant(),
+            rs.getBoolean("has_content"), rs.getInt("completed_chunks"), rs.getInt("total_chunks"),
+            rs.getTimestamp("created_at").toInstant(),
             rs.getTimestamp("updated_at").toInstant(),
             rs.getTimestamp("completed_at") == null ? null : rs.getTimestamp("completed_at").toInstant());
 
@@ -64,6 +67,17 @@ public class ProductDescriptionJobRepository {
                 + "AND status = 'COMPLETED' ORDER BY created_at DESC LIMIT 1", submissionId);
     }
 
+    public Optional<ProductDescriptionJob> findActiveForMember(long memberId) {
+        return first("SELECT " + COLUMNS + " FROM product_description_jobs WHERE member_id = ? AND status IN "
+                + ACTIVE + " ORDER BY created_at DESC LIMIT 1", memberId);
+    }
+
+    public Optional<ProductDescriptionJob> findResumable(UUID submissionId, long memberId) {
+        return first("SELECT " + COLUMNS + " FROM product_description_jobs WHERE submission_id = ? "
+                + "AND member_id = ? AND content IS NULL AND status IN " + RESUMABLE
+                + " ORDER BY created_at DESC LIMIT 1", submissionId, memberId);
+    }
+
     public boolean markContentReady(UUID jobId, int attempt, String snapshotJson, String contentJson, String mode,
                                     String label, String templateId, String templateVersion) {
         return jdbcTemplate.update("""
@@ -95,9 +109,26 @@ public class ProductDescriptionJobRepository {
     public boolean cancel(UUID jobId) {
         return jdbcTemplate.update("""
                 UPDATE product_description_jobs
-                SET status = 'CANCELED', error_code = 'CANCELED', error_message = '사용자가 생성을 중단했습니다.',
+                SET status = CASE WHEN status = 'GENERATING_CONTENT' THEN 'CONTENT_PAUSED' ELSE 'CANCELED' END,
+                    error_code = 'CANCELED', error_message = '사용자가 생성을 중단했습니다.',
                     updated_at = now(), completed_at = now()
                 WHERE job_id = ? AND status IN """ + ACTIVE, jobId) == 1;
+    }
+
+    public boolean updateProgress(UUID jobId, int attempt, int completed, int total) {
+        return jdbcTemplate.update("""
+                UPDATE product_description_jobs SET completed_chunks = ?, total_chunks = ?, updated_at = now()
+                WHERE job_id = ? AND attempt = ? AND status = 'GENERATING_CONTENT'
+                """, Math.max(0, completed), Math.max(0, total), jobId, attempt) == 1;
+    }
+
+    public Optional<Integer> resumeContent(UUID jobId) {
+        List<Integer> attempts = jdbcTemplate.query("""
+                UPDATE product_description_jobs SET status = 'GENERATING_CONTENT', attempt = attempt + 1,
+                    error_code = NULL, error_message = NULL, completed_at = NULL, updated_at = now()
+                WHERE job_id = ? AND content IS NULL AND status IN """ + RESUMABLE + " RETURNING attempt",
+                (rs, row) -> rs.getInt(1), jobId);
+        return attempts.stream().findFirst();
     }
 
     public void touch(UUID jobId, int attempt) {
