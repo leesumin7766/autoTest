@@ -221,8 +221,13 @@ class FakeRequest:
 
 
 class EndpointTest(unittest.TestCase):
+    def setUp(self):
+        self.enabled = patch.dict("os.environ", {"PRODUCT_DESCRIPTION_GENERATION_ENABLED": "true"})
+        self.enabled.start()
+        self.addCleanup(self.enabled.stop)
+
     def call(self, body, env, request=None):
-        with patch.dict("os.environ", env, clear=False):
+        with patch.dict("os.environ", {**env, "PRODUCT_DESCRIPTION_GENERATION_ENABLED": "true"}, clear=False):
             return asyncio.run(api.generate_content(api.ContentRequest(**body), request or FakeRequest()))
 
     def test_mock_generation(self):

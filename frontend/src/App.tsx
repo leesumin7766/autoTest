@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
-import { ProductDescriptionPanel } from './ProductDescriptionPanel'
+import { TcGenerationPanel } from './TcGenerationPanel'
 import { PreflightWarningDetails, type PreflightDiagnostics, type PreflightWarning } from './PreflightWarningDetails'
 
 type Role = 'AGREEMENT' | 'FUNCTION_LIST' | 'MANUAL'
@@ -67,6 +67,21 @@ function App() {
   const [aiDelivery, setAiDelivery] = useState<AiDeliveryResult>({
     status: 'NOT_READY', attempts: 0, lastError: null, deliveredAt: null, updatedAt: null, retryable: false, preflight: null,
   })
+
+  useEffect(() => {
+    if (!submissionId || aiDelivery.status !== 'PENDING') return
+    const controller = new AbortController()
+    const timer = window.setInterval(() => {
+      void fetch(`/api/submissions/${submissionId}`, { signal: controller.signal })
+        .then(async response => {
+          if (response.ok) {
+            const value = await response.json() as SubmissionResponse
+            if (!controller.signal.aborted) setAiDelivery(value.aiDelivery)
+          }
+        }).catch(() => undefined)
+    }, 3000)
+    return () => { window.clearInterval(timer); controller.abort() }
+  }, [submissionId, aiDelivery.status])
 
   const updateAiDelivery = (delivery?: AiDeliveryResult) => {
     if (delivery) setAiDelivery(delivery)
@@ -353,11 +368,13 @@ function App() {
           </div>
         )}
         {submissionId && (
-          <ProductDescriptionPanel
+          <TcGenerationPanel
+            key={`${submissionId}:${memberId}`}
             submissionId={submissionId}
             memberId={memberId}
             deliveryStatus={aiDelivery.status}
             preflight={aiDelivery.preflight}
+            revision={aiDelivery.deliveredAt ?? aiDelivery.updatedAt ?? ''}
           />
         )}
       </section>

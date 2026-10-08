@@ -27,3 +27,6 @@ ai-service:
   base-url: ${AI_SERVICE_URL:http://localhost:8005}
   product-description:
     content-timeout-seconds: ${AI_SERVICE_PRODUCT_DESCRIPTION_CONTENT_TIMEOUT_SECONDS:21600}
+product-description:
+  internal-token: ${PRODUCT_DESCRIPTION_INTERNAL_TOKEN:}
+  generation-enabled: ${PRODUCT_DESCRIPTION_GENERATION_ENABLED:false}

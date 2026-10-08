@@ -64,6 +64,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @SpringBootTest(
         classes = Application.class,
         properties = {
+                "product-description.generation-enabled=true",
                 "spring.datasource.username=test",
                 "spring.datasource.password=test",
                 "spring.jpa.hibernate.ddl-auto=validate",

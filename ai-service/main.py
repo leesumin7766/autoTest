@@ -15,9 +15,11 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from preflight import evaluate_preflight
 import preflight_store
 from product_description.api import router as product_description_router
+from tc_generation import router as tc_router
 
 app = FastAPI()
 app.include_router(product_description_router)
+app.include_router(tc_router)
 logger = logging.getLogger(__name__)
 
 
