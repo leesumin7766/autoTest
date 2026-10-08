@@ -266,3 +266,10 @@
 .quiet-button.danger { border-color: #d9a396; color: #b34e3d; }
 @keyframes dialog-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+.tc-panel { margin-top: 24px; padding: 20px; border: 1px solid #cfdad2; background: #fff; }
+.tc-panel > p { font-size: 13px; line-height: 1.6; }
+.tc-table-scroll { overflow-x: auto; max-height: 650px; }
+.tc-table { border-collapse: collapse; font-size: 12px; }
+.tc-table th, .tc-table td { min-width: 100px; max-width: 320px; padding: 10px; border: 1px solid #cfdad2; vertical-align: top; white-space: pre-line; overflow-wrap: anywhere; }
+.tc-table th { background: #eef3ef; position: sticky; top: 0; }
+.tc-dialog::backdrop { background: rgba(32,46,39,.42); }

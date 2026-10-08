@@ -6,9 +6,9 @@
 
 - 최종 목표: 시험합의서·기능리스트·제품 매뉴얼 업로드 → LLM으로 제품 설명과 TC 생성 → 테스트 자동화와 결함 리포트.
 - LLM 전 문서 적합성 판정에는 결정적인 프로그램 검사와 Jev(TypeSafe) 의미 판정을 사용한다. 제품 설명·TC 생성은 생성형 LLM에 맡긴다.
-- **현재 구현 범위는 업로드·사전 점검·비동기 제품 설명 PDF 생성과 청크 체크포인트 재개까지다.**
+- **현재 구현 범위는 업로드·사전 점검과 승인 후 비동기 TC 초안 생성·저장·표시다.** 제품 설명 PDF 생성 코드는 보존하지만 품질 개선 전까지 신규 생성·재출력을 기본 비활성화한다.
 - 제품 설명 생성은 READY/READY_WITH_WARNINGS만 허용한다. 작업 상태와 청크 진행률, 중단·재개, 회원별 동시 생성 제한은 test-management-service가 담당한다. 실제 계정 인증·역할 권한은 아직 별도 개발 범위다.
-- Ollama는 로컬 LLM 제공자로 연결할 수 있고 Compose 기본 모드는 mock이다. TC 생성과 테스트 실행은 아직 범위 밖이다.
+- Ollama는 로컬 LLM 제공자로 연결할 수 있고 Compose 기본 모드는 mock이다. TC 초안 수정·확정·결과 기록, 실제 자동 시험과 결함 분석은 후속 범위다. 보안·성능 시험은 수동으로 진행한다.
 - 코드 제출/채점 시스템이 아니다. Main.java 및 @test input: 주석 파싱·채점 로직을 도입하지 않는다.
 
 ## 2. 실행 구성
@@ -89,7 +89,7 @@ docker-compose.yml이 서비스 구성의 기준이다. 사용자 제공 Docker 
 
 - 업로드 컨트롤러, 역할별 문서 저장, 문서별 파서 코드, Vite 프록시가 존재한다.
 - 파서의 실제 지원 범위·추출 품질은 문서로 검증한다. 기존 파서를 일괄 교체하지 않는다.
-- ai-service는 문서 접수·중복 방지·LLM 전 사전 점검 API를 제공한다. 생성형 LLM 연동은 미구현이다.
+- ai-service는 문서 접수·중복 방지·LLM 전 사전 점검 API와 승인 후 TC 초안 생성용 내부 API를 제공한다. 제품 설명 생성은 기본 비활성화한다.
 - Jev 필터는 출력 형식이 구조화되어도 판정 정확성이 자동으로 보장되는 것은 아니므로 실제 샘플과 손상 문서로 확인한다.
 - 과거 `/api/submissions` 404 원인은 Gateway 모듈에 Spring Cloud Gateway 의존성이 없고 실행 이미지도 오래된 MVC 이미지였던 것이다. WebFlux Gateway 의존성과 라우트 설정을 적용했고, 최신 컨테이너에서 Vite→Gateway→TMS 요청이 415 multipart 검증 응답까지 도달하는 것을 확인했다.
 - 과거 `Failed to fetch`는 HTTP 응답이 아닌 연결 실패다. 당시 상세 브라우저 오류 기록은 보존되지 않아 최초 원인은 단정하지 않는다. Vite 5173 및 프록시 경로는 현재 정상 동작한다.
@@ -150,3 +150,14 @@ Gateway 비교 요청은 주소를 http://localhost:8080/api/submissions로 변�
 - 템플릿은 `ai-service/doc_templates/product-description/`(버전 있는 패키지)에서만 정의한다. 수정·검증 절차는 `ai-service/doc_templates/README.md`. 작업 행에 템플릿 스냅샷과 구조화 문서를 저장한다.
 - LLM: `LLM_MODE=mock|real`(compose 기본 mock), Ollama는 `LLM_PROVIDER=ollama`, `LLM_MODEL=qwen3:4b` 및 `OLLAMA_BASE_URL=http://ollama:11434`로 선택한다. 새 제공업체는 `ai-service/product_description/llm.py`의 `LlmProvider` 어댑터로 연결한다. 품질 지침·근거 검증·청크 중첩은 `ai-service/doc_templates/product-description/content.json`에서 관리하고 템플릿 버전 스냅샷과 체크포인트 digest에 반영한다.
 - 테스트: `docker compose run --rm --no-deps ai-service python -m unittest test_product_description`, `.\gradlew.bat :test-management-service:test`(격리 DB `autotest_test`). Java 서비스 이미지는 `bootJar` 후 `docker compose up -d --build`로 반영한다.
+
+## 8. 승인 후 TC 초안 생성
+
+- 제품 설명 신규 생성·재출력은 기본 `PRODUCT_DESCRIPTION_GENERATION_ENABLED=false`로 차단한다. 기존 결과·다운로드는 보존하고 품질 개선 전까지 자동 생성 경로를 복원하지 않는다. `.env`는 사용자만 수정한다.
+- 사전 점검 `DELIVERED` + `READY`/`READY_WITH_WARNINGS`에서 TC 생성 팝업을 열고, 사용자가 승인한 경우에만 생성한다. `나중에`는 작업을 만들지 않는다. 제품 설명 PDF를 TC 입력으로 사용하지 않는다.
+- TMS API: `POST /api/submissions/{id}/test-cases` body `{"approved":true}`, 같은 경로 GET 상태·결과 조회, `POST .../{jobId}/cancel`. 개발용 `X-Member-Id` 소유권, 세 문서 파싱, 사전 점검, 문서 digest를 서버에서 확인한다.
+- ai-service 내부 API: `POST /api/v1/test-cases/generate`, `/progress`. 기존 내부 토큰으로 인증한다. 전체 입력을 청크 처리하고 원문 인용과 문자 위치를 검증하며 본문·모델 출력은 로그에 남기지 않는다.
+- V12 `tc_generation_jobs`는 승인 시각·입력 digest·작업 상태·진행률·결과 JSON을 보존한다. 동일 입력의 진행/완료 작업은 재사용한다. 회원별 활성 TC 작업 1개, 단일 TMS 인스턴스를 가정한다. 재시작·lease 만료는 `INTERRUPTED`로 닫고 취소·늦은 완료는 상태 조건부 UPDATE로 제어한다.
+- 모든 TC는 검토용 초안이며 결과 `null`, `reviewRequired=true`다. 결함 요약·정도·내용은 작성 예시이고 실제 결함으로 저장하지 않는다. 보안·성능 TC는 수동, 나머지는 브라우저 실행 가능 여부 검토 대상이다. 자동 시험을 시작하지 않는다.
+- 완료 TC의 Excel 다운로드는 `GET .../test-cases/{jobId}/download`에서 소유권과 완료 상태를 확인한다. 기존 POI 의존성으로 TC 15열·빈 결과·P/F/N/A 선택 목록과 절차/근거/안내 시트를 출력한다. 값은 수식이 아닌 문자열로 기록하며 LLM을 재호출하지 않는다. Excel 편집 내용은 서버에 자동 반영되지 않는다.
+- 초기 품질 분류 어휘는 사용자 TC 예시에 기반한 검토용 제한 목록이다. 적용 표준 판·전체 분류, 기능의 문서 간 통합·유사 TC 중복 제거, 실제 샘플의 TC 품질 검증, 편집·확정·P/F/N/A 기록과 실행·결함 분석은 후속 개발이다.

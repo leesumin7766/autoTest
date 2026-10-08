@@ -80,6 +80,8 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
 
 @router.post("/content")
 async def generate_content(body: ContentRequest, request: Request):
+    if os.environ.get("PRODUCT_DESCRIPTION_GENERATION_ENABLED", "false").lower() != "true":
+        return _error(503, "PRODUCT_DESCRIPTION_DISABLED", "제품 설명 생성은 품질 개선 전까지 비활성화되어 있습니다.")
     try:
         provider = provider_from_env()
         snapshot = load_template(body.templateId)
@@ -142,6 +144,8 @@ async def content_progress(body: ContentRequest):
 
 @router.post("/render")
 async def render_document(body: RenderRequest):
+    if os.environ.get("PRODUCT_DESCRIPTION_GENERATION_ENABLED", "false").lower() != "true":
+        return _error(503, "PRODUCT_DESCRIPTION_DISABLED", "제품 설명 생성은 품질 개선 전까지 비활성화되어 있습니다.")
     try:
         renderer = get_renderer(body.format)
         content = await asyncio.to_thread(renderer.render, body.document, body.presentation)

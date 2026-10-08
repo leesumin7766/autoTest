@@ -36,6 +36,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class ProductDescriptionService {
+    @Value("${product-description.generation-enabled:false}")
+    private boolean generationEnabled;
+
+    private void requireGenerationEnabled() {
+        if (!generationEnabled) {
+            throw new ProductDescriptionException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "PRODUCT_DESCRIPTION_DISABLED", "제품 설명 생성은 품질 개선 전까지 비활성화되어 있습니다.");
+        }
+    }
     private static final Logger logger = LoggerFactory.getLogger(ProductDescriptionService.class);
 
     private final SubmissionRepository submissionRepository;
@@ -77,6 +86,7 @@ public class ProductDescriptionService {
     }
 
     public StartResult start(UUID submissionId, long memberId) {
+        requireGenerationEnabled();
         jobs.recoverStale(lease);
         StartResult result;
         try {
@@ -134,6 +144,7 @@ public class ProductDescriptionService {
 
     /** Re-runs only the output stage from the stored content; the LLM is not called again. */
     public StartResult rerender(UUID submissionId, UUID jobId, long memberId) {
+        requireGenerationEnabled();
         authorize(submissionId, memberId);
         jobs.recoverStale(lease);
         ProductDescriptionJob job = ownedJob(submissionId, jobId);
