@@ -308,6 +308,17 @@
 .playwright-evidence { display: flex; flex-wrap: wrap; gap: 8px; }
 .playwright-evidence span { padding: 6px 10px; border-radius: 4px; background: #e8f1eb; color: #335c44; font-size: 12px; }
 .playwright-setup-form fieldset .playwright-confirmation { display: flex; align-items: flex-start; }
+.browser-check-result { padding: 10px 12px; border-left: 3px solid #39775a; background: #eff7f1; color: #335c44; font-size: 13px; }
+.remote-crawl-panel { display: grid; gap: 12px; margin-top: 24px; padding-top: 18px; border-top: 1px solid #cbd5e1; }
+.remote-crawl-panel p, .remote-crawl-panel li { font-size: 13px; line-height: 1.6; }
+.remote-crawl-panel label { display: grid; gap: 7px; margin: 12px 0; font-size: 13px; }
+.remote-crawl-panel input, .remote-crawl-panel select { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #1f2937; }
+.remote-crawl-panel small { display: block; color: #64748b; font-size: 12px; overflow-wrap: anywhere; }
+.crawl-page-list { display: grid; gap: 12px; padding-left: 22px; }
+.crawl-page-list button { background: transparent; border: 0; padding: 0; text-align: left; color: var(--green); cursor: pointer; }
+.crawl-preview { width: min(94vw, 1100px); max-height: 90vh; overflow: auto; border: 1px solid #cbd5e1; border-radius: 8px; }
+.crawl-preview img { display: block; width: 100%; margin-top: 12px; }
+.crawl-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
 .menu-tree-review { margin: 1rem 0; padding: 1rem; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc; }
 .menu-tree-review h3 { margin-top: 0; }
 .menu-tree-progress { display: flex; align-items: flex-start; gap: 12px; margin: 14px 0; padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc; color: #334155; }

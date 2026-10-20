@@ -13,21 +13,25 @@ public record CrawlAutomation(
         String usernameSelector, String passwordSelector, String submitSelector,
         String successUrl, String successSelector, List<String> allowedOrigins,
         List<String> includePaths, List<String> excludePaths,
-        int maxPages, int maxDepth, int maxDurationSeconds, int viewportWidth, int viewportHeight) {
+        int maxPages, int maxDepth, int maxDurationSeconds, int viewportWidth, int viewportHeight,
+        Integer pageLoadTimeoutSeconds) {
 
     public static CrawlAutomation defaults() {
         return new CrawlAutomation("", "", "", "", "", "", "", "", List.of(), List.of(),
-                List.of("/logout*", "/signout*"), 100, 5, 600, 1440, 900);
+                List.of("/logout*", "/signout*"), 100, 5, 600, 1440, 900, 30);
     }
 
     public CrawlAutomation normalized() {
         return new CrawlAutomation(text(productVersion), text(loginUrl), text(username), text(usernameSelector),
                 text(passwordSelector), text(submitSelector), text(successUrl), text(successSelector),
                 list(allowedOrigins), list(includePaths), list(excludePaths),
-                maxPages, maxDepth, maxDurationSeconds, viewportWidth, viewportHeight);
+                maxPages, maxDepth, maxDurationSeconds, viewportWidth, viewportHeight,
+                pageLoadTimeoutSeconds == null ? 30 : pageLoadTimeoutSeconds);
     }
 
     public void validate(String targetUrl, String loginMethod) {
+        if (pageLoadTimeoutSeconds == null || pageLoadTimeoutSeconds < 1 || pageLoadTimeoutSeconds > 60)
+            invalid("페이지 로딩 최대 대기 시간은 1~60초로 입력해 주세요.");
         if (productVersion.length() > 160 || username.length() > 320
                 || usernameSelector.length() > 500 || passwordSelector.length() > 500
                 || submitSelector.length() > 500 || successSelector.length() > 500)

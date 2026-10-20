@@ -40,6 +40,8 @@ db_data/
 .env
 .runtime/
 backups/
+**/agent-config.json
+frontend/public/downloads/*.zip
 # Python runtime caches
 __pycache__/
 *.py[cod]

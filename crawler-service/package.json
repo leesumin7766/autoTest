@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "main": "index.js",
   "engines": { "node": "24.x", "npm": "11.x" },
-  "scripts": { "start": "node index.js" },
+  "scripts": { "start": "node index.js", "agent": "node remote-agent/agent.js", "test:agent": "node --test remote-agent/*.test.js" },
   "dependencies": { "playwright": "^1.44.0", "express": "^4.19.2" }
 }
