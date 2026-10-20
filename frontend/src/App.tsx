@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import { PlaywrightSetupPanel } from './PlaywrightSetupPanel'
+import { FunctionalMenuPanel } from './FunctionalMenuPanel'
 import { PreflightWarningDetails, type PreflightDiagnostics, type PreflightWarning } from './PreflightWarningDetails'
 
 type Role = 'AGREEMENT' | 'FUNCTION_LIST' | 'MANUAL'
@@ -412,6 +413,8 @@ function App() {
             preflight={aiDelivery.preflight}
           />
         )}
+        {submissionId&&<FunctionalMenuPanel key={`functional:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId}
+          ready={aiDelivery.status==='DELIVERED'&&['READY','READY_WITH_WARNINGS'].includes(aiDelivery.preflight?.decision||'')&&aiDelivery.preflight?.generationGate?.allowed!==false}/>}
       </section>
       <footer className="page-footer"><span>AUTOTEST DOCUMENT INTAKE</span><span>SECURE FILE VALIDATION · TEXT EXTRACTION</span></footer>
     </main>

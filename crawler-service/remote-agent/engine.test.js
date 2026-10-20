@@ -17,6 +17,7 @@ test('scope limits origins, excludes paths, strips query secrets and preserves h
   for (const url of ['https://other.test/', 'https://example.test/logout', 'https://example.test/private/1', 'https://example.test/delete/1'])
     assert.equal(policy.page(url), false);
   assert.equal(normalizedUrl('https://example.test/?token=secret#/reports'), 'https://example.test/#/reports');
+  assert.equal(normalizedUrl('https://example.test/#/reports?token=secret'), 'https://example.test/#/reports');
   assert.equal(glob('/a.*', '/abc'), false);
 });
 test('real browser logs in, captures linked screens, masks input and blocks writes/outside hosts', { timeout: 60000 }, async () => {
@@ -36,7 +37,8 @@ test('real browser logs in, captures linked screens, masks input and blocks writ
     if (req.url === '/write') { writes++; return res.end('should not happen'); }
     if (req.url === '/logout') { logouts++; return res.end('should not happen'); }
     res.setHeader('Content-Type', 'text/html');
-    if (req.url === '/dashboard') return res.end(`<title>Dashboard</title><h1>Overview</h1><nav><a href="/reports">Reports</a><a href="/logout">Logout</a><a href="/private">Private</a></nav><input value="test-secret-!42"><img src="${outsideOrigin}/pixel"><script>fetch('/write',{method:'POST'})</script>`);
+    if (req.url === '/embedded') return res.end('<nav aria-label="Tools"><a href="/reports">Reports</a></nav>');
+    if (req.url === '/dashboard') return res.end(`<title>Dashboard</title><h1>Overview</h1><nav aria-label="Primary"><ul><li><button aria-expanded="false" onclick="this.setAttribute('aria-expanded','true');this.nextElementSibling.hidden=false">System</button><ul hidden><li><a href="/reports">Reports</a></li></ul></li></ul><a href="/logout">Logout</a><a href="/private">Private</a></nav><div role="tablist"><button role="tab" aria-selected="true">Summary</button><button role="tab">History</button></div><iframe src="/embedded"></iframe><input value="test-secret-!42"><img src="${outsideOrigin}/pixel"><script>fetch('/write',{method:'POST'})</script>`);
     if (req.url === '/reports') return res.end('<title>Reports</title><h1>Report list</h1><a href="/dashboard">Home</a>');
     res.statusCode = 404; res.end('not found');
   });
@@ -45,10 +47,20 @@ test('real browser logs in, captures linked screens, masks input and blocks writ
   const pages = [];
   try {
     const result = await crawl(job, { onPage: async page => pages.push(page) });
-    assert.equal(result.pageCount, 2);
-    assert.deepEqual(pages.map(page => page.title), ['Dashboard', 'Reports']);
+    assert.ok(result.pageCount >= 3);
+    assert.ok(pages.some(page => page.title === 'Reports'));
+    const mainReport = pages.find(page => page.transition.menuPath.join('/') === 'Primary/System/Reports');
+    const frameReport = pages.find(page => page.transition.menuPath.join('/') === 'Tools/Reports');
+    assert.ok(mainReport && frameReport);
+    assert.notEqual(mainReport.transition.menuKey, frameReport.transition.menuKey);
+    assert.ok(pages[0].screenState.frames.length >= 2);
+    assert.ok(pages.some(page => page.transition.outcome === 'NO_STATE_CHANGE'));
     assert.ok(Buffer.from(pages[0].screenshot, 'base64').length > 100);
     assert.equal(JSON.stringify(pages).includes(job.password), false);
+    assert.ok(pages[0].navigation.some(node => node.path.join('/') === 'Primary/System/Reports' && node.url.endsWith('/reports')));
+    assert.ok(pages[0].navigation.some(node => node.path.join('/') === 'Tools/Reports' && node.frameUrl.endsWith('/embedded')));
+    assert.ok(pages[0].navigation.some(node => node.kind === 'TAB' && node.selected && node.path.at(-1) === 'Summary'));
+    assert.ok(pages[0].navigation.filter(node => node.path.some(label => /logout|private/i.test(label))).every(node => node.canExplore === false));
     assert.equal(writes, 0); assert.equal(logouts, 0); assert.equal(outsideHits, 0);
     const limited = [];
     const result2 = await crawl({ ...job, automation: { ...job.automation, maxPages: 1 } }, { onPage: async page => limited.push(page) });

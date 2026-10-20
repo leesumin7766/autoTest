@@ -180,9 +180,27 @@ class PlaywrightSetupIntegrationTest {
         var bytes=new java.io.ByteArrayOutputStream();
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(4,4,java.awt.image.BufferedImage.TYPE_INT_RGB),"jpeg",bytes);
         page.put("screenshot",java.util.Base64.getEncoder().encodeToString(bytes.toByteArray()));
+        var menu=page.putArray("navigation").addObject().put("kind","LINK").put("url","https://test.example/dashboard")
+                .put("frameUrl","https://test.example/dashboard").put("order",0);
+        menu.putArray("path").add("System").add("Dashboard");
+        String menuKey="a".repeat(64);
+        menu.put("menuKey",menuKey);
+        page.putObject("screenState").put("screenKey","b".repeat(64)).put("readiness","READY");
+        page.putObject("transition").put("menuKey",menuKey).put("outcome","CONFIRMED");
+        menu.put("url","https://outside.example/blocked");
+        channel(agent,"event",page,400);
+        menu.put("url","https://test.example/dashboard");
         channel(agent,"event",page,200);channel(agent,"event",page,200);
         assertEquals(1,remote.status(id,8101).path("job").path("pageCount").asInt());
         UUID jobId=UUID.fromString(job.path("jobId").asText());
+        String menuEndpoint="/api/submissions/"+id+"/playwright-crawls/"+jobId+"/menu-tree";
+        mvc.perform(get(menuEndpoint).header("X-Member-Id",8101)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes[0].children[0].title").value("Dashboard"))
+                .andExpect(jsonPath("$.nodes[0].children[0].status").value("CAPTURED"))
+                .andExpect(jsonPath("$.nodes[0].children[0].pageIndex").value(0));
+        mvc.perform(get(menuEndpoint).header("X-Member-Id",8102)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/submissions/"+id+"/playwright-crawls/"+UUID.randomUUID()+"/menu-tree").header("X-Member-Id",8101))
+                .andExpect(status().isNotFound());
         mvc.perform(get("/api/submissions/"+id+"/playwright-crawls/"+jobId+"/pages/0/screenshot").header("X-Member-Id",8101))
                 .andExpect(status().isOk()).andExpect(content().contentType("image/jpeg"));
         mvc.perform(get("/api/submissions/"+id+"/playwright-crawls/"+jobId+"/pages/0/screenshot").header("X-Member-Id",8102))
@@ -260,5 +278,30 @@ class PlaywrightSetupIntegrationTest {
         event.putObject("result").put("httpStatus",200).put("loginVerified",false);
         channel(agent,"event",event,200);
         assertEquals("FAILED",remote.status(id,8101).path("checks").path("LOGIN").path("status").asText());
+    }
+    @Test void integratedFunctionalMenuValidatesEvidenceReviewsAndExportsSixColumns() throws Exception {
+        UUID crawl=UUID.randomUUID();String digest=jdbc.queryForObject("SELECT verified_document_digest FROM submission_ai_deliveries WHERE submission_id=?",String.class,id);
+        jdbc.update("INSERT INTO playwright_crawl_jobs(job_id,submission_id,member_id,status,setup_snapshot,document_digest,page_count,execution_mode,purpose) VALUES (?,?,8101,'COMPLETED','{}'::jsonb,?,1,'LOCAL','CRAWL')",crawl,id,digest);
+        String key="d".repeat(64);
+        var nav=mapper.createArrayNode();nav.addObject().put("kind","BUTTON").put("menuKey",key).put("location","HEADER").putArray("path").add("도움말");
+        jdbc.update("INSERT INTO playwright_crawl_pages(job_id,page_index,url,title,body_text,elements,links,screenshot,navigation) VALUES (?,0,'https://test.example/','Test','도움말을 조회할 수 있습니다.','[]'::jsonb,'[]'::jsonb,?,?::jsonb)",crawl,new byte[]{(byte)255,(byte)216,(byte)255},nav.toString());
+        String base="/api/submissions/"+id+"/functional-menu";
+        var start=mapper.createObjectNode().put("crawlJobId",crawl.toString()).put("productName","검증 제품").put("mode","EXTERNAL");
+        var created=mapper.readTree(mvc.perform(post(base).header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(start.toString())).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        String job=created.path("job").path("jobId").asText();String endpoint=base+"/"+job;
+        var rows=mapper.createArrayNode();var row=rows.addObject().put("functionName","도움말 조회").put("menuDescription","도움말을 조회하는 기능").put("location","HEADER");
+        row.putArray("menuPath").add("도움말");row.putArray("matchedMenuKeys").add(key);row.putArray("reviewNotes");row.putArray("evidence").addObject().put("sourceId","menu:"+key).put("quote","거짓 근거");
+        var imported=mapper.createObjectNode().put("revision",0);imported.set("rows",rows);
+        mvc.perform(post(endpoint+"/import").header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(imported.toString())).andExpect(status().isBadRequest());
+        ((ObjectNode)row.path("evidence").get(0)).put("quote","도움말");
+        var response=mapper.readTree(mvc.perform(post(endpoint+"/import").header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(imported.toString())).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var edit=mapper.createObjectNode().put("revision",response.path("job").path("revision").asInt());edit.set("rows",response.path("job").path("output").path("rows"));
+        mvc.perform(put(endpoint+"/approval").header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(edit.toString())).andExpect(status().isOk()).andExpect(jsonPath("$.job.status").value("APPROVED"));
+        mvc.perform(put(endpoint+"/draft").header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(edit.toString())).andExpect(status().isConflict());
+        byte[] bytes=mvc.perform(get(endpoint+"/download").header("X-Member-Id",8101)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        try(var book=new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(bytes))){assertEquals(6,book.getSheetAt(0).getRow(0).getLastCellNum());assertEquals("메뉴 설명",book.getSheetAt(0).getRow(0).getCell(5).getStringCellValue());assertEquals("검증 제품",book.getSheetAt(0).getRow(1).getCell(0).getStringCellValue());assertEquals("도움말을 조회하는 기능",book.getSheetAt(0).getRow(1).getCell(5).getStringCellValue());}
+        mvc.perform(get(endpoint+"/download").header("X-Member-Id",8102)).andExpect(status().isForbidden());
+        jdbc.update("UPDATE submission_files SET extracted_text='changed' WHERE submission_id=? AND role='MANUAL'",id);entityManager.clear();
+        mvc.perform(get(endpoint+"/download").header("X-Member-Id",8101)).andExpect(status().isConflict());
     }
 }

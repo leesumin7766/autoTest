@@ -344,3 +344,25 @@
 .external-prompt-panel textarea[id="external-menu-tree-response"] { min-height: 180px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .menu-source-label { display: block; margin: .85rem 0 .35rem; font-size: 13px; font-weight: 600; }
 .menu-source-input { box-sizing: border-box; width: 100%; min-height: 180px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #1f2937; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; resize: vertical; }
+.captured-menu-panel { margin: 1rem 0; padding: 1rem; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc; }
+.captured-menu-panel h4 { margin: 0 0 .5rem; }
+.captured-menu-tree { list-style: none; margin: .5rem 0; padding-left: 1.2rem; border-left: 1px solid #cbd5e1; }
+.captured-menu-tree li { margin: .6rem 0; }
+.captured-menu-tree small { display: block; color: #64748b; overflow-wrap: anywhere; }
+.captured-menu-tree span { font-size: .8rem; padding: .15rem .4rem; border-radius: 4px; }
+.menu-observation-captured { color: #166534; background: #dcfce7; }
+.menu-observation-unvisited { color: #92400e; background: #fef3c7; }
+.menu-observation-group { color: #475569; background: #e2e8f0; }
+.menu-observation-load_timeout, .menu-observation-no_state_change, .menu-observation-unverified { color: #92400e; background: #fef3c7; }
+.functional-menu-panel { margin-top: 2rem; padding: 1.25rem; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; }
+.functional-menu-panel label { display: block; margin: .6rem 0; }
+.functional-menu-panel input, .functional-menu-panel select, .functional-menu-panel textarea { max-width: 100%; padding: .5rem; border: 1px solid #cbd5e1; border-radius: 6px; }
+.functional-menu-panel textarea { width: 100%; box-sizing: border-box; }
+.functional-menu-table-wrap { overflow: auto; max-height: 70vh; margin: 1rem 0; }
+.functional-menu-table { border-collapse: collapse; min-width: 1400px; width: 100%; font-size: .85rem; }
+.functional-menu-table th { position: sticky; top: 0; background: #dbeafe; z-index: 1; }
+.functional-menu-table td, .functional-menu-table th { border: 1px solid #cbd5e1; padding: .5rem; vertical-align: top; }
+.functional-menu-table td:nth-child(7) { min-width: 280px; }
+.functional-menu-table td:last-child { min-width: 220px; }
+.functional-menu-table small { display: block; color: #64748b; margin: .3rem 0; }
+.functional-menu-warning { padding: .5rem; color: #854d0e; background: #fef9c3; border-radius: 6px; }
