@@ -68,9 +68,14 @@ class OllamaLlmProvider:
         self.quality = quality
         self.configure_quality(quality)
         # Budget includes instructions, schema, payload and output, not just source text.
-        self.input_budget = self.num_ctx - self.num_predict - 512
+        self.input_budget = self.input_budget_for()
         if self.input_budget < 2048:
             raise LlmConfigurationError("Ollama context has insufficient input budget")
+
+    def input_budget_for(self, num_predict=None):
+        """Return the request's input budget using its actual reserved output size."""
+        output_reserve = int(num_predict or self.num_predict)
+        return self.num_ctx - output_reserve - 512
 
     def configure_quality(self, quality):
         self.quality = quality
@@ -116,7 +121,7 @@ class OllamaLlmProvider:
             {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
         ]
         estimated = len(json.dumps(messages, ensure_ascii=False).encode()) + len(json.dumps(schema).encode())
-        if estimated > self.input_budget:
+        if estimated > self.input_budget_for(num_predict):
             raise ValueError("LLM_INPUT_BUDGET_EXCEEDED: input was not truncated")
         async with httpx.AsyncClient(timeout=httpx.Timeout(self.timeout, connect=10)) as client:
             response = await client.post(self.base_url.rstrip("/") + "/api/chat", json={

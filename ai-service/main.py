@@ -16,10 +16,12 @@ from preflight import evaluate_preflight
 import preflight_store
 from product_description.api import router as product_description_router
 from tc_generation import router as tc_router
+from menu_tree import router as menu_tree_router
 
 app = FastAPI()
 app.include_router(product_description_router)
 app.include_router(tc_router)
+app.include_router(menu_tree_router)
 logger = logging.getLogger(__name__)
 
 
@@ -51,10 +53,13 @@ class DocumentIntake(BaseModel):
 
     @model_validator(mode="after")
     def validate_documents(self):
-        required_roles = {"AGREEMENT", "FUNCTION_LIST", "MANUAL"}
+        required_roles = {"FUNCTION_LIST", "MANUAL"}
         roles = [document.role for document in self.documents]
-        if len(roles) != 3 or set(roles) != required_roles:
-            raise ValueError("Exactly one document for each required role is required")
+        if not required_roles.issubset(roles) or len(roles) != len(set(roles)) \
+                or set(roles) - required_roles - {"AGREEMENT"}:
+            raise ValueError("Function list and manual are required; agreement is optional")
+        if len(roles) not in (2, 3):
+            raise ValueError("Two or three documents are required")
         if any(not document.extractedText.strip() for document in self.documents):
             raise ValueError("Extracted text must not be empty")
         return self

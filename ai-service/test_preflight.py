@@ -21,6 +21,17 @@ class PreflightTests(unittest.TestCase):
         self.assertIn("JEV_NOT_CONFIGURED", self.warning_codes(result))
         self.assertFalse(result["diagnostics"]["jevEvaluated"])
 
+    def test_missing_agreement_is_warning_and_core_documents_are_still_checked(self):
+        documents = self.documents[1:]
+        with patch.dict(os.environ, {}, clear=True):
+            result = evaluate_preflight(documents)
+
+        self.assertEqual("READY_WITH_WARNINGS", result["decision"])
+        warning = next(w for w in result["warnings"] if w["code"] == "AGREEMENT_DOCUMENT_MISSING")
+        self.assertEqual("WARNING", warning["severity"])
+        self.assertEqual({"FUNCTION_LIST", "MANUAL"},
+                         {item["role"] for item in result["diagnostics"]["documents"]})
+
     def test_small_amount_of_unreadable_characters_warns(self):
         damaged = self.documents.copy()
         damaged[1] = self.document("FUNCTION_LIST", "A" * 99 + "\ufffd")
@@ -101,6 +112,39 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual("BLOCKED", result["decision"])
         self.assertIn("DOCUMENT_ROLE_MISMATCH", self.warning_codes(result))
 
+    def test_lower_role_mismatch_threshold_blocks_single_clear_mismatch(self):
+        answers = self.jev_answers()
+        answers["role_match_AGREEMENT"] = {"choice": "mismatch", "confidence": 0.64}
+        with patch.dict(os.environ, {"TYPESAFE_API_KEY": "test-key"}), \
+             patch("preflight._evaluate_with_jev", return_value=answers):
+            result = evaluate_preflight(self.documents)
+        self.assertEqual("BLOCKED", result["decision"])
+        self.assertFalse(result["generationGate"]["allowed"])
+        warning = next(w for w in result["warnings"] if w["code"] == "DOCUMENT_ROLE_MISMATCH")
+        self.assertEqual(0.60, warning["evidence"]["blockConfidenceThreshold"])
+
+    def test_repeated_moderate_role_mismatches_block_cross_assigned_roles(self):
+        answers = self.jev_answers()
+        answers["role_match_AGREEMENT"] = {"choice": "mismatch", "confidence": 0.79}
+        answers["role_match_FUNCTION_LIST"] = {"choice": "mismatch", "confidence": 0.39}
+        answers["role_match_MANUAL"] = {"choice": "mismatch", "confidence": 0.43}
+        with patch.dict(os.environ, {"TYPESAFE_API_KEY": "test-key"}), \
+             patch("preflight._evaluate_with_jev", return_value=answers):
+            result = evaluate_preflight(self.documents)
+        self.assertEqual("BLOCKED", result["decision"])
+        self.assertIn("MULTIPLE_DOCUMENT_ROLE_MISMATCHES", self.warning_codes(result))
+        self.assertEqual(3, next(w for w in result["warnings"]
+                                 if w["code"] == "MULTIPLE_DOCUMENT_ROLE_MISMATCHES")["evidence"]["count"])
+
+    def test_weak_single_role_mismatch_remains_warning(self):
+        answers = self.jev_answers()
+        answers["role_match_AGREEMENT"] = {"choice": "mismatch", "confidence": 0.32}
+        with patch.dict(os.environ, {"TYPESAFE_API_KEY": "test-key"}), \
+             patch("preflight._evaluate_with_jev", return_value=answers):
+            result = evaluate_preflight(self.documents)
+        self.assertEqual("READY_WITH_WARNINGS", result["decision"])
+        self.assertTrue(result["generationGate"]["allowed"])
+
     def test_jev_failure_fails_open_with_warning(self):
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "test-key"}), \
              patch("preflight._evaluate_with_jev", side_effect=RuntimeError("offline")):
@@ -156,15 +200,19 @@ class PreflightTests(unittest.TestCase):
         def client_with_mock_transport(**kwargs):
             return real_client(api_key="test-key", transport=httpx2.MockTransport(handler), **kwargs)
 
-        state = {"documents": [{"role": "AGREEMENT", "text": "sample"}]}
+        state = {"documents": [
+            {"role": "FUNCTION_LIST", "text": "sample"},
+            {"role": "MANUAL", "text": "sample"},
+        ]}
         with patch("typesafe_sdk.TypeSafeClient", client_with_mock_transport):
             result = _evaluate_with_jev(state)
 
         self.assertEqual(state, captured["body"]["state"])
-        self.assertEqual(9, len(captured["body"]["questions"]))
+        self.assertEqual(5, len(captured["body"]["questions"]))
         self.assertTrue(all(q["type"] == "choice" for q in captured["body"]["questions"].values()))
         self.assertEqual(set(captured["body"]["questions"]), set(result))
-        self.assertEqual({"choice": "readable", "confidence": 0.9}, result["readability_AGREEMENT"])
+        self.assertEqual({"choice": "readable", "confidence": 0.9}, result["readability_MANUAL"])
+        self.assertNotIn("readability_AGREEMENT", result)
         self.assertIsInstance(result["role_match_MANUAL"]["confidence"], float)
 
     def test_jev_timing_layers_do_not_overlap(self):
@@ -223,7 +271,7 @@ class PreflightTests(unittest.TestCase):
                  patch("preflight.JEV_RETRY_BUDGET_SECONDS", budget), \
                  patch("preflight.JEV_DEADLINE_SECONDS", 0.1):
                 with self.assertRaises(TimeoutError):
-                    preflight._evaluate_with_jev({"documents": []})
+                    preflight._evaluate_with_jev({"documents": [{"role": "MANUAL", "text": "sample"}]})
                 self.assertEqual(1, len(sdk_threads()))
                 while sdk_threads() and time.monotonic() - started < lifetime_bound + 1:
                     time.sleep(0.05)
@@ -329,7 +377,7 @@ class PreflightTests(unittest.TestCase):
 
         def evaluate():
             try:
-                preflight._evaluate_with_jev({"documents": []})
+                preflight._evaluate_with_jev({"documents": [{"role": "MANUAL", "text": "sample"}]})
             except Exception as error:
                 errors.append(type(error).__name__)
 

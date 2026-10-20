@@ -285,6 +285,16 @@ class ProductDescriptionIntegrationTest {
     }
 
     @Test
+    void generationGateIsEnforcedByServerEvenIfDeliveryWasMarkedDelivered() throws Exception {
+        UUID submissionId = ready("READY_WITH_WARNINGS");
+        jdbc.update("UPDATE submission_ai_deliveries SET preflight_result = "
+                + "jsonb_set(preflight_result, '{generationGate}', '{\"allowed\":false,\"reasons\":[]}') "
+                + "WHERE submission_id = ?", submissionId);
+        rejects("GENERATION_GATE_BLOCKED", () -> service.start(submissionId, OWNER));
+        verify(gateway, times(0)).generateContent(any());
+    }
+
+    @Test
     void memberCannotStartAnotherSubmissionWhileGenerationIsActive() throws Exception {
         UUID firstSubmission = ready("READY");
         UUID secondSubmission = ready("READY");

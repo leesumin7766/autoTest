@@ -49,10 +49,10 @@ public class TcExcelExporter {
                 text(titles, c, HEADERS[c], header); sheet.setColumnWidth(c, WIDTHS[c] * 256);
             }
             var details = book.createSheet("절차 및 근거");
-            String[] detailHeaders = {"TC-ID", "실행 구분", "시험 절차", "검토 메모", "문서 근거"};
+            String[] detailHeaders = {"TC-ID", "검증 유형", "실행 구분", "시험 절차", "검토 메모", "문서·기준 근거"};
             var detailTitle = details.createRow(0); detailTitle.setHeightInPoints(30);
             for (int c = 0; c < detailHeaders.length; c++) {
-                text(detailTitle, c, detailHeaders[c], header); details.setColumnWidth(c, (c == 0 ? 18 : c == 1 ? 28 : 70) * 256);
+                text(detailTitle, c, detailHeaders[c], header); details.setColumnWidth(c, (c == 0 ? 18 : c < 3 ? 26 : 70) * 256);
             }
             int index = 1;
             for (var tc : cases) {
@@ -71,17 +71,24 @@ public class TcExcelExporter {
                 text(row, 14, tc.path("defectExampleContent").asText(), body);
                 var detail = details.createRow(index++); detail.setHeightInPoints(130);
                 text(detail, 0, tc.path("tcId").asText(), body);
-                text(detail, 1, "MANUAL".equals(tc.path("executionMode").asText()) ? "수동 시험" : "브라우저 실행 가능 여부 검토 필요", body);
-                text(detail, 2, lines(tc.path("steps"), true), body);
-                text(detail, 3, lines(tc.path("reviewNotes"), false), body);
+                text(detail, 1, "DOCUMENT_CONFORMANCE".equals(tc.path("testType").asText()) ? "문서 적합성" : "제품 동작", body);
+                text(detail, 2, "MANUAL".equals(tc.path("executionMode").asText()) ? "수동 시험" : "브라우저 실행 가능 여부 검토 필요", body);
+                text(detail, 3, lines(tc.path("steps"), true), body);
+                text(detail, 4, lines(tc.path("reviewNotes"), false), body);
                 List<String> sources = new ArrayList<>();
-                for (var source : tc.path("sources")) sources.add(source.path("role").asText() + " / "
-                        + source.path("fileId").asText() + " / 문자 " + source.path("characterStart").asInt() + "–"
-                        + source.path("characterEnd").asInt() + "\n" + source.path("quote").asText());
-                text(detail, 4, String.join("\n\n", sources), body);
+                for (var source : tc.path("sources")) {
+                    if ("PROJECT_CRITERION".equals(source.path("kind").asText())) {
+                        sources.add("프로젝트 공통 기준 / " + source.path("criterionId").asText() + "\n" + source.path("quote").asText());
+                    } else {
+                        sources.add(source.path("role").asText() + " / " + source.path("fileId").asText() + " / 문자 "
+                                + source.path("characterStart").asInt() + "–" + source.path("characterEnd").asInt()
+                                + "\n" + source.path("quote").asText());
+                    }
+                }
+                text(detail, 5, String.join("\n\n", sources), body);
             }
             sheet.createFreezePane(6, 1); sheet.setAutoFilter(new CellRangeAddress(0, index - 1, 0, 14));
-            details.createFreezePane(1, 1); details.setAutoFilter(new CellRangeAddress(0, index - 1, 0, 4));
+            details.createFreezePane(1, 1); details.setAutoFilter(new CellRangeAddress(0, index - 1, 0, 5));
             var validation = sheet.getDataValidationHelper().createValidation(
                     sheet.getDataValidationHelper().createExplicitListConstraint(new String[]{"P", "F", "N/A"}),
                     new CellRangeAddressList(1, index - 1, 11, 11));
@@ -92,7 +99,8 @@ public class TcExcelExporter {
             var info = book.createSheet("안내"); info.setColumnWidth(0, 110 * 256);
             String[] notes = {"검토용 TC 초안 — 시험 결과 미기록", "결함 관련 열은 리포트 작성 예시이며 실제 발견된 결함이 아닙니다.",
                     "담당자가 시험 후 TC 시트의 결과 열에 P/F/N/A를 기록하세요. Excel에서 입력한 결과는 서버에 자동 반영되지 않습니다.",
-                    "보안·성능 항목은 수동 시험입니다. 자동 실행은 수행되지 않았습니다.",
+                    "문서 적합성 TC는 프로젝트 공통 문서 제공 기준과 제출 문서 근거를 구분해 검토하세요.",
+                    "보안·성능 및 문서 적합성 항목은 수동 시험입니다. 자동 실행은 수행되지 않았습니다.",
                     "생성 모드: " + job.path("output").path("generationMode").asText(),
                     "생성 작업: " + job.path("jobId").asText(), "승인 시각(UTC): " + job.path("approvedAt").asText()};
             for (int r = 0; r < notes.length; r++) { var row = info.createRow(r); row.setHeightInPoints(36); text(row, 0, notes[r], body); }

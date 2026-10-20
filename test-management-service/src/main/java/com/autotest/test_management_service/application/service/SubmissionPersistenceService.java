@@ -25,7 +25,7 @@ public class SubmissionPersistenceService {
     // Longer than the AI HTTP read timeout so a live attempt is never claimed twice.
     public static final java.time.Duration AI_DELIVERY_LEASE = java.time.Duration.ofSeconds(45);
     private static final List<SubmissionType> REQUIRED_ROLES = List.of(
-            SubmissionType.AGREEMENT, SubmissionType.FUNCTION_LIST, SubmissionType.MANUAL);
+            SubmissionType.FUNCTION_LIST, SubmissionType.MANUAL);
 
     private final SubmissionRepository submissionRepository;
     private final SubmittedDocumentRepository submittedDocumentRepository;
@@ -121,7 +121,7 @@ public class SubmissionPersistenceService {
     public Optional<DeliveryClaim> claimAiDelivery(SubmissionId id) {
         Submission submission = submissionRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new IllegalArgumentException("Submission not found"));
-        List<SubmittedDocument> documents = submittedDocumentRepository.findBySubmissionId(id);
+        List<SubmittedDocument> documents = deliveryDocuments(submittedDocumentRepository.findBySubmissionId(id));
         if (!hasAllReadyDocuments(documents)) {
             return Optional.empty();
         }
@@ -161,18 +161,26 @@ public class SubmissionPersistenceService {
     }
 
     private boolean hasAllReadyDocuments(List<SubmittedDocument> documents) {
-        if (documents.size() != REQUIRED_ROLES.size()) {
+        if (documents.size() < REQUIRED_ROLES.size() || documents.size() > REQUIRED_ROLES.size() + 1) {
             return false;
         }
         EnumSet<SubmissionType> roles = EnumSet.noneOf(SubmissionType.class);
         for (SubmittedDocument document : documents) {
-            if (!REQUIRED_ROLES.contains(document.role()) || !roles.add(document.role())
+            if (!(REQUIRED_ROLES.contains(document.role()) || document.role() == SubmissionType.AGREEMENT)
+                    || !roles.add(document.role())
                     || document.status() != SubmissionStatus.PARSED
                     || document.extractedText() == null || document.extractedText().isBlank()) {
                 return false;
             }
         }
         return roles.containsAll(REQUIRED_ROLES);
+    }
+
+    /** An unreadable optional agreement is treated as omitted; the core documents still gate preflight. */
+    public List<SubmittedDocument> deliveryDocuments(List<SubmittedDocument> documents) {
+        return documents.stream().filter(document -> document.role() != SubmissionType.AGREEMENT
+                || (document.status() == SubmissionStatus.PARSED
+                    && document.extractedText() != null && !document.extractedText().isBlank())).toList();
     }
 
     @Transactional(readOnly = true)

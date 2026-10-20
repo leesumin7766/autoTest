@@ -15,7 +15,7 @@ class TcExcelExporterTest {
     @Test void preservesDraftColumnsBlankResultAndEvidenceWithoutExecutingFormulas() throws Exception {
         var job = mapper.readTree("""
             {"jobId":"job","status":"COMPLETED","approvedAt":"2026-10-08T00:00:00Z","output":{"generationMode":"REAL","testCases":[
-            {"tcId":"TC-001-001","featurePath":["보고서","내보내기"],"qualityCharacteristic":"기능적합성","subCharacteristic":"기능정확성",
+            {"tcId":"TC-001-001","testType":"PRODUCT_BEHAVIOR","featurePath":["보고서","내보내기"],"qualityCharacteristic":"기능적합성","subCharacteristic":"기능정확성",
              "scenario":"=HYPERLINK(\\\"https://invalid\\\",\\\"text\\\")","preconditions":["로그인"],"inputs":"CSV","expectedResult":"CSV 다운로드",
              "result":"P","steps":["보고서 열기","내보내기 클릭"],"executionMode":"BROWSER_CANDIDATE","reviewNotes":["초안 검토"],
              "defectExampleSummary":"다운로드 오류","defectExampleSeverity":"M","defectExampleContent":"예시 내용",
@@ -32,8 +32,26 @@ class TcExcelExporterTest {
             assertTrue(tc.getRow(1).getCell(8).getStringCellValue().startsWith("=HYPERLINK"));
             assertArrayEquals(new String[]{"P", "F", "N/A"}, tc.getDataValidations().get(0).getValidationConstraint().getExplicitListValues());
             assertNotNull(tc.getPaneInformation());
-            assertTrue(book.getSheet("절차 및 근거").getRow(1).getCell(4).getStringCellValue().contains("원문 근거 내용"));
+            assertTrue(book.getSheet("절차 및 근거").getRow(1).getCell(5).getStringCellValue().contains("원문 근거 내용"));
             assertTrue(book.getSheet("안내").getRow(1).getCell(0).getStringCellValue().contains("실제 발견된 결함이 아닙니다"));
+        }
+    }
+
+    @Test void exportsProjectPolicyAsDocumentConformanceWithoutFakeSourceOffsets() throws Exception {
+        var job = mapper.readTree("""
+            {"jobId":"job","status":"COMPLETED","approvedAt":"2026-10-08T00:00:00Z","output":{"generationMode":"REAL","testCases":[
+            {"tcId":"TC-002-001","testType":"DOCUMENT_CONFORMANCE","featurePath":["제품 문서","제품설명서"],
+             "qualityCharacteristic":"일반적 요구사항","subCharacteristic":"제품설명서/사용자취급설명서 요구사항",
+             "scenario":"제품설명서 제공 여부 확인","preconditions":["공식 배포 패키지 확보"],"inputs":"제품 패키지",
+             "expectedResult":"제품설명서 제공","steps":["패키지 확인"],"reviewNotes":["실제 공급 자료 확인"],
+             "executionMode":"MANUAL","sources":[{"kind":"PROJECT_CRITERION","criterionId":"product-description",
+              "fileId":"TC_GENERATION_GUIDELINES_V1","role":"PROJECT_POLICY","quote":"제품설명서와 사용자매뉴얼의 제공 여부를 각각 확인한다."}]}]}}
+            """);
+        try (var book = new XSSFWorkbook(new ByteArrayInputStream(exporter.export(job)))) {
+            var detail = book.getSheet("절차 및 근거").getRow(1);
+            assertEquals("문서 적합성", detail.getCell(1).getStringCellValue());
+            assertTrue(detail.getCell(5).getStringCellValue().contains("product-description"));
+            assertFalse(detail.getCell(5).getStringCellValue().contains("문자 0"));
         }
     }
 

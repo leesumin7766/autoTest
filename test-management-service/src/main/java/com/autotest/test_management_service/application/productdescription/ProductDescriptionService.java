@@ -32,6 +32,7 @@ import com.autotest.test_management_service.domain.submission.SubmissionStatus;
 import com.autotest.test_management_service.domain.submission.SubmissionType;
 import com.autotest.test_management_service.domain.submission.SubmittedDocument;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
@@ -245,6 +246,10 @@ public class ProductDescriptionService {
             throw new ProductDescriptionException(HttpStatus.CONFLICT, "PREFLIGHT_BLOCKED",
                     "문서 검증 결과가 생성 조건을 만족하지 않습니다.");
         }
+        if (!generationGateAllows(verdict.preflightJson())) {
+            throw new ProductDescriptionException(HttpStatus.CONFLICT, "GENERATION_GATE_BLOCKED",
+                    "사전 점검에서 AI 문서 생성을 제한했습니다. 상세 사유를 확인해 주세요.");
+        }
         String digest = DocumentDigest.of(documents);
         if (!digest.equals(verdict.documentDigest())) {
             throw new ProductDescriptionException(HttpStatus.CONFLICT, "DOCUMENT_VERSION_MISMATCH",
@@ -261,6 +266,16 @@ public class ProductDescriptionService {
             return objectMapper.readTree(preflightJson).path("decision").asText("");
         } catch (JsonProcessingException unreadable) {
             return "";
+        }
+    }
+
+    private boolean generationGateAllows(String preflightJson) {
+        if (preflightJson == null) return true;
+        try {
+            JsonNode gate = objectMapper.readTree(preflightJson).path("generationGate");
+            return !gate.isObject() || gate.path("allowed").asBoolean(true);
+        } catch (JsonProcessingException unreadable) {
+            return false;
         }
     }
 
