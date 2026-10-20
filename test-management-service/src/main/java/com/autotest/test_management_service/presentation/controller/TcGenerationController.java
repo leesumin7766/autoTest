@@ -29,6 +29,11 @@ public class TcGenerationController {
     @GetMapping public JsonNode status(@PathVariable UUID submissionId, @RequestHeader("X-Member-Id") long memberId) {
         return service.status(submissionId, memberId);
     }
+    @GetMapping("/external-prompt") public ResponseEntity<JsonNode> externalPrompt(@PathVariable UUID submissionId,
+            @RequestHeader("X-Member-Id") long memberId, @RequestParam(defaultValue = "0") int chunkIndex) {
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(service.externalPrompt(submissionId, memberId, chunkIndex));
+    }
     @PostMapping("/{jobId}/cancel") public JsonNode cancel(@PathVariable UUID submissionId,
             @PathVariable UUID jobId, @RequestHeader("X-Member-Id") long memberId) {
         return service.cancel(submissionId, jobId, memberId);

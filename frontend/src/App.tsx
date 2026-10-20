@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
-import { TcGenerationPanel } from './TcGenerationPanel'
+import { PlaywrightSetupPanel } from './PlaywrightSetupPanel'
 import { PreflightWarningDetails, type PreflightDiagnostics, type PreflightWarning } from './PreflightWarningDetails'
 
 type Role = 'AGREEMENT' | 'FUNCTION_LIST' | 'MANUAL'
@@ -64,6 +64,9 @@ function App() {
   const [errors, setErrors] = useState<Partial<Record<Role, string>>>({})
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [missingCoreRoles, setMissingCoreRoles] = useState<Role[]>([])
+  const [pendingUploadRoles, setPendingUploadRoles] = useState<Role[]>([])
+  const missingDocumentsDialog = useRef<HTMLDialogElement>(null)
   const [aiDelivery, setAiDelivery] = useState<AiDeliveryResult>({
     status: 'NOT_READY', attempts: 0, lastError: null, deliveredAt: null, updatedAt: null, retryable: false, preflight: null,
   })
@@ -166,6 +169,29 @@ function App() {
     setBusy(false)
   }
 
+  const requestUpload = (selectedRoles: Role[]) => {
+    const rolesToUpload = selectedRoles.filter((role) => files[role])
+    if (!rolesToUpload.length) return
+    const missing = (['FUNCTION_LIST', 'MANUAL'] as Role[]).filter((role) => {
+      const alreadyParsed = documents[role]?.status === 'PARSED'
+      return !alreadyParsed && !rolesToUpload.includes(role)
+    })
+    if (missing.length) {
+      setMissingCoreRoles(missing)
+      setPendingUploadRoles(rolesToUpload)
+      missingDocumentsDialog.current?.showModal()
+      return
+    }
+    void uploadRoles(rolesToUpload)
+  }
+
+  const continueUploadWithMissingDocuments = () => {
+    const rolesToUpload = pendingUploadRoles
+    setPendingUploadRoles([])
+    missingDocumentsDialog.current?.close()
+    void uploadRoles(rolesToUpload)
+  }
+
   const loadSubmission = async () => {
     if (!submissionId.trim()) return
     setBusy(true)
@@ -242,7 +268,7 @@ function App() {
         <div className="intro-copy">
           <p className="eyebrow">DOCUMENT INTAKE <span>01 / 03</span></p>
           <h1>시험 문서<br /><em>업로드</em></h1>
-          <p className="intro-description">제품 검토에 필요한 세 문서를 역할별로 등록합니다.<br />한 번에 선택하거나 각 문서를 나누어 올릴 수 있습니다.</p>
+          <p className="intro-description">기능리스트와 매뉴얼은 필수이며 시험합의서는 선택입니다.<br />한 번에 선택하거나 각 문서를 나누어 올릴 수 있습니다.</p>
         </div>
         <div className="intro-stamp" aria-hidden="true">
           <span className="stamp-line" />
@@ -272,7 +298,7 @@ function App() {
       <section className="document-section">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">REQUIRED DOCUMENTS</p>
+            <p className="eyebrow">DOCUMENTS</p>
             <h2>검토 자료 <span>{registeredCount.toString().padStart(2, '0')} / 03</span></h2>
           </div>
           {submissionId && <button className="text-button" type="button" onClick={startNewSet} disabled={busy}>새 문서 세트</button>}
@@ -290,7 +316,7 @@ function App() {
                   <div className="document-title-line">
                     <h3>{title}</h3>
                     <span className={`status-label status-${state}`}>
-                      {state === 'uploading' ? '업로드 중' : state === 'success' ? '완료' : state === 'error' ? '오류' : '필수'}
+                      {state === 'uploading' ? '업로드 중' : state === 'success' ? '완료' : state === 'error' ? '오류' : id === 'AGREEMENT' ? '선택' : '필수'}
                     </span>
                   </div>
                   <p>{description}</p>
@@ -329,7 +355,7 @@ function App() {
                     <span>{selectedFile ? '파일 변경' : document?.status === 'FAILED' ? '실패 문서 교체' : document && aiDelivery.status === 'BLOCKED' ? '문서 교체' : document ? '등록 완료' : '파일 선택'}</span>
                   </label>
                   {selectedFile && (!document || isReplaceable(document)) && (
-                    <button className="upload-one" type="button" disabled={busy} onClick={() => void uploadRoles([id])}>업로드</button>
+                    <button className="upload-one" type="button" disabled={busy} onClick={() => requestUpload([id])}>업로드</button>
                   )}
                 </div>
                 {selectedFile && <div className="selected-file">{selectedFile.name} <span>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</span></div>}
@@ -343,11 +369,21 @@ function App() {
             <span className="note-mark">i</span>
             <span>PDF · Excel · HWP · Word <small>파일당 최대 100 MB</small></span>
           </div>
-          <button className="primary-button" type="button" disabled={busy || selectedCount === 0} onClick={() => void uploadRoles(roles.map(({ id }) => id))}>
+          <button className="primary-button" type="button" disabled={busy || selectedCount === 0} onClick={() => requestUpload(roles.map(({ id }) => id))}>
             {busy ? '업로드 중…' : `선택한 문서 업로드${selectedCount ? ` · ${selectedCount}` : ''}`}
             <span aria-hidden="true">↗</span>
           </button>
         </div>
+        <dialog ref={missingDocumentsDialog} className="dialog tc-dialog" aria-labelledby="missing-documents-title" onCancel={() => setPendingUploadRoles([])}>
+          <h2 id="missing-documents-title">필수 문서가 아직 없습니다</h2>
+          <p>{missingCoreRoles.map((role) => roles.find((item) => item.id === role)?.title).join(', ')} 문서가 업로드되지 않았습니다.</p>
+          <p>선택한 파일은 계속 업로드할 수 있습니다. 기능리스트와 매뉴얼이 모두 정상 파싱된 뒤 Jev 사전 점검을 진행합니다.
+            시험합의서는 선택 문서이며, 없으면 사전 점검 결과에 경고로 표시됩니다.</p>
+          <div className="dialog-actions">
+            <button className="primary-button" onClick={continueUploadWithMissingDocuments}>선택한 문서 계속 업로드</button>
+            <button className="quiet-button" onClick={() => { setPendingUploadRoles([]); missingDocumentsDialog.current?.close() }}>취소</button>
+          </div>
+        </dialog>
         {notice && <p className="global-notice" role="alert">{notice}</p>}
         {submissionId && <p className="set-confirmation"><span /> 문서 세트 연결됨 <code>{submissionId}</code></p>}
         {submissionId && (
@@ -368,13 +404,12 @@ function App() {
           </div>
         )}
         {submissionId && (
-          <TcGenerationPanel
+          <PlaywrightSetupPanel
             key={`${submissionId}:${memberId}`}
             submissionId={submissionId}
             memberId={memberId}
             deliveryStatus={aiDelivery.status}
             preflight={aiDelivery.preflight}
-            revision={aiDelivery.deliveredAt ?? aiDelivery.updatedAt ?? ''}
           />
         )}
       </section>

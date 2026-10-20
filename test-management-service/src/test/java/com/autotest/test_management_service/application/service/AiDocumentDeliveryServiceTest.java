@@ -109,6 +109,21 @@ class AiDocumentDeliveryServiceTest {
     }
 
     @Test
+    void acceptsReceiptWhenOptionalAgreementIsMissing() throws Exception {
+        documents = List.of(
+                document(com.autotest.test_management_service.domain.submission.SubmissionType.FUNCTION_LIST, true),
+                document(com.autotest.test_management_service.domain.submission.SubmissionType.MANUAL, true));
+        responseBody = receipt(false, submissionId.value(), 2);
+
+        AiDocumentDeliveryService.DeliveryResult result = service().deliverIfReady(submissionId);
+
+        assertEquals("DELIVERED", result.status());
+        JsonNode sent = objectMapper.readTree(httpServerRequestBody);
+        assertEquals(2, sent.path("documents").size());
+        assertEquals(Set.of("FUNCTION_LIST", "MANUAL"), roles(sent));
+    }
+
+    @Test
     void rejectsReceiptWithWrongSubmissionOrDocumentCount() {
         responseBody = receipt(false, UUID.randomUUID(), 3);
 
@@ -118,7 +133,7 @@ class AiDocumentDeliveryServiceTest {
         assertEquals(1, wrongId.attempts());
 
         jdbcTemplate.resetForRetry();
-        responseBody = receipt(false, submissionId.value(), 2);
+        responseBody = receipt(false, submissionId.value(), 1);
         AiDocumentDeliveryService.DeliveryResult wrongCount = service().deliverIfReady(submissionId);
 
         assertEquals("FAILED", wrongCount.status());
@@ -370,7 +385,7 @@ class AiDocumentDeliveryServiceTest {
                 List<SubmittedDocument> documents
         ) {
             claims++;
-            if (documents.size() != 3 || documents.stream().anyMatch(document ->
+            if (documents.size() < 2 || documents.size() > 3 || documents.stream().anyMatch(document ->
                     document.status() != SubmissionStatus.PARSED || document.extractedText().isBlank())) {
                 return java.util.Optional.empty();
             }

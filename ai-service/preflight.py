@@ -14,6 +14,9 @@ MIN_MEANINGFUL_CHARACTERS = 12
 SPARSE_MEANINGFUL_CHARACTERS = 80
 MAX_JEV_TEXT_CHARACTERS = 12_000
 BLOCK_CONFIDENCE = 0.80
+ROLE_MISMATCH_BLOCK_CONFIDENCE = 0.60
+ROLE_MISMATCH_AGGREGATE_MIN_CONFIDENCE = 0.35
+ROLE_MISMATCH_AGGREGATE_COUNT = 2
 # httpx timeouts are per phase and a deadline cannot cancel an in-flight SDK request, so the
 # worst-case SDK lifetime (retry budget + one more attempt) is bounded explicitly.
 JEV_CONNECT_TIMEOUT_SECONDS = 2.0
@@ -46,6 +49,12 @@ def evaluate_preflight(documents: list[dict[str, Any]]) -> dict[str, Any]:
     warnings: list[dict[str, Any]] = []
     diagnostics: list[dict[str, Any]] = []
     blocked = False
+    present_roles = {document["role"] for document in documents}
+    if "AGREEMENT" not in present_roles:
+        warnings.append(_warning(
+            "AGREEMENT_DOCUMENT_MISSING", "AGREEMENT", "WARNING",
+            "시험합의서가 없어 시험 범위·합의 기준 확인은 생략했습니다. 기능리스트와 매뉴얼 기준으로 점검합니다.",
+        ))
     jev_state_documents = []
     truncated_roles = set()
 
@@ -104,6 +113,7 @@ def evaluate_preflight(documents: list[dict[str, Any]]) -> dict[str, Any]:
 
     diagnostics_by_role = {item["role"]: item for item in diagnostics}
     jev_decisions: dict[str, dict[str, Any]] = {}
+    role_mismatches: list[dict[str, Any]] = []
     jev_configured = bool(os.environ.get("TYPESAFE_API_KEY", "").strip())
     if jev_configured:
         try:
@@ -111,8 +121,12 @@ def evaluate_preflight(documents: list[dict[str, Any]]) -> dict[str, Any]:
             jev_available = True
             jev_decisions = answers
             for role in ROLES:
+                if role not in present_roles:
+                    continue
                 readability = answers[f"readability_{role}"]
                 role_match = answers[f"role_match_{role}"]
+                if role_match["choice"] == "mismatch":
+                    role_mismatches.append({"role": role, **role_match})
                 if readability["choice"] == "unusable" and readability["confidence"] >= BLOCK_CONFIDENCE:
                     blocked = True
                     warnings.append(_warning(
@@ -129,23 +143,44 @@ def evaluate_preflight(documents: list[dict[str, Any]]) -> dict[str, Any]:
                          "extractedCharacterCount": len(next(d["extractedText"] for d in documents if d["role"] == role)),
                          "explanationCaptured": False},
                     ))
-                if role_match["choice"] == "mismatch" and role_match["confidence"] >= BLOCK_CONFIDENCE:
+                if role_match["choice"] == "mismatch" and role_match["confidence"] >= ROLE_MISMATCH_BLOCK_CONFIDENCE:
                     blocked = True
                     warnings.append(_warning(
                         "DOCUMENT_ROLE_MISMATCH", role, "BLOCKER",
                         "문서 내용이 지정된 역할과 명백히 다릅니다.",
+                        {"type": "role_match", "choice": role_match["choice"],
+                         "confidence": role_match["confidence"],
+                         "blockConfidenceThreshold": ROLE_MISMATCH_BLOCK_CONFIDENCE},
                     ))
                 elif role_match["choice"] != "match" or role_match["confidence"] < BLOCK_CONFIDENCE:
                     warnings.append(_warning(
                         "DOCUMENT_ROLE_UNCERTAIN", role, "WARNING",
                         "문서 내용이 지정된 역할과 맞는지 확실하지 않습니다.",
+                        {"type": "role_match", "choice": role_match["choice"],
+                         "confidence": role_match["confidence"],
+                         "blockConfidenceThreshold": ROLE_MISMATCH_BLOCK_CONFIDENCE},
                     ))
+
+            repeated_mismatches = [item for item in role_mismatches
+                                   if item["confidence"] >= ROLE_MISMATCH_AGGREGATE_MIN_CONFIDENCE]
+            if len(repeated_mismatches) >= ROLE_MISMATCH_AGGREGATE_COUNT:
+                blocked = True
+                warnings.append(_warning(
+                    "MULTIPLE_DOCUMENT_ROLE_MISMATCHES", None, "BLOCKER",
+                    "여러 문서가 지정된 역할과 다르다는 Jev 판정이 있어 문서 역할 배치를 확인해야 합니다.",
+                    {"type": "multiple_role_mismatches", "count": len(repeated_mismatches),
+                     "minimumCount": ROLE_MISMATCH_AGGREGATE_COUNT,
+                     "minimumConfidence": ROLE_MISMATCH_AGGREGATE_MIN_CONFIDENCE,
+                     "roles": repeated_mismatches},
+                ))
 
             for pair in (
                 ("AGREEMENT", "FUNCTION_LIST"),
                 ("AGREEMENT", "MANUAL"),
                 ("FUNCTION_LIST", "MANUAL"),
             ):
+                if not set(pair).issubset(present_roles):
+                    continue
                 answer = answers[f"same_product_{pair[0]}_{pair[1]}"]
                 if answer["choice"] == "different" and answer["confidence"] >= BLOCK_CONFIDENCE:
                     blocked = True
@@ -190,8 +225,14 @@ def evaluate_preflight(documents: list[dict[str, Any]]) -> dict[str, Any]:
              "selection": "앞부분과 뒷부분을 각각 절반씩 사용하고 중간은 생략"},
         ))
 
+    decision = "BLOCKED" if blocked else "READY_WITH_WARNINGS" if warnings else "READY"
     return {
-        "decision": "BLOCKED" if blocked else "READY_WITH_WARNINGS" if warnings else "READY",
+        "decision": decision,
+        "generationGate": {
+            "allowed": not blocked,
+            "reasons": [{"code": warning["code"], "role": warning["role"], "message": warning["message"]}
+                        for warning in warnings if warning["severity"] == "BLOCKER"],
+        },
         "warnings": warnings,
         "diagnostics": {
             "jevEvaluated": jev_available,
@@ -223,7 +264,10 @@ def _evaluate_with_jev(state: dict[str, Any]) -> dict[str, dict[str, Any]]:
         },
     }
     questions = {}
+    present_roles = {document["role"] for document in state["documents"]}
     for role in ROLES:
+        if role not in present_roles:
+            continue
         questions[f"readability_{role}"] = Choice(
             instructions=(
                 f"Judge only whether `documents` entry with role `{role}` contains enough readable, "
@@ -243,6 +287,8 @@ def _evaluate_with_jev(state: dict[str, Any]) -> dict[str, dict[str, Any]]:
         ("AGREEMENT", "MANUAL"),
         ("FUNCTION_LIST", "MANUAL"),
     ):
+        if left not in present_roles or right not in present_roles:
+            continue
         questions[f"same_product_{left}_{right}"] = Choice(
             instructions=(
                 f"Do `documents` entries `{left}` and `{right}` describe the same product? "

@@ -7,6 +7,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,13 +46,14 @@ import jakarta.annotation.PreDestroy;
 public class TcGenerationService {
     private static final java.util.Set<String> SAFE_FAILURE_CODES = java.util.Set.of(
             "TC_INPUT_BUDGET_INSUFFICIENT", "TC_EVIDENCE_INVALID", "TC_SCHEMA_INVALID", "TC_NO_GROUNDED_CASES",
-            "TC_PROVIDER_NOT_IMPLEMENTED", "TC_GENERATION_FAILED", "LLM_OUTPUT_INCOMPLETE", "LLM_INPUT_BUDGET_EXCEEDED",
+            "TC_PROVIDER_NOT_IMPLEMENTED", "TC_GENERATION_FAILED", "TC_FEATURE_PATH_INVALID", "LLM_OUTPUT_INCOMPLETE", "LLM_INPUT_BUDGET_EXCEEDED",
             "LLM_PROVIDER_UNAVAILABLE", "LLM_RESPONSE_INVALID_JSON", "DOCUMENT_VERSION_MISMATCH", "INTERNAL_AUTH_NOT_CONFIGURED");
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
     private final SubmissionRepository repository;
     private final SubmissionPersistenceService submissions;
     private final ProductDescriptionJobRepository verdicts;
+    private final MenuTreeService menuTrees;
     private final TransactionTemplate transactions;
     private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(5)).build();
@@ -66,12 +68,13 @@ public class TcGenerationService {
 
     public TcGenerationService(JdbcTemplate jdbc, ObjectMapper mapper, SubmissionRepository repository,
             SubmissionPersistenceService submissions, ProductDescriptionJobRepository verdicts,
-            PlatformTransactionManager transactionManager,
+            MenuTreeService menuTrees, PlatformTransactionManager transactionManager,
             @Value("${ai-service.base-url:http://localhost:8005}") String baseUrl,
             @Value("${product-description.internal-token:}") String internalToken,
             @Value("${ai-service.product-description.content-timeout-seconds:21600}") long timeoutSeconds) {
         this.jdbc = jdbc; this.mapper = mapper; this.repository = repository;
         this.submissions = submissions; this.verdicts = verdicts;
+        this.menuTrees = menuTrees;
         this.transactions = new TransactionTemplate(transactionManager);
         this.baseUrl = baseUrl.replaceAll("/+$", ""); this.internalToken = internalToken;
         this.timeout = Duration.ofSeconds(timeoutSeconds);
@@ -108,11 +111,15 @@ public class TcGenerationService {
     private Input verifiedInput(UUID id, long memberId) {
         authorize(id, memberId);
         var submission = submissions.findById(SubmissionId.of(id)).orElseThrow();
-        var docs = submissions.findDocumentsBySubmissionId(SubmissionId.of(id));
-        if (docs.size() != 3 || docs.stream().map(d -> d.role()).distinct().count() != 3
+        var docs = submissions.deliveryDocuments(submissions.findDocumentsBySubmissionId(SubmissionId.of(id)));
+        var roles = docs.stream().map(d -> d.role()).collect(java.util.stream.Collectors.toSet());
+        if (docs.size() < 2 || docs.size() > 3 || roles.size() != docs.size()
+                || !roles.containsAll(java.util.Set.of(
+                    com.autotest.test_management_service.domain.submission.SubmissionType.FUNCTION_LIST,
+                    com.autotest.test_management_service.domain.submission.SubmissionType.MANUAL))
                 || docs.stream().anyMatch(d -> d.status() != SubmissionStatus.PARSED
                     || d.extractedText() == null || d.extractedText().isBlank())) {
-            throw error(HttpStatus.CONFLICT, "DOCUMENTS_NOT_READY", "세 문서가 모두 정상 파싱되어야 합니다.");
+            throw error(HttpStatus.CONFLICT, "DOCUMENTS_NOT_READY", "기능리스트와 매뉴얼이 정상 파싱되어야 합니다.");
         }
         var verdict = verdicts.findDeliveryVerdict(id).orElse(null);
         if (verdict == null || !"DELIVERED".equals(verdict.status())) {
@@ -134,10 +141,13 @@ public class TcGenerationService {
             body.put("submissionId", id.toString()); body.put("productId", submission.productId().value());
             body.put("decision", decision);
             body.set("warnings", preflight.path("warnings").isArray() ? preflight.path("warnings") : mapper.createArrayNode());
+            body.set("menuTree", menuTrees.approvedTree(id, memberId, digest));
             var documents = body.putArray("documents");
             docs.forEach(d -> documents.addObject().put("fileId", d.fileId().toString()).put("role", d.role().name())
                     .put("originalFilename", d.originalFilename()).put("format", d.format().name()).put("extractedText", d.extractedText()));
-            return new Input(digest, body);
+            String generationDigest = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest((digest + mapper.writeValueAsString(body.path("menuTree"))).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            return new Input(generationDigest, body);
         } catch (ProductDescriptionException known) { throw known;
         } catch (Exception invalid) {
             throw error(HttpStatus.CONFLICT, "PREFLIGHT_NOT_VERIFIED", "문서 검증 기록을 확인할 수 없습니다.");
@@ -168,6 +178,24 @@ public class TcGenerationService {
         }
         if (created[0]) submit(jobId, id, memberId, input[0]);
         return status(id, memberId);
+    }
+
+    public JsonNode externalPrompt(UUID id, long memberId, int chunkIndex) {
+        if (chunkIndex < 0)
+            throw error(HttpStatus.BAD_REQUEST, "TC_PROMPT_CHUNK_INVALID", "청크 번호가 올바르지 않습니다.");
+        Input input = verifiedInput(id, memberId);
+        try {
+            var response = post("prompt-preview?chunkIndex=" + chunkIndex, input.body(), Duration.ofSeconds(60));
+            JsonNode result = mapper.readTree(response.body());
+            if (response.statusCode() == 200) return result;
+            String code = result.path("code").asText();
+            if ("TC_PROMPT_CHUNK_NOT_FOUND".equals(code))
+                throw error(HttpStatus.NOT_FOUND, code, "복사할 매뉴얼 청크를 찾을 수 없습니다.");
+            throw error(HttpStatus.BAD_GATEWAY, "TC_PROMPT_PREVIEW_FAILED", "외부 LLM용 프롬프트를 준비하지 못했습니다.");
+        } catch (ProductDescriptionException known) { throw known;
+        } catch (Exception failure) {
+            throw error(HttpStatus.BAD_GATEWAY, "TC_PROMPT_PREVIEW_FAILED", "외부 LLM용 프롬프트를 준비하지 못했습니다.");
+        }
     }
 
     private HttpResponse<String> post(String path, JsonNode body, Duration limit) throws Exception {
@@ -234,15 +262,30 @@ public class TcGenerationService {
                 || !result.path("testCases").isArray() || result.path("testCases").isEmpty())
             throw new IllegalStateException("TC_RESPONSE_INVALID");
         var ids = new HashSet<String>();
+        var approvedPaths = new HashSet<String>();
+        collectPaths(input.path("menuTree").path("nodes"), approvedPaths);
+        var allowedPolicyCriteria = Set.of("product-description", "user-manual");
+        var observedPolicyCriteria = new HashSet<String>();
         for (var tc : result.path("testCases")) {
             if (!tc.has("result") || !tc.path("result").isNull() || !tc.path("reviewRequired").asBoolean()
                     || !ids.add(tc.path("tcId").asText()) || tc.path("tcId").asText().isBlank()
                     || tc.path("expectedResult").asText().isBlank()
+                    || !Set.of("PRODUCT_BEHAVIOR", "DOCUMENT_CONFORMANCE").contains(tc.path("testType").asText())
                     || !tc.path("featurePath").isArray() || tc.path("featurePath").isEmpty()
                     || !tc.path("steps").isArray() || tc.path("steps").isEmpty()
                     || !tc.path("sources").isArray() || tc.path("sources").isEmpty())
                 throw new IllegalStateException("TC_RESPONSE_INVALID");
             for (var source : tc.path("sources")) {
+                if ("PROJECT_CRITERION".equals(source.path("kind").asText())) {
+                    if (!"PROJECT_POLICY".equals(source.path("role").asText())
+                            || !"TC_GENERATION_GUIDELINES_V1".equals(source.path("fileId").asText())
+                            || !allowedPolicyCriteria.contains(source.path("criterionId").asText())
+                            || !"DOCUMENT_CONFORMANCE".equals(tc.path("testType").asText())
+                            || !"제품설명서와 사용자매뉴얼의 제공 여부를 각각 확인한다.".equals(source.path("quote").asText()))
+                        throw new IllegalStateException("TC_EVIDENCE_INVALID");
+                    observedPolicyCriteria.add(source.path("criterionId").asText());
+                    continue;
+                }
                 boolean matches = false;
                 for (var doc : input.path("documents")) {
                     if (doc.path("fileId").asText().equals(source.path("fileId").asText())
@@ -257,7 +300,25 @@ public class TcGenerationService {
                 }
                 if (!matches) throw new IllegalStateException("TC_EVIDENCE_INVALID");
             }
+            if ("PRODUCT_BEHAVIOR".equals(tc.path("testType").asText())
+                    && !approvedPaths.contains(pathKey(tc.path("featurePath"))))
+                throw new IllegalStateException("TC_FEATURE_PATH_INVALID");
         }
+        if (!observedPolicyCriteria.containsAll(allowedPolicyCriteria))
+            throw new IllegalStateException("TC_DOCUMENT_CRITERIA_MISSING");
+    }
+
+    private static void collectPaths(JsonNode nodes, Set<String> paths) {
+        for (var node : nodes) {
+            if (node.path("featurePath").isArray()) paths.add(pathKey(node.path("featurePath")));
+            collectPaths(node.path("children"), paths);
+        }
+    }
+
+    private static String pathKey(JsonNode path) {
+        var parts = new java.util.ArrayList<String>();
+        for (var part : path) parts.add(part.asText());
+        return String.join("\u001f", parts);
     }
 
     private void fail(UUID id, String code) {

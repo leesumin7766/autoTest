@@ -1,0 +1,1145 @@
+{
+  "schemaVersion": "menu-tree-draft-v1",
+  "submissionId": null,
+  "manualFileId": "26c88dfa-75c1-4532-912e-8e3be3d8e3ba",
+  "status": "DRAFT_NEEDS_REVIEW",
+  "depthMeaning": "featurePath contains names only; manualSection is a source reference and is not a menu depth",
+  "nodes": [
+    {
+      "manualSection": "1",
+      "title": "출력물보안",
+      "classification": "FEATURE_CANDIDATE",
+      "manualPage": 4,
+      "sourceLine": 125,
+      "children": [
+        {
+          "manualSection": "1.1",
+          "title": "로그조회",
+          "classification": "FEATURE_CANDIDATE",
+          "manualPage": 4,
+          "sourceLine": 126,
+          "children": [
+            {
+              "manualSection": "1.1.1",
+              "title": "출력로그조회",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 4,
+              "sourceLine": 127,
+              "children": [],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.1.1.1",
+                  "title": "출력로그조회 필드 설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 7,
+                  "sourceLine": 163,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "로그조회",
+                "출력로그조회"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.1.2",
+              "title": "개인정보 출력로그 조회",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 8,
+              "sourceLine": 201,
+              "children": [],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.1.2.1",
+                  "title": "개인정보 출력로그 조회 필드 설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 9,
+                  "sourceLine": 225,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "로그조회",
+                "개인정보 출력로그 조회"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.1.3",
+              "title": "소명출력 이력조회",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 10,
+              "sourceLine": 263,
+              "children": [],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.1.3.1",
+                  "title": "소명출력 이력조회 필드 설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 10,
+                  "sourceLine": 270,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "로그조회",
+                "소명출력 이력조회"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.1.4",
+              "title": "폐기 이력조회",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 11,
+              "sourceLine": 288,
+              "children": [],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.1.4.1",
+                  "title": "폐기 이력조회 필드 설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 11,
+                  "sourceLine": 295,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "로그조회",
+                "폐기 이력조회"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.1.5",
+              "title": "사용자 로그인조회",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 12,
+              "sourceLine": 315,
+              "children": [],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.1.5.1",
+                  "title": "사용자 로그인 조회 필드 설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 12,
+                  "sourceLine": 333,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "로그조회",
+                "사용자 로그인조회"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.1.6",
+              "title": "관리자 접근조회",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 13,
+              "sourceLine": 350,
+              "children": [
+                {
+                  "manualSection": "1.1.6.1",
+                  "title": "로그인 이력",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 13,
+                  "sourceLine": 364,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "로그조회",
+                    "관리자 접근조회",
+                    "로그인 이력"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.1.6.3",
+                  "title": "정책변경",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 15,
+                  "sourceLine": 392,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "로그조회",
+                    "관리자 접근조회",
+                    "정책변경"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.1.6.5",
+                  "title": "정책설계",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 16,
+                  "sourceLine": 430,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "로그조회",
+                    "관리자 접근조회",
+                    "정책설계"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.1.6.7",
+                  "title": "사용자변경",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 18,
+                  "sourceLine": 462,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "로그조회",
+                    "관리자 접근조회",
+                    "사용자변경"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.1.6.2",
+                  "title": "로그인 이력 필드설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 14,
+                  "sourceLine": 375,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.1.6.4",
+                  "title": "정책변경 필드 설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 15,
+                  "sourceLine": 402,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.1.6.6",
+                  "title": "정책설계 필드 설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 17,
+                  "sourceLine": 444,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.1.6.8",
+                  "title": "사용자변경 필드 설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 18,
+                  "sourceLine": 468,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "로그조회",
+                "관리자 접근조회"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            }
+          ],
+          "supportingReferences": [],
+          "featurePath": [
+            "출력물보안",
+            "로그조회"
+          ],
+          "menuDepth": 2,
+          "reviewStatus": "NEEDS_HUMAN_REVIEW"
+        },
+        {
+          "manualSection": "1.2",
+          "title": "정책설계",
+          "classification": "FEATURE_CANDIDATE",
+          "manualPage": 19,
+          "sourceLine": 490,
+          "children": [
+            {
+              "manualSection": "1.2.1",
+              "title": "출력 정책설계",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 19,
+              "sourceLine": 491,
+              "children": [
+                {
+                  "manualSection": "1.2.1.1",
+                  "title": "에이전트 정책 설계",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 21,
+                  "sourceLine": 535,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "출력 정책설계",
+                    "에이전트 정책 설계"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.2.1.2",
+                  "title": "출력제어 정책 설계",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 22,
+                  "sourceLine": 549,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "출력 정책설계",
+                    "출력제어 정책 설계"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.2.1.3",
+                  "title": "기타 정책 설계",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 23,
+                  "sourceLine": 566,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "출력 정책설계",
+                    "기타 정책 설계"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.2.1.4",
+                  "title": "정책 추가",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 24,
+                  "sourceLine": 590,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "출력 정책설계",
+                    "정책 추가"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "supportingReferences": [],
+              "featurePath": [
+                "출력물보안",
+                "정책설계",
+                "출력 정책설계"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.2.2",
+              "title": "프로파일 설정",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 25,
+              "sourceLine": 604,
+              "children": [
+                {
+                  "manualSection": "1.2.2.1",
+                  "title": "출력로그 전송",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 26,
+                  "sourceLine": 618,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "프로파일 설정",
+                    "출력로그 전송"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.2.2.2",
+                  "title": "출력로그 전송",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 27,
+                  "sourceLine": 636,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "프로파일 설정",
+                    "출력로그 전송"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.2.2.3",
+                  "title": "워터마크 아이템 추가",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 28,
+                  "sourceLine": 657,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "프로파일 설정",
+                    "워터마크 아이템 추가"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.2.2.4",
+                  "title": "워터마크 아이템 설정(이미지)",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 29,
+                  "sourceLine": 669,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "프로파일 설정",
+                    "워터마크 아이템 설정(이미지)"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.2.2.5",
+                  "title": "워터마크 아이템 설정(텍스트)",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 30,
+                  "sourceLine": 692,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "프로파일 설정",
+                    "워터마크 아이템 설정(텍스트)"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.2.2.6",
+                  "title": "워터마크 아이템 설정(출력정보)",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 31,
+                  "sourceLine": 715,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "프로파일 설정",
+                    "워터마크 아이템 설정(출력정보)"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "supportingReferences": [],
+              "featurePath": [
+                "출력물보안",
+                "정책설계",
+                "프로파일 설정"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.2.3",
+              "title": "예외 정책 설계",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 32,
+              "sourceLine": 744,
+              "children": [
+                {
+                  "manualSection": "1.2.3.2",
+                  "title": "예외 정책 추가",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 33,
+                  "sourceLine": 769,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "예외 정책 설계",
+                    "예외 정책 추가"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.2.3.3",
+                  "title": "예외 정책 설계 (기능별 예외)",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 34,
+                  "sourceLine": 782,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "예외 정책 설계",
+                    "예외 정책 설계 (기능별 예외)"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.2.3.4",
+                  "title": "예외 정책 수정 시 유의사항",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 35,
+                  "sourceLine": 815,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "정책설계",
+                    "예외 정책 설계",
+                    "예외 정책 수정 시 유의사항"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.2.3.1",
+                  "title": "예외 정책 설계 필드설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 32,
+                  "sourceLine": 751,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "정책설계",
+                "예외 정책 설계"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            }
+          ],
+          "supportingReferences": [],
+          "featurePath": [
+            "출력물보안",
+            "정책설계"
+          ],
+          "menuDepth": 2,
+          "reviewStatus": "NEEDS_HUMAN_REVIEW"
+        },
+        {
+          "manualSection": "1.3",
+          "title": "정책할당",
+          "classification": "FEATURE_CANDIDATE",
+          "manualPage": 36,
+          "sourceLine": 832,
+          "children": [
+            {
+              "manualSection": "1.3.1",
+              "title": "부서정책할당",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 36,
+              "sourceLine": 838,
+              "children": [],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.3.1.1",
+                  "title": "부서정책할당 필드설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 37,
+                  "sourceLine": 862,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "정책할당",
+                "부서정책할당"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.3.2",
+              "title": "사용자정책할당",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 38,
+              "sourceLine": 880,
+              "children": [],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.3.2.1",
+                  "title": "사용자정책할당 필드설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 38,
+                  "sourceLine": 900,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "정책할당",
+                "사용자정책할당"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.3.3",
+              "title": "IP 정책할당",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 39,
+              "sourceLine": 919,
+              "children": [],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.3.3.1",
+                  "title": "IP 정책할당 필드설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 40,
+                  "sourceLine": 950,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "정책할당",
+                "IP 정책할당"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.3.4",
+              "title": "기간별 사용자정책할당",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 41,
+              "sourceLine": 966,
+              "children": [],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.3.4.1",
+                  "title": "기간별 사용자정책할당 필드설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 41,
+                  "sourceLine": 983,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "정책할당",
+                "기간별 사용자정책할당"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            }
+          ],
+          "supportingReferences": [],
+          "featurePath": [
+            "출력물보안",
+            "정책할당"
+          ],
+          "menuDepth": 2,
+          "reviewStatus": "NEEDS_HUMAN_REVIEW"
+        },
+        {
+          "manualSection": "1.4",
+          "title": "조직관리",
+          "classification": "FEATURE_CANDIDATE",
+          "manualPage": 42,
+          "sourceLine": 1003,
+          "children": [
+            {
+              "manualSection": "1.4.1",
+              "title": "조직관리",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 42,
+              "sourceLine": 1004,
+              "children": [
+                {
+                  "manualSection": "1.4.1.2",
+                  "title": "사용자 추가",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 43,
+                  "sourceLine": 1032,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "조직관리",
+                    "조직관리",
+                    "사용자 추가"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.4.1.3",
+                  "title": "사용자 수정",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 44,
+                  "sourceLine": 1049,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "조직관리",
+                    "조직관리",
+                    "사용자 수정"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.4.1.4",
+                  "title": "사용자 비밀번호 초기화를 참고하여 주시기 바랍니다",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 43,
+                  "sourceLine": 1042,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "조직관리",
+                    "조직관리",
+                    "사용자 비밀번호 초기화를 참고하여 주시기 바랍니다"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.4.1.1",
+                  "title": "조직관리 필드 설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 43,
+                  "sourceLine": 1021,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "조직관리",
+                "조직관리"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.4.2",
+              "title": "직위관리",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 46,
+              "sourceLine": 1082,
+              "children": [],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.4.2.1",
+                  "title": "직위 관리 필드 설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 46,
+                  "sourceLine": 1089,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "조직관리",
+                "직위관리"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            }
+          ],
+          "supportingReferences": [],
+          "featurePath": [
+            "출력물보안",
+            "조직관리"
+          ],
+          "menuDepth": 2,
+          "reviewStatus": "NEEDS_HUMAN_REVIEW"
+        },
+        {
+          "manualSection": "1.5",
+          "title": "에이전트 삭제키",
+          "classification": "FEATURE_CANDIDATE",
+          "manualPage": 47,
+          "sourceLine": 1104,
+          "children": [
+            {
+              "manualSection": "1.5.1",
+              "title": "에이전트 삭제키 발급",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 47,
+              "sourceLine": 1105,
+              "children": [
+                {
+                  "manualSection": "1.5.1.1",
+                  "title": "에이전트 삭제키 발급 방법",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 47,
+                  "sourceLine": 1114,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "에이전트 삭제키",
+                    "에이전트 삭제키 발급",
+                    "에이전트 삭제키 발급 방법"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "supportingReferences": [],
+              "featurePath": [
+                "출력물보안",
+                "에이전트 삭제키",
+                "에이전트 삭제키 발급"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.5.2",
+              "title": "에이전트 삭제키 발급이력",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 48,
+              "sourceLine": 1131,
+              "children": [],
+              "supportingReferences": [
+                {
+                  "manualSection": "1.5.2.1",
+                  "title": "에이전트 삭제키 발급이력 필드 설명",
+                  "classification": "SUPPORTING_REFERENCE",
+                  "manualPage": 48,
+                  "sourceLine": 1137,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "featurePath": [
+                "출력물보안",
+                "에이전트 삭제키",
+                "에이전트 삭제키 발급이력"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            }
+          ],
+          "supportingReferences": [],
+          "featurePath": [
+            "출력물보안",
+            "에이전트 삭제키"
+          ],
+          "menuDepth": 2,
+          "reviewStatus": "NEEDS_HUMAN_REVIEW"
+        },
+        {
+          "manualSection": "1.6",
+          "title": "시스템 관리",
+          "classification": "FEATURE_CANDIDATE",
+          "manualPage": 49,
+          "sourceLine": 1153,
+          "children": [
+            {
+              "manualSection": "1.6.1",
+              "title": "시스템 관리",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 49,
+              "sourceLine": 1154,
+              "children": [],
+              "supportingReferences": [],
+              "featurePath": [
+                "출력물보안",
+                "시스템 관리",
+                "시스템 관리"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            },
+            {
+              "manualSection": "1.6.2",
+              "title": "권한 및 메뉴설정",
+              "classification": "FEATURE_CANDIDATE",
+              "manualPage": 49,
+              "sourceLine": 1162,
+              "children": [
+                {
+                  "manualSection": "1.6.2.1",
+                  "title": "관리자 그룹 생성",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 50,
+                  "sourceLine": 1179,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "시스템 관리",
+                    "권한 및 메뉴설정",
+                    "관리자 그룹 생성"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.6.2.2",
+                  "title": "관리자 그룹 수정 삭제",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 50,
+                  "sourceLine": 1183,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "시스템 관리",
+                    "권한 및 메뉴설정",
+                    "관리자 그룹 수정 삭제"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                },
+                {
+                  "manualSection": "1.6.2.3",
+                  "title": "메뉴 할당",
+                  "classification": "FEATURE_CANDIDATE",
+                  "manualPage": 51,
+                  "sourceLine": 1207,
+                  "children": [],
+                  "supportingReferences": [],
+                  "featurePath": [
+                    "출력물보안",
+                    "시스템 관리",
+                    "권한 및 메뉴설정",
+                    "메뉴 할당"
+                  ],
+                  "menuDepth": 4,
+                  "reviewStatus": "NEEDS_HUMAN_REVIEW"
+                }
+              ],
+              "supportingReferences": [],
+              "featurePath": [
+                "출력물보안",
+                "시스템 관리",
+                "권한 및 메뉴설정"
+              ],
+              "menuDepth": 3,
+              "reviewStatus": "NEEDS_HUMAN_REVIEW"
+            }
+          ],
+          "supportingReferences": [],
+          "featurePath": [
+            "출력물보안",
+            "시스템 관리"
+          ],
+          "menuDepth": 2,
+          "reviewStatus": "NEEDS_HUMAN_REVIEW"
+        }
+      ],
+      "supportingReferences": [],
+      "featurePath": [
+        "출력물보안"
+      ],
+      "menuDepth": 1,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    }
+  ],
+  "nonFeatureReferences": [
+    {
+      "manualSection": "2",
+      "title": "시스템 정보",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 52,
+      "sourceLine": 1224,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "2.1",
+      "title": "PrintChaser 3.0",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 52,
+      "sourceLine": 1225,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "2.1.1",
+      "title": "제품 정보",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 52,
+      "sourceLine": 1226,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "2.1.2",
+      "title": "PrintChaser 3.0 제품 기능소개",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 52,
+      "sourceLine": 1236,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "2.1.3",
+      "title": "PrintChaser 3.0 제품 기능요약",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 52,
+      "sourceLine": 1244,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "2.1.4",
+      "title": "PrintChaser 3.0 에이전트 구동 최소사양",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 52,
+      "sourceLine": 1250,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "2.1.5",
+      "title": "관리자 웹 페이지 정보",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 53,
+      "sourceLine": 1263,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "2.1.6",
+      "title": "데이터 백업 및 복구에 대한 정보",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 53,
+      "sourceLine": 1271,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "2.1.7",
+      "title": "사용자 비밀번호 운영 방침",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 53,
+      "sourceLine": 1280,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "2.1.8",
+      "title": "유지보수 및 장애지원 연락처",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 53,
+      "sourceLine": 1285,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "2.1.9",
+      "title": "유지보수 기간 안내",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 53,
+      "sourceLine": 1289,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "2.1.10",
+      "title": "서버 상 로그 저장 위치",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 54,
+      "sourceLine": 1298,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "2.1.11",
+      "title": "시스템 구축 후 고객에게 제공되는 정보",
+      "classification": "PRODUCT_OR_DOCUMENT_INFO",
+      "manualPage": 54,
+      "sourceLine": 1305,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "3",
+      "title": "관리자 FAQ",
+      "classification": "FAQ_REFERENCE",
+      "manualPage": 55,
+      "sourceLine": 1314,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "3.1",
+      "title": "로그인 페이지에서 출력물보안은 어떤 제품입니까?",
+      "classification": "FAQ_REFERENCE",
+      "manualPage": 55,
+      "sourceLine": 1315,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "3.2",
+      "title": "출력물보안으로 통제가 되는 프로세스는 어느 것이 있습니까?",
+      "classification": "FAQ_REFERENCE",
+      "manualPage": 55,
+      "sourceLine": 1320,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "3.3",
+      "title": "정책을 수신하였는데, 바로 출력제어가 되지 않습니다",
+      "classification": "FAQ_REFERENCE",
+      "manualPage": 55,
+      "sourceLine": 1326,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "3.4",
+      "title": "부서정책할당을 하였는데, 실제 정책이 반영이 되지 않았습니다",
+      "classification": "FAQ_REFERENCE",
+      "manualPage": 55,
+      "sourceLine": 1333,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "manualSection": "3.5",
+      "title": "사용자정책할당을 하였는데, 실제 정책이 반영이 되지 않았습니다",
+      "classification": "FAQ_REFERENCE",
+      "manualPage": 55,
+      "sourceLine": 1338,
+      "reviewStatus": "NEEDS_HUMAN_REVIEW"
+    }
+  ],
+  "unattachedReferences": [],
+  "warning": "문서 목차 기반 후보입니다. 실제 제품 UI를 확인하고 담당자가 기능명·상하위 관계·불필요 항목을 승인해야 합니다. 승인 전 TC 생성을 시작하지 마세요."
+}

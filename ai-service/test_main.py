@@ -120,23 +120,25 @@ class DocumentIntakeTests(unittest.TestCase):
             "extractedText": extracted_text,
         }
 
-    def test_accepts_exactly_the_three_required_document_roles(self):
+    def test_accepts_required_core_documents_without_optional_agreement(self):
         intake = DocumentIntake(
             submissionId=uuid4(),
             productId=12,
             documents=[
-                self.make_document("AGREEMENT"),
                 self.make_document("FUNCTION_LIST"),
                 self.make_document("MANUAL"),
             ],
         )
 
+        self.assertEqual(2, len(intake.documents))
+
+    def test_accepts_all_three_documents(self):
+        intake = self.create_intake()
         self.assertEqual(3, len(intake.documents))
 
-    def test_rejects_missing_or_duplicate_roles(self):
+    def test_rejects_missing_core_or_duplicate_roles(self):
         documents = [
             self.make_document("AGREEMENT"),
-            self.make_document("FUNCTION_LIST"),
             self.make_document("FUNCTION_LIST"),
         ]
 

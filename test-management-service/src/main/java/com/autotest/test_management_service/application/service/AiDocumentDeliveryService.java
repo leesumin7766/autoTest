@@ -30,7 +30,8 @@ public class AiDocumentDeliveryService {
     // Must stay above the ai-service Jev deadline (13s) and below the lease.
     static final Duration HTTP_CONNECT_TIMEOUT = Duration.ofSeconds(3);
     static final Duration HTTP_READ_TIMEOUT = Duration.ofSeconds(20);
-        private static final int REQUIRED_DOCUMENT_COUNT = 3;
+        private static final int MIN_REQUIRED_DOCUMENT_COUNT = 2;
+        private static final int MAX_DOCUMENT_COUNT = 3;
 
         private final SubmissionPersistenceService submissionPersistenceService;
     private final JdbcTemplate jdbcTemplate;
@@ -80,7 +81,8 @@ public class AiDocumentDeliveryService {
             }
             if (receipt == null || !receipt.accepted()
                     || !Objects.equals(receipt.submissionId(), submissionId.value())
-                    || receipt.documentCount() != REQUIRED_DOCUMENT_COUNT
+                    || receipt.documentCount() < MIN_REQUIRED_DOCUMENT_COUNT
+                    || receipt.documentCount() > MAX_DOCUMENT_COUNT
                     || receipt.preflight() == null
                     || "BLOCKED".equals(receipt.preflight().path("decision").asText())) {
                 throw new IllegalStateException("AI service did not confirm document intake");
@@ -175,7 +177,8 @@ public class AiDocumentDeliveryService {
             throws JsonProcessingException {
         JsonNode preflight = receipt.preflight();
         if (receipt.accepted() || !Objects.equals(receipt.submissionId(), submissionId.value())
-                || receipt.documentCount() != REQUIRED_DOCUMENT_COUNT || preflight == null
+                || receipt.documentCount() < MIN_REQUIRED_DOCUMENT_COUNT
+                || receipt.documentCount() > MAX_DOCUMENT_COUNT || preflight == null
                 || !"BLOCKED".equals(preflight.path("decision").asText())) {
             throw new IllegalStateException("AI service returned an inconsistent blocked receipt");
         }
