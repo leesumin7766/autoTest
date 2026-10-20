@@ -295,6 +295,19 @@
 .playwright-ready, .playwright-stale { padding: 10px 12px; border-left: 3px solid #39775a; background: #eff7f1; color: #335c44; }
 .playwright-stale { border-color: #b9872e; background: #fff8e8; color: #73521c; }
 .playwright-not-run { color: #64748b; font-size: 12px; }
+.playwright-description { color: #52645a; font-size: 13px; line-height: 1.7; }
+.playwright-setup-form fieldset { display: grid; gap: 12px; min-width: 0; margin: 10px 0; padding: 18px; border: 1px solid #d3ddd5; border-radius: 8px; }
+.playwright-setup-form legend { padding: 0 8px; color: var(--green); font-size: 14px; font-weight: 650; }
+.playwright-setup-form fieldset label { display: grid; gap: 7px; color: #334b3e; font-size: 13px; }
+.playwright-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 14px; }
+.playwright-advanced { padding: 12px; border: 1px solid #dce5de; border-radius: 6px; background: #fff; }
+.playwright-advanced summary { color: #52645a; cursor: pointer; font-size: 13px; }
+.playwright-advanced .playwright-grid { margin-top: 14px; }
+.playwright-setup-form fieldset p, .playwright-advanced p { margin: 0; color: #64748b; font-size: 12px; line-height: 1.6; }
+.playwright-assisted { padding: 10px; background: #fff8e8; border-left: 3px solid #b9872e; }
+.playwright-evidence { display: flex; flex-wrap: wrap; gap: 8px; }
+.playwright-evidence span { padding: 6px 10px; border-radius: 4px; background: #e8f1eb; color: #335c44; font-size: 12px; }
+.playwright-setup-form fieldset .playwright-confirmation { display: flex; align-items: flex-start; }
 .menu-tree-review { margin: 1rem 0; padding: 1rem; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc; }
 .menu-tree-review h3 { margin-top: 0; }
 .menu-tree-progress { display: flex; align-items: flex-start; gap: 12px; margin: 14px 0; padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc; color: #334155; }

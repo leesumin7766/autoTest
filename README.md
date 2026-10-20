@@ -119,9 +119,12 @@ Gateway는 서비스 탐색용 `lb://` 대신 다음 고정 HTTP 주소를 사�
 ### Jev 이후 Playwright 준비 흐름
 
 - 기능리스트와 매뉴얼이 정상 파싱되면 시험합의서가 없어도 Jev 사전 점검을 진행합니다. 합의서 누락은 경고로 저장합니다. 필수 문서가 모두 준비되고 Jev 결과가 `READY` 또는 허용된 `READY_WITH_WARNINGS`일 때만 Playwright 준비 설정을 저장할 수 있습니다.
-- Jev 차단 상태에서는 설정 API도 거부합니다. 준비 화면은 테스트 사이트 URL, 로그인 방식과 절차 메모, 테스트 계정 식별명, 수집할 화면 범위, 테스트 데이터 메모를 받습니다. 접속 권한이 있는 테스트 환경 확인도 필요합니다.
-- 비밀번호·쿠키·토큰은 입력하거나 저장하지 않습니다. 이번 단계는 설정 저장까지만 하며 URL에 접속하거나 브라우저·Playwright를 실행하지 않습니다. 설정은 V14 `playwright_crawl_setups`에 문서 digest와 함께 저장하고, 문서가 변경되면 오래된 설정으로 표시합니다.
-- API는 `GET|PUT /api/submissions/{id}/playwright-setup`이며 개발용 `X-Member-Id`를 사용합니다. URL은 http/https만 허용하고 user-info, query parameter, fragment를 거부합니다.
+- Jev 차단 상태에서는 설정 API도 거부합니다. 준비 화면은 시작 URL·제품 버전, 로그인 계정·권한, 허용 사이트·포함/제외 경로, 화면 수·깊이·시간·해상도, 테스트 데이터 메모를 구분해서 받습니다.
+- 로그인 방식은 `FORM_AUTO`(아이디·비밀번호), `BASIC_AUTH`, `NONE`, `MANUAL`, `SSO`, `OTHER`입니다. 폼 로그인 URL·입력칸/버튼 CSS 선택자·성공 확인 URL/요소를 추가로 지정할 수 있습니다. 선택자가 비어 있으면 이후 실행기에서 자동 인식할 예정이며, SSO·MFA·CAPTCHA는 사용자 개입 또는 별도 인증 연동 대상입니다.
+- 이번 단계는 **입력·저장만** 수행합니다. 로그인·선택자 자동 인식·허용 사이트/경로 및 탐색 한도 적용·스크린샷/DOM 수집·문서와 화면을 합친 메뉴트리/TC 생성은 이후 브라우저 실행기에 연결해야 합니다. `CONFIGURED`는 저장 완료를 뜻하며 로그인 성공이나 사이트 연결 확인 결과가 아닙니다.
+- V15는 V14 `playwright_crawl_setups`에 구조화된 `automation_config`와 `password_ciphertext`를 추가합니다. 비밀번호는 전용 필드에서만 받고 제출 ID를 AAD로 사용하는 AES-256-GCM으로 암호화합니다. GET/PUT 응답에는 암호문·비밀번호 대신 `passwordConfigured`만 반환합니다. 빈 비밀번호로 수정하면 기존 값을 유지하고, 계정·로그인 방식·시작/로그인 사이트를 변경하면 재입력을 요구합니다. 자동 로그인 이외 방식으로 저장하면 기존 비밀번호를 삭제합니다. 메모에는 비밀번호·쿠키·토큰을 입력하지 않습니다.
+- 암호화 키는 DB와 분리된 `playwright_credentials` Docker 볼륨의 `/app/.runtime/playwright/credentials.key`에 최초 비밀번호 저장 시 생성합니다. DB 복원·서비스 이전 시 이 키도 별도로 보존해야 합니다. 직접 Java 실행 시 기본 경로는 `./.runtime/playwright/credentials.key`이며 `playwright.credentials-key-file`로 변경할 수 있습니다. 키 파일과 백업은 Git에 올리지 않습니다. 현재 API 인증은 개발용 `X-Member-Id`이므로 실제 운영 계정 연동 전에는 테스트 전용 계정을 사용합니다.
+- API는 `GET|PUT /api/submissions/{id}/playwright-setup`이며 개발용 `X-Member-Id`를 사용합니다. 기존 메모 필드는 유지하며 PUT에 `automation`, `password`(신규/교체 시만)를 추가합니다. 응답은 `Cache-Control: no-store`입니다. URL은 http/https만 허용하고 user-info, query parameter, fragment를 거부합니다. 시작 사이트 외 로그인·성공 URL은 `allowedOrigins`에 등록해야 합니다. 문서 digest가 바뀌면 설정을 다시 저장해야 합니다.
 - 현재 `crawler-service`의 `/crawl`은 URL을 열어 네트워크 요청을 기록하는 기존 기능입니다. 로그인 세션 유지, 메뉴 탐색, DOM/접근성 구조 및 화면 캡처 저장은 아직 구현하지 않았습니다. 이후 실행 단계에서는 허용 호스트 제한과 읽기 전용 상호작용을 추가해야 합니다.
 - Playwright 탐색 자료가 쌓인 뒤 사용자 예시와 같은 7열(1~5 depth, 메뉴 설명, 기능구분) 트리와 근거를 생성할 계획입니다. 메뉴 설명 및 주요/부가기능 분류는 화면만으로 확정할 수 없는 항목이 있어 사용자 검토·승인이 필요합니다.
 - TC 생성과 승인된 TC의 Playwright 실행은 아직 이 준비 단계에 포함되지 않습니다. 기존 TC 생성 API는 남아 있으나 새 흐름의 화면 수집·메뉴 트리 승인 단계와 연결하는 작업이 후속으로 남아 있습니다.
