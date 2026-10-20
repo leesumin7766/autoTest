@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @SpringBootTest(properties = {"s3.enabled=false", "s3.access-key=test", "s3.secret-key=test",
+        "product-description.internal-token=local-check-test",
         "playwright.credentials-key-file=./build/test-playwright/credentials.key"})
 @AutoConfigureMockMvc
 @Transactional
@@ -42,6 +43,9 @@ class PlaywrightSetupIntegrationTest {
     @Autowired ObjectMapper mapper;
     @Autowired MockMvc mvc;
     @Autowired PlaywrightCredentialCipher cipher;
+    @Autowired RemoteCrawlService remote;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean LocalCrawlDispatcher dispatcher;
+    @Autowired jakarta.persistence.EntityManager entityManager;
     UUID id;
     String endpoint;
 
@@ -117,6 +121,17 @@ class PlaywrightSetupIntegrationTest {
     }
 
     @Test void rejectsUnlistedLoginHostExcessiveCrawlLimitsAndBlockedPreflight() throws Exception {
+        for (int seconds : new int[]{1, 60}) {
+            var timed = request(); ((ObjectNode) timed.get("automation")).put("pageLoadTimeoutSeconds", seconds);
+            mvc.perform(put(endpoint).header("X-Member-Id", "8101").contentType(MediaType.APPLICATION_JSON)
+                    .content(mapper.writeValueAsBytes(timed))).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.setup.automation.pageLoadTimeoutSeconds").value(seconds));
+        }
+        for (int seconds : new int[]{0, 61}) {
+            var timed = request(); ((ObjectNode) timed.get("automation")).put("pageLoadTimeoutSeconds", seconds);
+            mvc.perform(put(endpoint).header("X-Member-Id", "8101").contentType(MediaType.APPLICATION_JSON)
+                    .content(mapper.writeValueAsBytes(timed))).andExpect(status().isBadRequest());
+        }
         var body = request(); ((ObjectNode) body.get("automation")).put("loginUrl", "https://other.example/login");
         mvc.perform(put(endpoint).header("X-Member-Id", "8101").contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsBytes(body))).andExpect(status().isBadRequest());
@@ -126,5 +141,124 @@ class PlaywrightSetupIntegrationTest {
         jdbc.update("UPDATE submission_ai_deliveries SET status='BLOCKED' WHERE submission_id=?", id);
         mvc.perform(put(endpoint).header("X-Member-Id", "8101").contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsBytes(request()))).andExpect(status().isConflict());
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode channel(RemoteCrawlService.Provisioned agent,String action,
+            ObjectNode body,int expectedStatus) throws Exception {
+        UUID nonce=UUID.randomUUID(); long timestamp=java.time.Instant.now().getEpochSecond();
+        byte[] key=java.util.Base64.getUrlDecoder().decode(agent.token());
+        var envelope=CrawlAgentWire.seal(key,CrawlAgentWire.requestAad(agent.agent().agentId(),action,timestamp,nonce),mapper.writeValueAsBytes(body));
+        var result=mvc.perform(post("/api/crawl-agents/"+agent.agent().agentId()+"/channel/"+action)
+                .header("X-Agent-Timestamp",timestamp).header("X-Agent-Nonce",nonce)
+                .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsBytes(envelope)))
+                .andExpect(status().is(expectedStatus)).andReturn().getResponse().getContentAsString();
+        assertFalse(result.contains("test-secret-password"));
+        if(expectedStatus!=200) return mapper.readTree(result);
+        return mapper.readTree(CrawlAgentWire.unseal(key,("response\n"+nonce).getBytes(java.nio.charset.StandardCharsets.UTF_8),mapper.readValue(result,CrawlAgentWire.Envelope.class)));
+    }
+    private RemoteCrawlService.Provisioned onlineAgent() throws Exception {
+        var agent=remote.provision(8101,"isolated test PC");
+        channel(agent,"heartbeat",mapper.createObjectNode(),200);
+        return agent;
+    }
+    private void saveCrawlSetup() throws Exception {
+        var body=request(); ((ObjectNode)body.get("automation")).put("successUrl","https://test.example/dashboard");
+        save(body);
+    }
+    @Test void encryptedWorkerCapturesPagesIdempotentlyAndReturnsOwnedResults() throws Exception {
+        saveCrawlSetup();
+        var agent=onlineAgent();
+        var started=remote.start(id,8101,null); // One online agent is selected automatically.
+        assertEquals("QUEUED",started.path("job").path("status").asText());
+        var job=channel(agent,"claim",mapper.createObjectNode(),200);
+        assertEquals("test-secret-password",job.path("password").asText());
+        assertFalse(remote.status(id,8101).toString().contains("test-secret-password"));
+        var page=mapper.createObjectNode().put("event","page").put("jobId",job.path("jobId").asText())
+                .put("claimToken",job.path("claimToken").asText()).put("pageIndex",0)
+                .put("url","https://test.example/dashboard").put("title","Dashboard").put("bodyText","Overview");
+        page.putArray("elements");page.putArray("links");
+        var bytes=new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(4,4,java.awt.image.BufferedImage.TYPE_INT_RGB),"jpeg",bytes);
+        page.put("screenshot",java.util.Base64.getEncoder().encodeToString(bytes.toByteArray()));
+        channel(agent,"event",page,200);channel(agent,"event",page,200);
+        assertEquals(1,remote.status(id,8101).path("job").path("pageCount").asInt());
+        UUID jobId=UUID.fromString(job.path("jobId").asText());
+        mvc.perform(get("/api/submissions/"+id+"/playwright-crawls/"+jobId+"/pages/0/screenshot").header("X-Member-Id",8101))
+                .andExpect(status().isOk()).andExpect(content().contentType("image/jpeg"));
+        mvc.perform(get("/api/submissions/"+id+"/playwright-crawls/"+jobId+"/pages/0/screenshot").header("X-Member-Id",8102))
+                .andExpect(status().isForbidden());
+        var complete=mapper.createObjectNode().put("jobId",jobId.toString()).put("claimToken",job.path("claimToken").asText())
+                .put("event","complete").put("stopReason","PAGE_LIMIT");
+        channel(agent,"event",complete,200);
+        assertEquals("COMPLETED",remote.status(id,8101).path("job").path("status").asText());
+        assertNull(jdbc.queryForObject("SELECT password_ciphertext FROM playwright_crawl_jobs WHERE job_id=?",String.class,jobId));
+        channel(agent,"event",page,409);
+    }
+    @Test void workerCannotReplayRequestsUseOtherAgentOrFinishCanceledJob() throws Exception {
+        saveCrawlSetup(); var agent=onlineAgent();remote.start(id,8101,agent.agent().agentId());
+        var job=channel(agent,"claim",mapper.createObjectNode(),200);
+        var event=mapper.createObjectNode().put("jobId",job.path("jobId").asText()).put("claimToken",job.path("claimToken").asText()).put("event","heartbeat");
+        var other=onlineAgent();channel(other,"event",event,409);
+        UUID nonce=UUID.randomUUID();long timestamp=java.time.Instant.now().getEpochSecond();
+        var envelope=CrawlAgentWire.seal(java.util.Base64.getUrlDecoder().decode(agent.token()),
+                CrawlAgentWire.requestAad(agent.agent().agentId(),"heartbeat",timestamp,nonce),"{}".getBytes());
+        for(int expected:new int[]{200,401})
+            mvc.perform(post("/api/crawl-agents/"+agent.agent().agentId()+"/channel/heartbeat")
+                    .header("X-Agent-Timestamp",timestamp).header("X-Agent-Nonce",nonce).contentType(MediaType.APPLICATION_JSON)
+                    .content(mapper.writeValueAsBytes(envelope))).andExpect(status().is(expected));
+        remote.cancel(id,8101,UUID.fromString(job.path("jobId").asText()));
+        channel(agent,"event",event,409);
+        remote.revoke(8101,agent.agent().agentId());
+        channel(agent,"heartbeat",mapper.createObjectNode(),401);
+    }
+    @Test void workerRejectsExpiredLeaseAndRevalidatesDocumentBeforeClaim() throws Exception {
+        saveCrawlSetup();var agent=onlineAgent();remote.start(id,8101,agent.agent().agentId());
+        var job=channel(agent,"claim",mapper.createObjectNode(),200);
+        UUID jobId=UUID.fromString(job.path("jobId").asText());
+        jdbc.update("UPDATE playwright_crawl_jobs SET lease_expires_at=now()-interval '1 second' WHERE job_id=?",jobId);
+        channel(agent,"event",mapper.createObjectNode().put("event","heartbeat").put("jobId",jobId.toString())
+                .put("claimToken",job.path("claimToken").asText()),409);
+        assertEquals("FAILED",remote.status(id,8101).path("job").path("status").asText());
+        remote.start(id,8101,agent.agent().agentId());
+        jdbc.update("UPDATE submission_files SET extracted_text='changed after queuing' WHERE submission_id=? AND role='MANUAL'",id);
+        entityManager.clear();
+        assertFalse(channel(agent,"claim",mapper.createObjectNode(),200).has("password"));
+        assertEquals("DOCUMENT_VERSION_MISMATCH",remote.status(id,8101).path("job").path("errorCode").asText());
+    }
+    @Test void connectionCheckNeedsOnlyUrlAndUsesLocalRunnerWithoutRegisteringAgent() throws Exception {
+        var draft=new PlaywrightSetupService.SetupRequest("https://test.example/login","NONE","","","","",true);
+        var status=remote.start(id,8101,null,"LOCAL","CONNECTION",draft);
+        var check=status.path("checks").path("CONNECTION");
+        assertEquals("RUNNING",check.path("status").asText());
+        assertEquals("현재 서버",check.path("agentName").asText());
+        var payload=org.mockito.ArgumentCaptor.forClass(com.fasterxml.jackson.databind.JsonNode.class);
+        org.mockito.Mockito.verify(dispatcher).dispatch(payload.capture(),org.mockito.ArgumentMatchers.any());
+        assertFalse(payload.getValue().has("password"));
+        assertEquals("CONNECTION",payload.getValue().path("purpose").asText());
+        var event=mapper.createObjectNode().put("event","complete").put("jobId",check.path("jobId").asText())
+                .put("claimToken",payload.getValue().path("claimToken").asText());
+        event.putObject("result").put("httpStatus",401).put("elapsedMs",150);
+        mvc.perform(post("/api/internal/playwright-crawls/events").header("X-Internal-Token","wrong")
+                .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsBytes(event))).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/internal/playwright-crawls/events").header("X-Internal-Token","local-check-test")
+                .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsBytes(event))).andExpect(status().isOk());
+        var completed=remote.status(id,8101).path("checks").path("CONNECTION");
+        assertEquals("COMPLETED",completed.path("status").asText());
+        assertEquals(401,completed.path("result").path("httpStatus").asInt());
+        assertTrue(remote.status(id,8101).path("pages").isEmpty());
+    }
+    @Test void remoteLoginProbeAcceptsDraftWithoutSavingAndRequiresLoginProof() throws Exception {
+        var agent=onlineAgent();
+        var draft=mapper.treeToValue(request(),PlaywrightSetupService.SetupRequest.class);
+        remote.start(id,8101,agent.agent().agentId(),"REMOTE","LOGIN",draft);
+        var payload=channel(agent,"claim",mapper.createObjectNode(),200);
+        assertEquals("LOGIN",payload.path("purpose").asText());
+        assertEquals("test-secret-password",payload.path("password").asText());
+        assertNull(mvc.perform(get(endpoint).header("X-Member-Id",8101)).andReturn().getResponse().getErrorMessage());
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM playwright_crawl_setups WHERE submission_id=?",Integer.class,id));
+        var event=mapper.createObjectNode().put("event","complete").put("jobId",payload.path("jobId").asText()).put("claimToken",payload.path("claimToken").asText());
+        event.putObject("result").put("httpStatus",200).put("loginVerified",false);
+        channel(agent,"event",event,200);
+        assertEquals("FAILED",remote.status(id,8101).path("checks").path("LOGIN").path("status").asText());
     }
 }

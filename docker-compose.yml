@@ -164,6 +164,9 @@ services:
     restart: unless-stopped
 
   crawler-service:
+    environment:
+      PRODUCT_DESCRIPTION_INTERNAL_TOKEN: ${PRODUCT_DESCRIPTION_INTERNAL_TOKEN:?Set internal token}
+      MANAGEMENT_SERVICE_URL: http://test-management-service:8082
     build: ./crawler-service
     container_name: autotest-crawler-1
     ports:

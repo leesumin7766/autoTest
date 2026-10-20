@@ -6,7 +6,7 @@
 
 - 최종 목표: 시험합의서·기능리스트·제품 매뉴얼 업로드 → LLM으로 제품 설명과 TC 생성 → 테스트 자동화와 결함 리포트.
 - LLM 전 문서 적합성 판정에는 결정적인 프로그램 검사와 Jev(TypeSafe) 의미 판정을 사용한다. 제품 설명·TC 생성은 생성형 LLM에 맡긴다.
-- **현재 구현 범위는 업로드·사전 점검, 승인 후 TC 초안 생성·저장·표시, Jev 통과 뒤 Playwright 접속 환경 준비 설정까지다.** Playwright UI 탐색/실행은 아직 이 준비 단계에 포함하지 않는다. 제품 설명 PDF 생성 코드는 보존하지만 품질 개선 전까지 신규 생성·재출력을 기본 비활성화한다.
+- **현재 구현 범위는 업로드·사전 점검, 승인 후 TC 초안 생성·저장·표시, Jev 통과 뒤 원격 실행기의 자동 로그인·화면/구조 수집 및 결과 회수까지다.** 문서와 수집 형상을 합친 메뉴트리/TC 자동 생성은 후속 연결 작업이다. 제품 설명 PDF 생성 코드는 보존하지만 품질 개선 전까지 신규 생성·재출력을 기본 비활성화한다.
 - 제품 설명 생성은 READY/READY_WITH_WARNINGS만 허용한다. 작업 상태와 청크 진행률, 중단·재개, 회원별 동시 생성 제한은 test-management-service가 담당한다. 실제 계정 인증·역할 권한은 아직 별도 개발 범위다.
 - Ollama는 로컬 LLM 제공자로 연결할 수 있고 Compose 기본 모드는 mock이다. TC 초안 수정·확정·결과 기록, 실제 자동 시험과 결함 분석은 후속 범위다. 보안·성능 시험은 수동으로 진행한다.
 - 코드 제출/채점 시스템이 아니다. Main.java 및 @test input: 주석 파싱·채점 로직을 도입하지 않는다.
@@ -33,7 +33,7 @@ docker-compose.yml이 서비스 구성의 기준이다. 사용자 제공 Docker 
 - Docker 내부 서비스 간 접근은 db:5432, seaweedfs:8333, ai-service:8005 등 Compose 서비스명을 사용한다. 컨테이너의 localhost는 해당 컨테이너 자신이다.
 - Java 서비스에는 소스 bind mount가 없다. 소스 변경 후 이미지 재빌드·컨테이너 재생성이 필요하다.
 - ai-service와 crawler-service 소스는 /app에 bind mount된다. 변경 반영에 재시작이 필요한지는 실행 명령을 확인한다. 의존성 변경 시 이미지를 재빌드한다.
-- crawler-service의 현재 `/crawl`은 임시 Chromium으로 URL을 열고 HTTP 요청 목록만 수집한다. 로그인 세션·DOM/접근성 트리·스크린샷·허용 호스트 검사는 아직 없다. Playwright 준비 API는 자동 로그인 계정과 구조화된 수집 설정을 저장하되 실제 브라우저는 실행하지 않는다. 비밀번호는 전용 필드로 받고 AES-GCM 암호화하며 조회/응답/로그/LLM 입력에 포함하지 않는다. 키는 DB와 분리된 `playwright_credentials` 볼륨에 보존한다. 자세한 계약은 README의 Jev 이후 Playwright 준비 흐름을 따른다.
+- Playwright 기본 흐름은 URL → Test Connection → 계정 입력 → 로그인 테스트 → 설정 저장·화면 수집이다. 기본은 현재 서버의 crawler-service이며 원격 PC는 선택 옵션이다. 연결/로그인 테스트는 수집·설정 저장과 별도 작업이며 로컬·원격에서 동일한 검사 코드를 사용한다. 로그인 성공을 확신할 수 없으면 실패로 표시하고 고급 설정으로 보정한다. `crawler-service/remote-agent/`는 원격 PC에서 관리 서버로 작업을 가져온다. 로컬은 내부 토큰 채널, 원격은 AES-GCM 채널을 사용한다. 로그인 이후 쓰기 요청은 차단한다. 상세 계약·설치·제한은 `docs/REMOTE_CRAWL_AGENT.md`를 따른다.
 - db_data와 seaweed-data 볼륨에 데이터를 보존한다. 업로드 오류 해결을 위해 볼륨을 삭제하지 않는다.
 - depends_on만으로 애플리케이션 API 준비 완료를 보장하지 않는다. DB는 service_healthy 조건이 지정된 서비스에서 healthcheck를 기다린다.
 - `test-management-service`는 `/actuator/health` healthcheck를 제공하고 Gateway는 해당 서비스가 healthy가 된 후 시작한다.

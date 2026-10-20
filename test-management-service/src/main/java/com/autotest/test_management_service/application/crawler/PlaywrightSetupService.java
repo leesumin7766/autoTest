@@ -51,6 +51,39 @@ public class PlaywrightSetupService {
 
     private record Verified(String digest) { }
 
+    String verifiedDigest(UUID id,long memberId) { return verifyReadySubmission(id,memberId).digest(); }
+
+    public record Prepared(SetupView setup,String passwordCiphertext) {
+        @Override public String toString() { return "PreparedBrowserCheck[redacted]"; }
+    }
+    Prepared prepareCheck(UUID id,long member,SetupRequest request,boolean connectionOnly) {
+        verifyReadySubmission(id,member);
+        if(request==null) throw error(HttpStatus.BAD_REQUEST,"PLAYWRIGHT_SETUP_INVALID","URL을 입력해 주세요.");
+        CrawlAutomation automation=request.automation()==null?CrawlAutomation.defaults():request.automation().normalized();
+        if(connectionOnly) {
+            automation=new CrawlAutomation("","","","","","","","",automation.allowedOrigins(),
+                    java.util.List.of(),java.util.List.of(),1,1,30,1440,900,automation.pageLoadTimeoutSeconds());
+            request=new SetupRequest(request.targetUrl(),"NONE","","","","",request.testEnvironmentConfirmed(),automation,null,false);
+        }
+        validate(request); automation.validate(request.targetUrl().trim(),request.loginMethod());
+        String secret=null;
+        if(Set.of("FORM_AUTO","BASIC_AUTH").contains(request.loginMethod())) {
+            if(request.password()!=null && !request.password().isEmpty()) secret=credentialCipher.encrypt(id,request.password());
+            else {
+                var old=jdbc.query("SELECT target_url,login_method,automation_config::text,password_ciphertext FROM playwright_crawl_setups WHERE submission_id=? AND member_id=?",
+                        (rs,n)->new SavedLogin(rs.getString(1),rs.getString(2),readAutomation(rs.getString(3)),rs.getString(4)),id,member)
+                        .stream().findFirst().orElse(null);
+                if(old!=null && old.method().equals(request.loginMethod()) && old.automation().username().equals(automation.username())
+                        && CrawlAutomation.origin(old.target()).equals(CrawlAutomation.origin(request.targetUrl().trim()))
+                        && loginOrigin(old.target(),old.automation()).equals(loginOrigin(request.targetUrl().trim(),automation))) secret=old.ciphertext();
+            }
+            if(secret==null) throw error(HttpStatus.BAD_REQUEST,"PLAYWRIGHT_PASSWORD_REQUIRED","로그인 비밀번호를 입력해 주세요.");
+        }
+        return new Prepared(new SetupView(request.targetUrl().trim(),request.loginMethod(),clean(request.loginInstructions()),
+                clean(request.testAccountLabel()),clean(request.crawlScopeNotes()),clean(request.testDataNotes()),
+                request.testEnvironmentConfirmed(),false,"DRAFT",automation,secret!=null),secret);
+    }
+
     private Verified verifyReadySubmission(UUID id, long memberId) {
         var submission = submissions.findById(SubmissionId.of(id))
                 .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "SUBMISSION_NOT_FOUND", "문서 세트를 찾을 수 없습니다."));
