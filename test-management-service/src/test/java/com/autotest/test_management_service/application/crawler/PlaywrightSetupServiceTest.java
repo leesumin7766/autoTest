@@ -19,7 +19,7 @@ class PlaywrightSetupServiceTest {
     private PlaywrightSetupService service(JdbcTemplate jdbc) {
         return new PlaywrightSetupService(jdbc, new ObjectMapper(), mock(SubmissionPersistenceService.class),
                 mock(SubmissionRepository.class), mock(ProductDescriptionJobRepository.class),
-                mock(PlatformTransactionManager.class));
+                mock(PlatformTransactionManager.class), mock(PlaywrightCredentialCipher.class));
     }
 
     private PlaywrightSetupService.SetupRequest request(String url, boolean confirmed) {

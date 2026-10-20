@@ -1,6 +1,5 @@
 package com.autotest.test_management_service.application.crawler;
 
-import java.net.URI;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -22,7 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class PlaywrightSetupService {
-    private static final Set<String> LOGIN_METHODS = Set.of("NONE", "MANUAL", "SSO", "OTHER");
+    private static final Set<String> LOGIN_METHODS = Set.of("NONE", "FORM_AUTO", "BASIC_AUTH", "MANUAL", "SSO", "OTHER");
     private static final Pattern SECRET_ASSIGNMENT = Pattern.compile(
             "(?i)\\b(password|passwd|pwd|token|cookie|secret|authorization|api[-_ ]?key)\\b\\s*[:=]\\s*\\S+");
     private final JdbcTemplate jdbc;
@@ -31,16 +30,19 @@ public class PlaywrightSetupService {
     private final SubmissionRepository repository;
     private final ProductDescriptionJobRepository verdicts;
     private final TransactionTemplate transactions;
+    private final PlaywrightCredentialCipher credentialCipher;
 
     public PlaywrightSetupService(JdbcTemplate jdbc, ObjectMapper mapper,
             SubmissionPersistenceService submissions, SubmissionRepository repository,
-            ProductDescriptionJobRepository verdicts, PlatformTransactionManager transactionManager) {
+            ProductDescriptionJobRepository verdicts, PlatformTransactionManager transactionManager,
+            PlaywrightCredentialCipher credentialCipher) {
         this.jdbc = jdbc;
         this.mapper = mapper;
         this.submissions = submissions;
         this.repository = repository;
         this.verdicts = verdicts;
         this.transactions = new TransactionTemplate(transactionManager);
+        this.credentialCipher = credentialCipher;
     }
 
     private ProductDescriptionException error(HttpStatus status, String code, String message) {
@@ -87,19 +89,24 @@ public class PlaywrightSetupService {
         String currentDigest = verifyReadySubmission(id, memberId).digest();
         var rows = jdbc.query("""
                 SELECT target_url, login_method, login_instructions, test_account_label,
-                       crawl_scope_notes, test_data_notes, test_environment_confirmed, document_digest
+                       crawl_scope_notes, test_data_notes, test_environment_confirmed, document_digest,
+                       automation_config::text, password_ciphertext IS NOT NULL AS password_configured
                 FROM playwright_crawl_setups WHERE submission_id=? AND member_id=?
                 """, (rs, row) -> new SetupView(rs.getString("target_url"), rs.getString("login_method"),
                         rs.getString("login_instructions"), rs.getString("test_account_label"),
                         rs.getString("crawl_scope_notes"), rs.getString("test_data_notes"),
                         rs.getBoolean("test_environment_confirmed"),
                         !currentDigest.equals(rs.getString("document_digest").trim()),
-                        "READY_TO_CRAWL"), id, memberId);
+                        "CONFIGURED", readAutomation(rs.getString("automation_config")),
+                        rs.getBoolean("password_configured")), id, memberId);
         return rows.stream().findFirst().orElse(null);
     }
 
     public SetupView save(UUID id, long memberId, SetupRequest request) {
         validate(request);
+        CrawlAutomation automation = request.automation() == null
+                ? CrawlAutomation.defaults() : request.automation().normalized();
+        automation.validate(request.targetUrl().trim(), request.loginMethod());
         Verified initial = verifyReadySubmission(id, memberId);
         transactions.execute(tx -> {
             repository.findByIdForUpdate(SubmissionId.of(id))
@@ -107,23 +114,50 @@ public class PlaywrightSetupService {
             Verified current = verifyReadySubmission(id, memberId);
             if (!initial.digest().equals(current.digest()))
                 throw error(HttpStatus.CONFLICT, "DOCUMENT_VERSION_MISMATCH", "준비 설정을 저장하는 동안 문서가 변경되었습니다.");
+            var previous = jdbc.query("""
+                    SELECT target_url, login_method, automation_config::text, password_ciphertext
+                    FROM playwright_crawl_setups WHERE submission_id=? AND member_id=?
+                    """, (rs, row) -> new SavedLogin(rs.getString("target_url"), rs.getString("login_method"),
+                            readAutomation(rs.getString("automation_config")), rs.getString("password_ciphertext")), id, memberId)
+                    .stream().findFirst().orElse(null);
+            String password = request.password();
+            String ciphertext = null;
+            boolean automatic = Set.of("FORM_AUTO", "BASIC_AUTH").contains(request.loginMethod());
+            if (automatic && !request.clearPassword()) {
+                if (password != null && !password.isEmpty()) {
+                    ciphertext = credentialCipher.encrypt(id, password);
+                } else if (previous != null && previous.ciphertext() != null
+                        && previous.method().equals(request.loginMethod())
+                        && previous.automation().username().equals(automation.username())
+                        && CrawlAutomation.origin(previous.target()).equals(CrawlAutomation.origin(request.targetUrl().trim()))
+                        && loginOrigin(previous.target(), previous.automation()).equals(loginOrigin(request.targetUrl().trim(), automation))) {
+                    ciphertext = previous.ciphertext();
+                } else {
+                    throw error(HttpStatus.BAD_REQUEST, "PLAYWRIGHT_PASSWORD_REQUIRED",
+                            "자동 로그인 비밀번호를 입력해 주세요. 계정이나 로그인 사이트를 바꾸면 다시 입력해야 합니다.");
+                }
+            }
+            if (automatic && ciphertext == null)
+                throw error(HttpStatus.BAD_REQUEST, "PLAYWRIGHT_PASSWORD_REQUIRED",
+                        "비밀번호를 삭제하려면 로그인 방식을 변경해 주세요.");
             jdbc.update("""
                     INSERT INTO playwright_crawl_setups(
                         submission_id, member_id, target_url, login_method, login_instructions,
                         test_account_label, crawl_scope_notes, test_data_notes,
-                        test_environment_confirmed, document_digest, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
+                        test_environment_confirmed, document_digest, automation_config, password_ciphertext, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, now())
                     ON CONFLICT (submission_id) DO UPDATE SET
                         member_id=EXCLUDED.member_id, target_url=EXCLUDED.target_url,
                         login_method=EXCLUDED.login_method, login_instructions=EXCLUDED.login_instructions,
                         test_account_label=EXCLUDED.test_account_label, crawl_scope_notes=EXCLUDED.crawl_scope_notes,
                         test_data_notes=EXCLUDED.test_data_notes,
                         test_environment_confirmed=EXCLUDED.test_environment_confirmed,
-                        document_digest=EXCLUDED.document_digest, updated_at=now()
+                        document_digest=EXCLUDED.document_digest, automation_config=EXCLUDED.automation_config,
+                        password_ciphertext=EXCLUDED.password_ciphertext, updated_at=now()
                     """, id, memberId, request.targetUrl().trim(), request.loginMethod(),
                     clean(request.loginInstructions()), clean(request.testAccountLabel()),
                     clean(request.crawlScopeNotes()), clean(request.testDataNotes()),
-                    request.testEnvironmentConfirmed(), current.digest());
+                    request.testEnvironmentConfirmed(), current.digest(), writeAutomation(automation), ciphertext);
             return null;
         });
         return get(id, memberId);
@@ -131,22 +165,42 @@ public class PlaywrightSetupService {
 
     private String clean(String value) { return value == null ? "" : value.trim(); }
 
+    private record SavedLogin(String target, String method, CrawlAutomation automation, String ciphertext) { }
+
+    private String loginOrigin(String target, CrawlAutomation automation) {
+        return CrawlAutomation.origin(automation.loginUrl().isBlank() ? target : automation.loginUrl());
+    }
+
+    private CrawlAutomation readAutomation(String json) {
+        if (json == null || "{}".equals(json)) return CrawlAutomation.defaults();
+        try { return mapper.readValue(json, CrawlAutomation.class).normalized(); }
+        catch (Exception invalid) {
+            throw error(HttpStatus.INTERNAL_SERVER_ERROR, "PLAYWRIGHT_CONFIG_INVALID", "저장된 자동화 설정을 읽을 수 없습니다.");
+        }
+    }
+
+    private String writeAutomation(CrawlAutomation config) {
+        try { return mapper.writeValueAsString(config); }
+        catch (Exception invalid) { throw error(HttpStatus.BAD_REQUEST, "PLAYWRIGHT_AUTOMATION_INVALID", "자동화 설정을 확인해 주세요."); }
+    }
+
     private void validate(SetupRequest request) {
         if (request == null || request.targetUrl() == null || request.loginMethod() == null)
             throw error(HttpStatus.BAD_REQUEST, "PLAYWRIGHT_SETUP_INVALID", "접속 URL과 로그인 방식을 입력해 주세요.");
         String url = request.targetUrl().trim();
         try {
-            URI uri = URI.create(url);
-            if (url.length() > 2048 || uri.getHost() == null
-                    || !("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
-                    || uri.getUserInfo() != null || uri.getRawQuery() != null || uri.getFragment() != null)
-                throw new IllegalArgumentException("unsupported URL");
+            CrawlAutomation.webUrl(url);
         } catch (IllegalArgumentException invalid) {
             throw error(HttpStatus.BAD_REQUEST, "PLAYWRIGHT_URL_INVALID",
                     "http 또는 https URL을 입력하세요. URL에 계정정보, query parameter, fragment를 포함하지 마세요.");
         }
         if (!LOGIN_METHODS.contains(request.loginMethod()))
             throw error(HttpStatus.BAD_REQUEST, "PLAYWRIGHT_LOGIN_METHOD_INVALID", "로그인 방식을 선택해 주세요.");
+        if (request.password() != null && request.password().length() > 4096)
+            throw error(HttpStatus.BAD_REQUEST, "PLAYWRIGHT_SETUP_TOO_LARGE", "비밀번호가 허용 길이를 초과했습니다.");
+        if (request.password() != null && !request.password().isEmpty()
+                && !Set.of("FORM_AUTO", "BASIC_AUTH").contains(request.loginMethod()))
+            throw error(HttpStatus.BAD_REQUEST, "PLAYWRIGHT_AUTOMATION_INVALID", "비밀번호는 자동 로그인 방식에서만 입력해 주세요.");
         if (length(request.loginInstructions()) > 2000 || length(request.testAccountLabel()) > 160
                 || length(request.crawlScopeNotes()) > 4000 || length(request.testDataNotes()) > 4000)
             throw error(HttpStatus.BAD_REQUEST, "PLAYWRIGHT_SETUP_TOO_LARGE", "설정 메모가 허용 길이를 초과했습니다.");
@@ -164,8 +218,16 @@ public class PlaywrightSetupService {
 
     public record SetupRequest(String targetUrl, String loginMethod, String loginInstructions,
             String testAccountLabel, String crawlScopeNotes, String testDataNotes,
-            boolean testEnvironmentConfirmed) { }
+            boolean testEnvironmentConfirmed, CrawlAutomation automation, String password, boolean clearPassword) {
+        public SetupRequest(String targetUrl, String loginMethod, String loginInstructions,
+                String testAccountLabel, String crawlScopeNotes, String testDataNotes, boolean testEnvironmentConfirmed) {
+            this(targetUrl, loginMethod, loginInstructions, testAccountLabel, crawlScopeNotes, testDataNotes,
+                    testEnvironmentConfirmed, null, null, false);
+        }
+        @Override public String toString() { return "PlaywrightSetupRequest[redacted]"; }
+    }
     public record SetupView(String targetUrl, String loginMethod, String loginInstructions,
             String testAccountLabel, String crawlScopeNotes, String testDataNotes,
-            boolean testEnvironmentConfirmed, boolean stale, String status) { }
+            boolean testEnvironmentConfirmed, boolean stale, String status, CrawlAutomation automation,
+            boolean passwordConfigured) { }
 }

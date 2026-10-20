@@ -45,6 +45,8 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in .env}
 
   test-management-service:
+    volumes:
+      - playwright_credentials:/app/.runtime/playwright
     build:
       context: .
       dockerfile: test-management-service/Dockerfile
@@ -170,6 +172,7 @@ services:
       - ./crawler-service:/app
 
 volumes:
+  playwright_credentials:
   generation_cache:
   ollama_data:
   db_data:

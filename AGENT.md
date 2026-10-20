@@ -33,7 +33,7 @@ docker-compose.yml이 서비스 구성의 기준이다. 사용자 제공 Docker 
 - Docker 내부 서비스 간 접근은 db:5432, seaweedfs:8333, ai-service:8005 등 Compose 서비스명을 사용한다. 컨테이너의 localhost는 해당 컨테이너 자신이다.
 - Java 서비스에는 소스 bind mount가 없다. 소스 변경 후 이미지 재빌드·컨테이너 재생성이 필요하다.
 - ai-service와 crawler-service 소스는 /app에 bind mount된다. 변경 반영에 재시작이 필요한지는 실행 명령을 확인한다. 의존성 변경 시 이미지를 재빌드한다.
-- crawler-service의 현재 `/crawl`은 임시 Chromium으로 URL을 열고 HTTP 요청 목록만 수집한다. 로그인 세션·DOM/접근성 트리·스크린샷·허용 호스트 검사는 아직 없다. Playwright 준비 API는 URL 및 비밀정보가 아닌 로그인/계정/테스트 데이터 메모만 저장하며 실제 브라우저를 실행하지 않는다.
+- crawler-service의 현재 `/crawl`은 임시 Chromium으로 URL을 열고 HTTP 요청 목록만 수집한다. 로그인 세션·DOM/접근성 트리·스크린샷·허용 호스트 검사는 아직 없다. Playwright 준비 API는 자동 로그인 계정과 구조화된 수집 설정을 저장하되 실제 브라우저는 실행하지 않는다. 비밀번호는 전용 필드로 받고 AES-GCM 암호화하며 조회/응답/로그/LLM 입력에 포함하지 않는다. 키는 DB와 분리된 `playwright_credentials` 볼륨에 보존한다. 자세한 계약은 README의 Jev 이후 Playwright 준비 흐름을 따른다.
 - db_data와 seaweed-data 볼륨에 데이터를 보존한다. 업로드 오류 해결을 위해 볼륨을 삭제하지 않는다.
 - depends_on만으로 애플리케이션 API 준비 완료를 보장하지 않는다. DB는 service_healthy 조건이 지정된 서비스에서 healthcheck를 기다린다.
 - `test-management-service`는 `/actuator/health` healthcheck를 제공하고 Gateway는 해당 서비스가 healthy가 된 후 시작한다.

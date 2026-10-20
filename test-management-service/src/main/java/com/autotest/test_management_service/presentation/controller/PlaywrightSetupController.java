@@ -33,7 +33,8 @@ public class PlaywrightSetupController {
     @PutMapping
     public ResponseEntity<SetupResponse> save(@PathVariable UUID submissionId, @RequestHeader("X-Member-Id") long memberId,
             @RequestBody PlaywrightSetupService.SetupRequest request) {
-        return ResponseEntity.ok(new SetupResponse(service.save(submissionId, memberId, request)));
+        return ResponseEntity.ok().header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(new SetupResponse(service.save(submissionId, memberId, request)));
     }
 
     @ExceptionHandler(ProductDescriptionException.class)
