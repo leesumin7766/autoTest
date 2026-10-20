@@ -1,0 +1,55 @@
+import asyncio
+import os
+import unittest
+from unittest.mock import patch
+from fastapi.testclient import TestClient
+from functional_menu import Request, baseline, validate_rows, prompt, generate
+from product_description.ollama_provider import OllamaLlmProvider
+from main import app
+
+class FunctionalMenuTest(unittest.TestCase):
+    def setUp(self):
+        self.sources=[{'id':'menu-a','kind':'MENU','menuKey':'a','path':['Global','System','Services'],'location':'SIDEBAR','text':'Global → System → Services'},
+                      {'id':'doc-a','kind':'DOCUMENT','role':'FUNCTION_LIST','text':'서비스 목록을 조회하고 서비스를 검색할 수 있다.'}]
+        self.row={'menuPath':['System','Services'],'functionName':'서비스 조회','menuDescription':'서비스 목록을 조회하는 기능','location':'SIDEBAR','matchedMenuKeys':['a'],
+                  'evidence':[{'sourceId':'menu-a','quote':'Services'},{'sourceId':'doc-a','quote':'서비스 목록을 조회'}],'reviewNotes':[]}
+    def test_exact_quotes_and_menu_match_are_required(self):
+        sources={source['id']:source for source in self.sources}
+        self.assertEqual(len(validate_rows([self.row],sources,'doc-a')),1)
+        bad={**self.row,'evidence':[{'sourceId':'doc-a','quote':'존재하지 않는 기능'}]}
+        with self.assertRaises(ValueError):validate_rows([bad],sources)
+        with self.assertRaises(ValueError):validate_rows([{**self.row,'matchedMenuKeys':['unknown']}],sources)
+        with self.assertRaises(ValueError):validate_rows([{**self.row,'menuPath':['1','2','3','4']}],sources)
+    def test_schema_examples_and_mock_are_explicit(self):
+        request=Request(jobId='test',productName='Example',evidence=self.sources)
+        self.assertEqual(len(baseline(self.sources)),1)
+        self.assertIn('스케줄',prompt(request))
+        with patch.dict(os.environ,{'LLM_MODE':'mock'}):
+            result=asyncio.run(generate(request))
+        self.assertEqual(result['generationMode'],'MOCK')
+        self.assertTrue(result['rows'])
+    def test_internal_authentication_and_safe_errors(self):
+        with patch.dict(os.environ,{'PRODUCT_DESCRIPTION_INTERNAL_TOKEN':'test-functional','LLM_MODE':'mock'}):
+            client=TestClient(app)
+            body={'jobId':'test','productName':'Example','evidence':self.sources}
+            self.assertEqual(client.post('/api/v1/functional-menus/generate',json=body).status_code,403)
+            response=client.post('/api/v1/functional-menus/generate',json=body,headers={'X-Internal-Token':'test-functional'})
+            self.assertEqual(response.status_code,200)
+            self.assertEqual(response.json()['generationMode'],'MOCK')
+    def test_missing_documented_action_is_recovered_with_grounded_span_ids(self):
+        class SmallModel(OllamaLlmProvider):
+            def __init__(self):pass
+            def input_budget_for(self,*args):return 100000
+            async def _call(self,instructions,payload,schema,num_predict=None):
+                focused=schema['properties']['rows']['items']['properties']['functionName'].get('pattern','')
+                verb='조회' if '조회' in focused else '삭제'
+                return {'rows':[{'menuPath':[],'functionName':'스케줄 '+verb,'menuDescription':'스케줄을 '+verb+'하는 기능','location':'UNKNOWN','matchedMenuKeys':[],
+                    'evidenceSpanIds':[payload['sourceSpans'][0]['spanId']],'reviewNotes':[]}]}
+        request=Request(jobId='coverage-test',productName='Example',evidence=[{'id':'doc','kind':'DOCUMENT','role':'FUNCTION_LIST','text':'스케줄을 조회하고 스케줄을 삭제할 수 있습니다.'}])
+        with patch('functional_menu.provider_from_env',return_value=SmallModel()):
+            result=asyncio.run(generate(request))
+        descriptions=' '.join(row['menuDescription'] for row in result['rows'])
+        self.assertIn('조회',descriptions);self.assertIn('삭제',descriptions)
+        self.assertTrue(all(row['evidence'][0]['sourceId']=='doc' for row in result['rows']))
+
+if __name__=='__main__':unittest.main()

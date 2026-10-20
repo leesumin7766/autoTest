@@ -72,6 +72,10 @@ public class RemoteCrawlController {
     public ResponseEntity<JsonNode> evidence(@PathVariable UUID submission,@PathVariable UUID job,@PathVariable int index,@RequestHeader("X-Member-Id") long member) {
         return response(service.evidence(submission,member,job,index));
     }
+    @GetMapping("/api/submissions/{submission}/playwright-crawls/{job}/menu-tree")
+    public ResponseEntity<?> menuTree(@PathVariable UUID submission,@PathVariable UUID job,@RequestHeader("X-Member-Id") long member) {
+        return response(service.menuTree(submission,member,job));
+    }
     @GetMapping("/api/submissions/{submission}/playwright-crawls/{job}/pages/{index}/screenshot")
     public ResponseEntity<byte[]> screenshot(@PathVariable UUID submission,@PathVariable UUID job,@PathVariable int index,@RequestHeader("X-Member-Id") long member) {
         return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL,"no-store").header("X-Content-Type-Options","nosniff")

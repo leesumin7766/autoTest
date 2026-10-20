@@ -24,7 +24,7 @@ async function runJob(config, job, dependencies = {}) {
       try { await event({ ...page, event: 'page' }); }
       catch (error) { if (error.status === 409) throw error; await event({ ...page, event: 'page' }); }
     } });
-    await event({ event: 'complete', stopReason: result.stopReason, ...(check ? { result } : {}) });
+    await event({ event: 'complete', stopReason: result.stopReason, result });
   } catch (error) {
     if (error.message !== 'CRAWL_LEASE_LOST')
       await event({ event: 'failed', errorCode: safeErrors.has(error.message) ? error.message : 'CRAWL_FAILED' }).catch(() => {});

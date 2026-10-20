@@ -1,12 +1,13 @@
 import { browserCheckMessage } from './browserCheckMessages'
+import { CapturedMenuTreePanel } from './CapturedMenuTreePanel'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 
 type Agent = { agentId: string; name: string; online: boolean; busy: boolean }
 export type BrowserCheck = { jobId: string; status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELED'
   agentName: string; pageCount: number; errorCode: string | null; stopReason: string | null
   result?: { httpStatus: number; elapsedMs: number; loginVerified: boolean } }
-type Job = BrowserCheck
-type Page = { pageIndex: number; url: string; title: string }
+type Job = BrowserCheck & { crawlResult?: { incompleteCount: number; navigationFailureCount: number; noChangeCount: number; uniqueScreenCount: number } }
+type Page = { pageIndex: number; url: string; title: string; screenState?: { screenKey?: string; readiness?: string; frames?: unknown[] }; transition?: { menuPath?: string[]; outcome?: string } }
 type View = { job: Job | null; pages: Page[]; checks?: Partial<Record<CheckType, BrowserCheck>> }
 export type CheckType = 'CONNECTION' | 'LOGIN'
 export type BrowserExecutionHandle = { runCheck: (type: CheckType, draft: unknown) => Promise<void>; invalidate: (type: 'ALL' | 'LOGIN') => void }
@@ -36,14 +37,15 @@ export const RemoteCrawlPanel = forwardRef<BrowserExecutionHandle, Props>(functi
   const request = useCallback(async (url: string, options?: RequestInit) => {
     const response = await fetch(url, { ...options, headers: { 'X-Member-Id': memberId,
       ...(options?.body ? { 'Content-Type': 'application/json' } : {}), ...options?.headers } })
-    const body = await response.json()
+    let body
+    try { body = await response.json() } catch { throw new Error('서비스에 다시 연결하고 있습니다. 잠시 후 다시 시도해 주세요.') }
     if (!response.ok) throw new Error(body.message || '원격 실행 요청을 처리하지 못했습니다.')
     return body
   }, [memberId])
   const refresh = useCallback(async (signal?: AbortSignal) => {
     const [list, status] = await Promise.all([request('/api/crawl-agents', { signal }), request(base, { signal })])
     if (!signal?.aborted) {
-      setAgents(list.agents); setView(status)
+      setAgents(list.agents); setView(status); setError('')
       const checks: Partial<Record<CheckType, BrowserCheck>> = {}
       for (const type of ['CONNECTION', 'LOGIN'] as const) if (issued.current[type]?.id === status.checks?.[type]?.jobId && issued.current[type]) checks[type] = status.checks[type]
       onChecks(checks)
@@ -151,12 +153,19 @@ export const RemoteCrawlPanel = forwardRef<BrowserExecutionHandle, Props>(functi
         setView(await request(`${base}/${activeJob!.jobId}/cancel`, { method: 'POST' })); await refresh()
       })}>수집 중단</button>}
     </div>
-    <p className="playwright-description">수집은 메뉴 링크와 화면 조회를 중심으로 진행합니다. 로그인 이후 데이터 입력·삭제·결제 폼을 제출하지 않습니다. 수집 결과를 문서와 합쳐 메뉴트리·TC를 생성하는 연결은 다음 단계입니다.</p>
+    <p className="playwright-description">수집은 메뉴와 화면 조회를 중심으로 진행합니다. 로그인 이후 데이터 입력·삭제·결제 폼을 제출하지 않습니다. 아래 통합 메뉴트리에서 기능리스트·매뉴얼과 함께 분석할 수 있습니다.</p>
     {view.job && <p role="status">{view.job.agentName} · {({ QUEUED: '실행기 작업 수신 대기', RUNNING: '화면 수집 중', COMPLETED: '수집 완료', FAILED: '수집 실패', CANCELED: '수집 중단' })[view.job.status]}
       {' · '}{view.job.pageCount}개 화면{view.job.stopReason && ` · ${stopMessages[view.job.stopReason] || view.job.stopReason}`}</p>}
     {view.job?.errorCode && <p className="error-copy" role="alert">{browserCheckMessage(view.job.errorCode)}</p>}
+    {view.job?.crawlResult && <p>확인된 화면 상태 {view.job.crawlResult.uniqueScreenCount}개 · 로딩 미완료 {view.job.crawlResult.incompleteCount}개
+      {' · '}이동 실패 {view.job.crawlResult.navigationFailureCount}개 · 변화 미확인 {view.job.crawlResult.noChangeCount}개</p>}
+    {view.job && view.pages.length > 0 && <CapturedMenuTreePanel key={view.job.jobId} base={base} jobId={view.job.jobId}
+      memberId={memberId} busy={busy} showPage={showPage} />}
     {view.pages.length > 0 && <ul className="crawl-page-list">{view.pages.map(page => <li key={page.pageIndex}>
       <button type="button" disabled={busy} onClick={() => void showPage(page)}>{page.pageIndex + 1}. {page.title || '제목 없음'} · 화면·근거 보기</button>
+      <small>{page.transition?.menuPath?.join(' → ') || '시작 화면'} · {page.screenState?.readiness === 'LOAD_TIMEOUT' ? '로딩 미완료 · 진단 캡처'
+        : page.transition?.outcome === 'NO_STATE_CHANGE' ? '클릭 후 변화 미확인'
+        : page.screenState?.readiness === 'READY' ? '로딩 완료 확인' : '이전 수집 · 상태 근거 없음'}</small>
       <small>{page.url}</small></li>)}</ul>}
     {error && <p className="error-copy" role="alert">{error}</p>}
     <dialog ref={preview} className="crawl-preview"><h3>{pageTitle}</h3>

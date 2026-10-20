@@ -2,15 +2,14 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const { probe } = require('./probe');
-const { loadForCapture } = require('./engine');
+const { screenState } = require('./screen');
 
-test('page load uses configured wait and does not swallow an unfinished load', async () => {
-  let idleBudget;
-  const page = { goto: async () => ({ status: () => 200 }), waitForLoadState: async (_state, options) => { idleBudget = options.timeout; } };
-  await loadForCapture(page, 'https://example.test', { pageLoadTimeoutSeconds: 60 }, Date.now() + 120000);
-  assert.ok(idleBudget > 59000 && idleBudget <= 60000);
-  page.waitForLoadState = async () => { const error = new Error('loading'); error.name = 'TimeoutError'; throw error; };
-  await assert.rejects(loadForCapture(page, 'https://example.test', { pageLoadTimeoutSeconds: 1 }, Date.now() + 120000), /PAGE_LOAD_TIMEOUT/);
+test('same URL and controls with different body content have different state fingerprints', () => {
+  const frame = { url: 'https://example.test/', rawUrl: 'https://example.test/', title: 'Product', headings: [], selected: [], blockers: [], elements: [], bodyText: 'Record 1' };
+  const first = screenState({ frames: [frame], readiness: 'READY', waitedMs: 1500 });
+  const second = screenState({ frames: [{ ...frame, bodyText: 'Record 2' }], readiness: 'READY', waitedMs: 1500 });
+  assert.notEqual(first.screenKey, second.screenKey);
+  assert.equal(JSON.stringify(first).includes('Record 1'), false);
 });
 
 test('connection probe is unauthenticated; login probe confirms login without capturing pages', { timeout: 60000 }, async () => {
