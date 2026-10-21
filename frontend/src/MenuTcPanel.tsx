@@ -59,7 +59,8 @@ export function MenuTcPanel({ submissionId, memberId }: { submissionId: string; 
     <p>메뉴트리의 기능구분에 따라 시험 항목을 생성합니다. 비적용 항목도 포함하며 P/F/N/A는 시험 실행 후 판정합니다.</p>
     {error && <p className="global-notice error-copy" role="alert">{error}</p>}
     {loading && <p role="status"><span className="spinner" /> 승인 메뉴트리와 TC를 확인하고 있습니다…</p>}
-    <div className="tc-field"><span>이미 만들어진 메뉴트리 업로드</span>
+    <div className="tc-field tc-upload"><span>이미 만들어진 메뉴트리 업로드</span>
+      <div className="document-actions"><label className="file-picker">
       <input type="file" accept=".xlsx,.json" aria-label="메뉴트리 파일 업로드" disabled={busy || loading} onChange={event => {
         const input = event.currentTarget, file = input.files?.[0]; if (!file) return
         void action(async () => {
@@ -69,7 +70,7 @@ export function MenuTcPanel({ submissionId, memberId }: { submissionId: string; 
           if (!response.ok) throw new Error(body.message || '메뉴트리를 업로드하지 못했습니다.')
           setSelectedMenu(body.job.jobId); await load()
         }).finally(() => { input.value = '' })
-      }} />
+      }} /><span>파일 선택</span></label></div>
       <small>메뉴트리 탭에서 내려받은 .xlsx 또는 rows가 담긴 .json을 올리면 화면 수집 없이 TC 생성에 사용합니다. 자료 등록은 필요합니다.</small></div>
     <label className="tc-field">메뉴트리 선택<select value={selectedMenu || menu?.jobId || ''} disabled={busy || loading} onChange={event => setSelectedMenu(event.target.value)}>
       {!menuView.history.length && <option value="">작성한 메뉴트리가 없습니다</option>}

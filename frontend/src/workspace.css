@@ -147,3 +147,14 @@
 .menu-tc-panel .tc-table { min-width: 1100px; width: 100%; }
 .menu-tc-panel .tc-table :is(td,th) { border-color: var(--line); }
 .menu-tc-panel .tc-table th { background: #f9fafb; }
+.tc-upload { padding: 12px 14px; border: 1px dashed var(--line); border-radius: 4px; background: #fafafa; }
+.tc-upload > span { font-weight: 500; font-size: 13px; }
+.tc-upload small { color: #6b7280; line-height: 1.6; }
+.tc-upload .file-picker { min-width: 94px; }
+.menu-tc-panel .tc-field select, .menu-tc-panel .tc-field input[type="search"] { width: 100%; max-width: 100%; }
+.menu-tc-panel .section-heading { gap: 12px; flex-wrap: wrap; }
+.tc-output-toolbar { align-items: flex-end; }
+.tc-output-toolbar label { flex: 1 1 280px; }
+.tc-output-toolbar button, .tc-generate-toolbar button, .tc-pagination button { min-width: 96px; white-space: nowrap; }
+.tc-pagination { justify-content: center; }
+.tc-table td .quiet-button { white-space: nowrap; }
