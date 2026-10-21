@@ -2,6 +2,27 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const { crawl } = require('./engine');
+const { navigation, clickNavigation } = require('./navigation');
+const { chromium } = require('playwright');
+
+test('preferences remain observed and semantic menu replay survives DOM reordering', async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.route('https://fixture.example/**', route => route.fulfill({body:'<html></html>',contentType:'text/html'}));
+    await page.goto('https://fixture.example/');
+    await page.setContent('<aside><button>Collapse sidebar</button><button>한국어</button><button>Dark Mode</button><nav><a href="/jobs">Jobs</a><button role="tab">Details</button></nav></aside><nav aria-label="pagination"><button>Next page</button></nav><h1>Initial</h1>');
+    await page.locator('[role="tab"]').evaluate(node => node.onclick=()=>document.querySelector('h1').textContent='Details loaded');
+    const policy = { origins: new Set(['https://fixture.example']), page: () => true };
+    const nodes = await navigation(page, policy);
+    assert.ok(!nodes.some(node=>node.path.at(-1)==='Next page'));
+    for (const label of ['Collapse sidebar','한국어','Dark Mode']) assert.equal(nodes.find(node=>node.path.at(-1)===label).canExplore,false);
+    const details=nodes.find(node=>node.path.at(-1)==='Details');
+    await page.locator('aside nav').evaluate(node=>node.prepend(document.createElement('button')));
+    await clickNavigation(page,details._action,policy,Date.now()+5000);
+    assert.equal(await page.locator('h1').innerText(),'Details loaded');
+  } finally { await browser.close(); }
+});
 
 test('same-URL iframe tabs keep separate click evidence and await asynchronous content', { timeout: 90000 }, async () => {
   const server = http.createServer((req, res) => {

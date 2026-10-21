@@ -29,7 +29,7 @@ public class FunctionalMenuService {
     private final JdbcTemplate jdbc;private final ObjectMapper mapper;private final SubmissionPersistenceService persistence;
     private final SubmissionRepository submissions;private final PlaywrightSetupService setups;private final FunctionalMenuValidator validator;private final FunctionalMenuExcel excel;
     private final TransactionTemplate tx;private final String aiUrl,token;
-    private final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+    private final HttpClient http=HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(5)).build();
     private final ExecutorService executor=Executors.newFixedThreadPool(2);
     private final ConcurrentMap<UUID,Future<?>> tasks=new ConcurrentHashMap<>();
     public FunctionalMenuService(JdbcTemplate jdbc,ObjectMapper mapper,SubmissionPersistenceService persistence,SubmissionRepository submissions,
@@ -53,6 +53,10 @@ public class FunctionalMenuService {
         ObjectNode input=mapper.createObjectNode().put("productName",product).put("documentDigest",digest).put("crawlJobId",crawl.toString()).put("rulesVersion",VERSION);
         input.put("targetUrl",jobs.getFirst().get(2));
         var evidence=input.putArray("evidence");var warnings=input.putArray("warnings");
+        JsonNode coverage=parse(jdbc.queryForObject("SELECT COALESCE(crawl_result,'{}'::jsonb)::text FROM playwright_crawl_jobs WHERE job_id=?",String.class,crawl));
+        input.set("crawlCoverage",coverage);
+        if(coverage.path("navigationFailureCount").asInt()>0 || coverage.path("incompleteCount").asInt()>0 || coverage.path("noChangeCount").asInt()>0 || "INCOMPLETE".equals(coverage.path("coverageStatus").asText()))
+            warnings.add("화면 수집에 실패·미확인 항목이 있습니다. 전체 메뉴를 확인한 결과가 아니므로 문서 기능의 화면 연결을 검토하세요.");
         for(var doc:persistence.deliveryDocuments(persistence.findDocumentsBySubmissionId(SubmissionId.of(id)))) {
             if(!Set.of("FUNCTION_LIST","MANUAL").contains(doc.role().name()))continue;
             chunks(evidence,doc.extractedText(),mapper.createObjectNode().put("kind","DOCUMENT").put("fileId",doc.fileId().toString()).put("role",doc.role().name()).put("filename",doc.originalFilename()),"doc:"+doc.fileId());
@@ -121,7 +125,10 @@ public class FunctionalMenuService {
         if(token.isBlank())throw error(HttpStatus.SERVICE_UNAVAILABLE,"INTERNAL_AUTH_NOT_CONFIGURED","생성 서비스 인증 설정이 없습니다.");
         try{var response=http.send(HttpRequest.newBuilder(URI.create(aiUrl+"/api/v1/functional-menus/"+path)).timeout(timeout).header("X-Internal-Token",token).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body.toString())).build(),HttpResponse.BodyHandlers.ofString());
             if(response.statusCode()/100!=2){String detail=parse(response.body()).path("detail").asText();String code=detail.matches("[A-Z_]{5,80}")?detail:"MENU_GENERATION_FAILED";throw error(HttpStatus.BAD_GATEWAY,code,"메뉴트리 생성 응답을 검증하지 못했습니다. 오류 코드: "+code);}return parse(response.body());
-        }catch(ProductDescriptionException known){throw known;}catch(Exception failed){throw error(HttpStatus.BAD_GATEWAY,"MENU_SERVICE_UNAVAILABLE","생성 서비스에 연결하지 못했거나 중단되었습니다.");}
+        }catch(ProductDescriptionException known){throw known;}
+        catch(java.net.http.HttpTimeoutException failed){throw error(HttpStatus.GATEWAY_TIMEOUT,"MENU_SERVICE_TIMEOUT","생성 서비스 응답 대기 시간을 초과했습니다.");}
+        catch(InterruptedException failed){Thread.currentThread().interrupt();throw error(HttpStatus.BAD_GATEWAY,"MENU_SERVICE_INTERRUPTED","생성 요청이 중단되었습니다.");}
+        catch(java.io.IOException failed){throw error(HttpStatus.BAD_GATEWAY,"MENU_SERVICE_UNAVAILABLE","생성 서비스에 연결하지 못했습니다.");}
     }
     private ArrayNode ensureMenus(JsonNode rows,JsonNode input){
         if(!rows.isArray())throw error(HttpStatus.BAD_REQUEST,"MENU_ROWS_INVALID","rows 배열이 필요합니다.");

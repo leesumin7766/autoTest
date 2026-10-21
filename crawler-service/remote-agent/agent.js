@@ -26,6 +26,8 @@ async function runJob(config, job, dependencies = {}) {
     } });
     await event({ event: 'complete', stopReason: result.stopReason, result });
   } catch (error) {
+    const locations = (error.stack || '').split('\n').slice(1).map(line => line.match(/(?:walker|navigation|screen|agent|index)\.js:\d+:\d+/)?.[0]).filter(Boolean);
+    console.warn('Crawl execution failed', /^[A-Za-z]+Error$/.test(error.name || '') ? error.name : 'Error', locations.join(','));
     if (error.message !== 'CRAWL_LEASE_LOST')
       await event({ event: 'failed', errorCode: safeErrors.has(error.message) ? error.message : 'CRAWL_FAILED' }).catch(() => {});
   } finally {
