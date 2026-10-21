@@ -1,0 +1,1184 @@
+{
+  "schemaVersion": "captured-menu-tree-v2",
+  "reviewRequired": true,
+  "source": "PLAYWRIGHT_DOM",
+  "nodes": [
+    {
+      "nodeId": "549ef56b-4d1b-31a1-8e6b-e753c4ce18a6",
+      "menuKey": "",
+      "title": "Global",
+      "kind": "GROUP",
+      "url": "",
+      "status": "GROUP",
+      "children": [
+        {
+          "nodeId": "eeb4e66a-b41c-3a93-bd29-0f7cff47050f",
+          "menuKey": "",
+          "title": "System",
+          "kind": "GROUP",
+          "url": "",
+          "status": "GROUP",
+          "children": [
+            {
+              "nodeId": "b4c10101-d5e8-3d97-8586-1b5f4bd284f4",
+              "menuKey": "a53a34b98ef87ad3bcd03221fce347508153a37ea03d3a917287a4905cb4fcd1",
+              "title": "Overview",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/system",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 1,
+                  "screenKey": "f2907e3a43832fc215836fec0bd824f497970d41695b0d1c91fc2ef7a1a67bac",
+                  "url": "https://210.96.71.204:9090/system",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 1
+            },
+            {
+              "nodeId": "1eb35af6-ec9b-3149-afd3-815263354f6d",
+              "menuKey": "32c85f1cc4f145c0d486d3fc354d8b2faa494ad36919ee3f1ee28efc7707ea57",
+              "title": "Logs",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/system/logs",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 2,
+                  "screenKey": "96bb530256c82143e2a6d2e9841296dd1b4adef972d969b0f4dd287a25aa6b4b",
+                  "url": "https://210.96.71.204:9090/system/logs",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 2
+            },
+            {
+              "nodeId": "42e05cb9-57db-3ce4-a615-d922b0003184",
+              "menuKey": "2ebb92ae559f8d15012d6484a05eee7b6a46d65c93994d6a652dd8db4af6868a",
+              "title": "Storage",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/storage",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 3,
+                  "screenKey": "331a392d3f8ae3264ddc675f32e5f39de21dfc4276283e36df4668bd0891cd73",
+                  "url": "https://210.96.71.204:9090/storage",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 3
+            },
+            {
+              "nodeId": "1966763d-d715-3862-9d0f-847ed12d3c25",
+              "menuKey": "c0135706c7ce0d098d5d1db522724359a5f91fea5929dc844d30ab3dbaef4afa",
+              "title": "Networking",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/network",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 4,
+                  "screenKey": "8426c6861c255e9802cb154b24090bbf0148cbe9bcd19f8f1e2b6d956a2da0bc",
+                  "url": "https://210.96.71.204:9090/network",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 4
+            },
+            {
+              "nodeId": "f649a495-0485-31d3-baaf-b066e5ced8a1",
+              "menuKey": "0380c9057944268ad870af89e1686a7fd5f7e694059e03ef7faf0ba29b5e7505",
+              "title": "Podman containers",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/podman",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 5,
+                  "screenKey": "07059cd86df387146b9a3438ef6aec8c8cbfee4f46ae6ce80d1123dcdcaea25f",
+                  "url": "https://210.96.71.204:9090/podman",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 5
+            },
+            {
+              "nodeId": "48d5eaa4-b51f-3410-a1cb-1774f1252c71",
+              "menuKey": "3ee75804166da4f501199d85efd4878bf70c882f317bbe10e272b5c12e152306",
+              "title": "Virtual machines",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/machines",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 6,
+                  "screenKey": "1c7dd0f85ca02576348023e8e9abfeced5cb8820351a06dc19d5506f72b61d27",
+                  "url": "https://210.96.71.204:9090/machines",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 6
+            },
+            {
+              "nodeId": "e3a4ed2f-0bbf-3de1-943f-048edcee30f7",
+              "menuKey": "3cee40b53b36196551be7e658acdae72454ed35c7012c2171dd42d00c54a2e17",
+              "title": "Accounts",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/users",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 7,
+                  "screenKey": "80781ff913bda499582606f9d38b1d07a9f1b8cb6224f8ed51c2e41ba73bde2a",
+                  "url": "https://210.96.71.204:9090/users",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 7
+            },
+            {
+              "nodeId": "d37f5c16-d8a1-3311-a173-c9dd465f3d66",
+              "menuKey": "8e76dd1006536391afa65f981eaf6c931f96637333af42c635e8a0bfe8e2d5ec",
+              "title": "Services",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/system/services",
+              "status": "CAPTURED",
+              "children": [
+                {
+                  "nodeId": "423b260f-e4e4-3e6f-b5dc-fba17873af40",
+                  "menuKey": "",
+                  "title": "Local",
+                  "kind": "GROUP",
+                  "url": "",
+                  "status": "GROUP",
+                  "children": [
+                    {
+                      "nodeId": "b7f24cd2-83b1-39fa-bd1f-012f86ebce30",
+                      "menuKey": "fcc331dbb71cf0e6964423bdbf3738d850a1804f283a541d03d8d3afbefed94b",
+                      "title": "Services",
+                      "kind": "TAB",
+                      "url": "",
+                      "status": "CAPTURED",
+                      "children": [],
+                      "sources": [
+                        {
+                          "pageIndex": 8,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 16,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 17,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 18,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 19,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 20,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        }
+                      ],
+                      "screens": [
+                        {
+                          "pageIndex": 16,
+                          "screenKey": "5c6c2cadcd8d6bd3ed0325c954a12c588e388410355bc9b0794f3260cf1c4032",
+                          "url": "https://210.96.71.204:9090/system/services#/",
+                          "status": "CAPTURED"
+                        }
+                      ],
+                      "pageIndex": 16
+                    },
+                    {
+                      "nodeId": "8b638690-036d-395b-b190-c64a291611cc",
+                      "menuKey": "d9a6e197d03352da4679401fdc1e31bd59dcddba38bae1399a9dd91d444e0a7d",
+                      "title": "Targets",
+                      "kind": "TAB",
+                      "url": "",
+                      "status": "CAPTURED",
+                      "children": [],
+                      "sources": [
+                        {
+                          "pageIndex": 8,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 16,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 17,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 18,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 19,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 20,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        }
+                      ],
+                      "screens": [
+                        {
+                          "pageIndex": 17,
+                          "screenKey": "9dc6f49d48f8b3d2f1acd23b43b861a56c2851646eb06bfdc1e95e286ae44372",
+                          "url": "https://210.96.71.204:9090/system/services#/",
+                          "status": "CAPTURED"
+                        }
+                      ],
+                      "pageIndex": 17
+                    },
+                    {
+                      "nodeId": "c7b2262f-7121-3087-b9c6-16bae2a4094e",
+                      "menuKey": "0fe361730f3976624848afad313a0dcf79513c66164d01448f7227860f0d4367",
+                      "title": "Sockets",
+                      "kind": "TAB",
+                      "url": "",
+                      "status": "CAPTURED",
+                      "children": [],
+                      "sources": [
+                        {
+                          "pageIndex": 8,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 16,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 17,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 18,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 19,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 20,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        }
+                      ],
+                      "screens": [
+                        {
+                          "pageIndex": 18,
+                          "screenKey": "a4ae503463cc5d7675680fef6af33c826f51c29989e5098926b105dd795c5acb",
+                          "url": "https://210.96.71.204:9090/system/services#/",
+                          "status": "CAPTURED"
+                        }
+                      ],
+                      "pageIndex": 18
+                    },
+                    {
+                      "nodeId": "bb07afec-198f-35ee-b4e5-b84e8ca7672f",
+                      "menuKey": "d63d9f44544a87f142ed613613c2bb46e5e573f2726157def516d5e4a2e81772",
+                      "title": "Timers",
+                      "kind": "TAB",
+                      "url": "",
+                      "status": "CAPTURED",
+                      "children": [],
+                      "sources": [
+                        {
+                          "pageIndex": 8,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 16,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 17,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 18,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 19,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 20,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        }
+                      ],
+                      "screens": [
+                        {
+                          "pageIndex": 19,
+                          "screenKey": "15935e80fce15dedf5867b9787ad55d845c72de27168ab8f37fcaaff1d224753",
+                          "url": "https://210.96.71.204:9090/system/services#/",
+                          "status": "CAPTURED"
+                        }
+                      ],
+                      "pageIndex": 19
+                    },
+                    {
+                      "nodeId": "161ce256-d57c-3bfb-af0b-63d02d2e39fb",
+                      "menuKey": "6e35e32299e5297bf380e331cd9079dd5509f1d99685f45a5dc17d76f34d03da",
+                      "title": "Paths",
+                      "kind": "TAB",
+                      "url": "",
+                      "status": "CAPTURED",
+                      "children": [],
+                      "sources": [
+                        {
+                          "pageIndex": 8,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 16,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 17,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 18,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 19,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        },
+                        {
+                          "pageIndex": 20,
+                          "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+                        }
+                      ],
+                      "screens": [
+                        {
+                          "pageIndex": 20,
+                          "screenKey": "b4b107debd5f110c58d723f96483ac48f37b74a16adb046c074b16cca21062cf",
+                          "url": "https://210.96.71.204:9090/system/services#/",
+                          "status": "CAPTURED"
+                        }
+                      ],
+                      "pageIndex": 20
+                    }
+                  ],
+                  "sources": [],
+                  "screens": []
+                }
+              ],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 8,
+                  "screenKey": "404143669516f13bc2312b8ab1137633253a239587aeb35a84350eac6d98f440",
+                  "url": "https://210.96.71.204:9090/system/services",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 8
+            }
+          ],
+          "sources": [],
+          "screens": []
+        },
+        {
+          "nodeId": "42f6c188-d906-3ed2-862c-3af4c85d2bdb",
+          "menuKey": "",
+          "title": "Tools",
+          "kind": "GROUP",
+          "url": "",
+          "status": "GROUP",
+          "children": [
+            {
+              "nodeId": "85b11cae-d897-3094-8830-9371b35de14f",
+              "menuKey": "3e4dc1b5d7d2d7f35fbfe64d546ec63731062ab61b2f2764f20327b1c32c8606",
+              "title": "Applications",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/apps",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 9,
+                  "screenKey": "837cf632efd7a94c620c0fb2b386e1796d6d5a06f3f2a1cf8a3714439ceafd2a",
+                  "url": "https://210.96.71.204:9090/apps",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 9
+            },
+            {
+              "nodeId": "c9a918a6-0b79-35de-a738-c7c87a69a7cd",
+              "menuKey": "d3246368eee870250f1602832919bdd0767928f2c210d31fdd211eec5b6bc220",
+              "title": "Diagnostic reports",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/sosreport",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 10,
+                  "screenKey": "aa1d45d43f537f8979fb8c7d157937f5301535e717922c902ada4c8b166b2e20",
+                  "url": "https://210.96.71.204:9090/sosreport",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 10
+            },
+            {
+              "nodeId": "42d4263b-df66-3441-b349-ae64c0b496e1",
+              "menuKey": "db44513e7ac5122a8713dd1def600e6b5f02e2915d61454952391e752100e93f",
+              "title": "Kernel dump",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/kdump",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 11,
+                  "screenKey": "08afe0bef68e65b5124dac953d98b93d57f41ec5285ded963c8bcc3c5b0daefc",
+                  "url": "https://210.96.71.204:9090/kdump",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 11
+            },
+            {
+              "nodeId": "6d56d588-ec0a-3d18-82bc-315450802d8d",
+              "menuKey": "dcc68561ff7f182a4c0aaa841897ffba3a0e9eac4f4c5482341c6a707cc44851",
+              "title": "SELinux",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/selinux",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 12,
+                  "screenKey": "7c107c8fd3a88d064b2e1ecaf1840d59bd24843573b33b74e9b90d30e9631c83",
+                  "url": "https://210.96.71.204:9090/selinux",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 12
+            },
+            {
+              "nodeId": "90f1a37d-66cb-3502-b271-33bec5656d34",
+              "menuKey": "35e5368f02c8bba9db4ed7e275a3a9ace2787b09b42d32b5f3ab56410dd555bc",
+              "title": "Software updates",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/updates",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 13,
+                  "screenKey": "436ab2d43dbb0af4a6f112475003b3d9cd9a171c93589616f12ee4d70987a525",
+                  "url": "https://210.96.71.204:9090/updates",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 13
+            },
+            {
+              "nodeId": "c8584595-a465-3be0-bc5f-9a9edb9b112d",
+              "menuKey": "7ac712aa814d6f827e75277f3469dec99f5afb6cc8c9a5adf5e42ce3e47be30c",
+              "title": "Subscriptions",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/subscriptions",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 14,
+                  "screenKey": "98a05c353dd25d1b046764f119f8199d7b6d1e2608e387576ad234ffb2c2bc72",
+                  "url": "https://210.96.71.204:9090/subscriptions",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 14
+            },
+            {
+              "nodeId": "dcabe15e-d157-3cf9-8b0d-3419b6fb3d91",
+              "menuKey": "a27b6820178cc76b298c4006b162da998a9767f1834927fd69b562afa991dab6",
+              "title": "Terminal",
+              "kind": "LINK",
+              "url": "https://210.96.71.204:9090/system/terminal",
+              "status": "CAPTURED",
+              "children": [],
+              "sources": [
+                {
+                  "pageIndex": 0,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 1,
+                  "frameUrl": "https://210.96.71.204:9090/system"
+                },
+                {
+                  "pageIndex": 2,
+                  "frameUrl": "https://210.96.71.204:9090/system/logs"
+                },
+                {
+                  "pageIndex": 3,
+                  "frameUrl": "https://210.96.71.204:9090/storage"
+                },
+                {
+                  "pageIndex": 4,
+                  "frameUrl": "https://210.96.71.204:9090/network"
+                },
+                {
+                  "pageIndex": 5,
+                  "frameUrl": "https://210.96.71.204:9090/podman"
+                },
+                {
+                  "pageIndex": 6,
+                  "frameUrl": "https://210.96.71.204:9090/machines"
+                },
+                {
+                  "pageIndex": 7,
+                  "frameUrl": "https://210.96.71.204:9090/users"
+                },
+                {
+                  "pageIndex": 8,
+                  "frameUrl": "https://210.96.71.204:9090/system/services"
+                },
+                {
+                  "pageIndex": 9,
+                  "frameUrl": "https://210.96.71.204:9090/apps"
+                }
+              ],
+              "screens": [
+                {
+                  "pageIndex": 15,
+                  "screenKey": "9b309b47fc20ae52f20394535d6a7942e13875b5659862b32b185b279271acc5",
+                  "url": "https://210.96.71.204:9090/system/terminal",
+                  "status": "CAPTURED"
+                }
+              ],
+              "pageIndex": 15
+            }
+          ],
+          "sources": [],
+          "screens": []
+        }
+      ],
+      "sources": [],
+      "screens": []
+    }
+  ],
+  "nodeCount": 24,
+  "pagesWithNavigation": 21,
+  "truncated": false,
+  "pagesWithoutNavigation": 0,
+  "confirmedMenuCount": 20,
+  "incompleteMenuCount": 0,
+  "jobId": "1880009a-c4a6-451e-b8dc-f45d63337a1e",
+  "crawlStatus": "COMPLETED"
+}

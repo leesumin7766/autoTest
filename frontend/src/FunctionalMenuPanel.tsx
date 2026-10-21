@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 type Row = { rowId: string; originRowId?: string; included: boolean; menuPath: string[]; functionName: string; menuDescription: string
-  location: string; verificationStatus: string; evidence: { sourceId: string; quote: string }[]; matchedMenuKeys: string[]; reviewNotes: string[] }
+  location: string; verificationStatus: string; rowType?: string; placementStatus?: string; evidenceStatus?: string; connectionStatus?: string; evidence: { sourceId: string; quote: string }[]; matchedMenuKeys: string[]; reviewNotes: string[] }
 type Source = { id: string; kind: string; filename?: string; role?: string; pageIndex?: number; text?: string }
 type Job = { jobId: string; crawlJobId: string; productName: string; status: string; revision: number; stale: boolean; generationMode: string
   newerCrawlAvailable?: boolean
   targetUrl?: string
-  errorCode?: string; warnings: string[]; sources: Source[]; progress?: { completed: number; total: number }; output?: { rows: Row[] } }
+  webStructure?: { version: string; nodes: { path: string[]; kind: string; depthReviewRequired?: boolean }[] }
+  errorCode?: string; warnings: string[]; sources: Source[]; progress?: { completed: number; total: number }; output?: { rows: Row[]; completionStatus?: string; issueCount?: number; diagnosticsTruncated?: boolean; issues?: { sourceId?: string; segmentStart?: number; code: string; rowIndex?: number; proposedRow?: unknown; expectedSpanIds?: string[]; fields?: unknown }[] } }
 type View = { job: Job | null; history: { jobId: string; productName: string; status: string }[]; crawls: { jobId: string; pageCount: number; createdAt: string; targetUrl?: string }[] }
 const locations: Record<string,string> = { HEADER: '상단', FOOTER: '하단', SIDEBAR: '측면', CONTENT: '본문·탭', UNKNOWN: '미분류' }
-const verification: Record<string,string> = { DOCUMENT_ONLY:'문서에만 존재', SCREEN_OBSERVED:'화면에서 발견', MATCH_PROPOSED:'문서·화면 연결 제안', INCOMPLETE:'화면 확인 불완전' }
+const verification: Record<string,string> = { DOCUMENT_ONLY:'문서 근거 확인 · 화면 연결 미확인', SCREEN_OBSERVED:'화면에서 발견', MATCH_PROPOSED:'문서·화면 연결 제안', INCOMPLETE:'화면 확인 불완전' }
+type MenuBranch={title:string;children:MenuBranch[]}
+function observedBranches(paths:string[][]){const roots:MenuBranch[]=[];for(const path of paths){let level=roots;for(const title of path){let item=level.find(node=>node.title===title);if(!item){item={title,children:[]};level.push(item)}level=item.children}}return roots}
+function renderBranches(nodes:MenuBranch[]){return <ul>{nodes.map(node=><li key={node.title}>{node.title}{node.children.length>0&&renderBranches(node.children)}</li>)}</ul>}
 
 export function FunctionalMenuPanel({ submissionId, memberId, ready }: { submissionId: string; memberId: string; ready: boolean }) {
   const base = `/api/submissions/${submissionId}/functional-menu`
@@ -58,10 +62,20 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready }: { submiss
     {job&&<>
       <p role="status">{job.productName} · {job.status} · {job.generationMode}{running&&` · ${job.progress?.completed||0}/${job.progress?.total||job.sources.length}개 근거 분석`}</p>
       {job.targetUrl&&<p>고정한 수집 대상: {job.targetUrl}</p>}
+      {job.webStructure&&<details open><summary>실제 웹 메뉴 구조 · {job.productName}</summary>
+        <p>화면에서 관찰한 순서와 그룹이 분류 기준입니다. 상단바·하단바는 실제 영역이 확인된 경우에만 포함됩니다.</p>
+        {renderBranches(observedBranches(job.webStructure.nodes.map(node=>node.path)))}
+        <p>웹 위치 미확인 기능 {rows.filter(row=>row.placementStatus==='UNASSIGNED').length}개는 별도 배치 검토 대상입니다.</p></details>}
       {job.stale&&<p className="error-copy">문서가 변경됐습니다. 새 문서와 수집 결과로 다시 생성하세요.</p>}
       {job.newerCrawlAvailable&&<p className="functional-menu-warning">더 최신 수집 실행이 있습니다. 이 초안은 선택했던 실행 결과를 유지합니다.</p>}
       {job.generationMode==='MOCK'&&<p className="error-copy">개발용 모의 결과입니다. 문서를 실제로 분석한 결과가 아니며 최종 승인할 수 없습니다.</p>}
       {job.errorCode&&<p className="error-copy">생성 오류: {job.errorCode}. 근거 자료는 보존됩니다. 외부 LLM 프롬프트로 이어갈 수 있습니다.</p>}
+      {job.output?.completionStatus==='PARTIAL'&&<p className="functional-menu-warning">부분 초안입니다. 정상 행은 보존되며 미완료·검증 실패 구간은 아래 진단에서 확인하세요. 전체 결과를 보완하기 전 최종 승인할 수 없습니다.</p>}
+      {!!job.output?.issues?.length&&<details><summary>미확인 구간·검증 진단 ({job.output.issueCount || job.output.issues.length}건)</summary>
+        {job.output.issues.map((issue,index)=><article key={index}><p>{issue.code} · {issue.sourceId || '생성 행'}{issue.segmentStart!==undefined&&` · 구간 내 위치 ${issue.segmentStart}`}{issue.rowIndex!==undefined&&` · ${issue.rowIndex+1}행`}</p>
+          {issue.sourceId&&<button type="button" onClick={()=>void action(()=>showEvidence(issue.sourceId!))}>입력 근거 보기</button>}
+          {issue.proposedRow!==undefined&&<pre>{JSON.stringify({검증필드:issue.fields,허용근거ID:issue.expectedSpanIds,생성응답:issue.proposedRow},null,2)}</pre>}</article>)}
+        {job.output.diagnosticsTruncated&&<p>화면 진단은 최대 100건이며 전체 실패 건수는 위에 표시됩니다.</p>}</details>}
       {job.warnings?.map((warning,index)=><p className="functional-menu-warning" key={index}>{warning}</p>)}
       {running&&<button type="button" disabled={busy} onClick={()=>void action(async()=>apply(await request(`${base}/${job.jobId}/cancel`,{method:'POST'})))}>생성 중단</button>}
       {!running&&<details><summary>외부 LLM 프롬프트·JSON 가져오기</summary><p>고정한 세 자료와 작성 규칙·예시를 포함합니다. 외부 서비스에 전달할 내용은 다운로드 전에 확인하세요.</p>
@@ -72,14 +86,16 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready }: { submiss
       {rows.length>0&&<><p>{rows.length}개 기능 · {rows.filter(row=>row.included).length}개 포함{dirty?' · 저장하지 않은 변경이 있습니다':''}</p>
         <div className="functional-menu-table-wrap"><table className="functional-menu-table"><thead><tr><th>포함</th><th>1depth</th><th>2depth</th><th>3depth</th><th>4depth</th><th>5depth 기능</th><th>메뉴 설명</th><th>위치·확인 상태·근거</th></tr></thead>
           <tbody>{rows.map((row,index)=><tr key={row.rowId}><td><input type="checkbox" checked={row.included} disabled={busy||running} onChange={event=>update(index,{included:event.target.checked})}/></td><td>{job.productName}</td>
-            {[0,1,2].map(depth=><td key={depth}><input aria-label={`${index+1}행 ${depth+2}depth`} value={row.menuPath[depth]||''} placeholder="-" maxLength={120} disabled={busy||running} onChange={event=>pathChange(index,depth,event.target.value)}/></td>)}
-            <td><input aria-label={`${index+1}행 기능명`} value={row.functionName} maxLength={160} disabled={busy||running} onChange={event=>update(index,{functionName:event.target.value})}/><button type="button" disabled={busy||running} onClick={()=>{setRows(current=>[...current.slice(0,index+1),{...row,rowId:crypto.randomUUID(),originRowId:row.originRowId||row.rowId},...current.slice(index+1)]);setDirty(true)}}>기능 분리</button></td>
+            {job.webStructure&&row.placementStatus==='UNASSIGNED'?<td colSpan={3}><select aria-label={`${index+1}행 웹 메뉴 배치`} disabled={busy||running} value={JSON.stringify(row.menuPath)} onChange={event=>{const path=JSON.parse(event.target.value);update(index,{menuPath:path,included:path.length>0})}}>
+              <option value="[]">웹 위치 미확인 · 문서 검토 항목</option>{job.webStructure.nodes.filter(node=>node.path.length<=3).map(node=><option key={JSON.stringify(node.path)} value={JSON.stringify(node.path)}>{node.path.join(' / ')}</option>)}</select></td>:
+              [0,1,2].map(depth=><td key={depth}><input aria-label={`${index+1}행 ${depth+2}depth`} value={row.menuPath[depth]||''} placeholder="-" maxLength={120} disabled={busy||running||!!job.webStructure} onChange={event=>pathChange(index,depth,event.target.value)}/></td>)}
+            <td><input aria-label={`${index+1}행 기능명`} value={row.rowType==='MENU_OBSERVATION'?'':row.functionName} placeholder={row.rowType==='MENU_OBSERVATION'?'메뉴 구조 항목':''} maxLength={160} disabled={busy||running||row.rowType==='MENU_OBSERVATION'} onChange={event=>update(index,{functionName:event.target.value})}/><button type="button" disabled={busy||running||row.rowType==='MENU_OBSERVATION'} onClick={()=>{setRows(current=>[...current.slice(0,index+1),{...row,rowId:crypto.randomUUID(),originRowId:row.originRowId||row.rowId},...current.slice(index+1)]);setDirty(true)}}>기능 분리</button></td>
             <td><textarea aria-label={`${index+1}행 메뉴 설명`} rows={3} value={row.menuDescription} maxLength={600} disabled={busy||running} onChange={event=>update(index,{menuDescription:event.target.value})}/></td>
             <td><select value={row.location} disabled={busy||running} onChange={event=>update(index,{location:event.target.value})}>{Object.entries(locations).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select>
-              <small>{verification[row.verificationStatus]||row.verificationStatus}</small>{row.evidence.map((ref,i)=><button type="button" className="text-button" key={i} disabled={busy} onClick={()=>void action(()=>showEvidence(ref.sourceId))}>근거 {i+1}: {ref.quote.slice(0,24)}</button>)}
+              <small>{verification[row.verificationStatus]||row.verificationStatus}</small><small>{row.evidenceStatus==='VALID'?'근거 참조 정상 · ':''}{row.connectionStatus==='PROPOSED'?'의미적 연결 검토 필요':row.connectionStatus==='NOT_LINKED'?'화면 메뉴 연결 미확인':''}</small>{row.evidence.map((ref,i)=><button type="button" className="text-button" key={i} disabled={busy} onClick={()=>void action(()=>showEvidence(ref.sourceId))}>근거 {i+1}: {ref.quote.slice(0,24)}</button>)}
               {row.reviewNotes.map((note,i)=><small key={i}>{note}</small>)}</td></tr>)}</tbody></table></div>
         <div className="dialog-actions"><button type="button" disabled={busy||running||job.stale||!dirty} onClick={()=>void action(()=>save(false))}>수정 초안 저장</button>
-          <button type="button" className="primary-button" disabled={busy||running||job.stale||job.generationMode==='MOCK'} onClick={()=>void action(()=>save(true))}>포함한 기능을 검토 완료·승인</button>
+          <button type="button" className="primary-button" disabled={busy||running||job.stale||job.generationMode==='MOCK'||job.output?.completionStatus==='PARTIAL'} onClick={()=>void action(()=>save(true))}>포함한 기능을 검토 완료·승인</button>
           <button type="button" disabled={busy||running||dirty||job.stale||job.status!=='DRAFT'} onClick={()=>void action(()=>download(true))}>초안 Excel</button>
           <button type="button" disabled={busy||dirty||job.stale||job.status!=='APPROVED'} onClick={()=>void action(()=>download(false))}>승인 Excel 다운로드</button>
           {dirty&&<button type="button" onClick={()=>{setDirty(false);setRows(job.output?.rows||[])}}>편집 취소</button>}</div>

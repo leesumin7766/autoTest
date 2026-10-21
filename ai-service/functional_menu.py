@@ -9,20 +9,118 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request as HttpRequest
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from product_description.api import require_internal_token
 from product_description.llm import provider_from_env
 from product_description.ollama_provider import OllamaLlmProvider
+from web_menu import web_path, structure, anchor
 
 ROOT = Path(__file__).parent / 'menu_templates' / 'functional-v1'
 RULES = json.loads((ROOT / 'rules.json').read_text(encoding='utf-8'))
 SCHEMA = json.loads((ROOT / 'output.schema.json').read_text(encoding='utf-8'))
 EXAMPLES = json.loads((ROOT / 'examples.json').read_text(encoding='utf-8'))
 OUTPUT_TOKENS = 2048
-AUTO_INSTRUCTIONS = '\n'.join(RULES['instructions'])+'\n자동 생성 응답에서는 evidence 대신 evidenceSpanIds를 사용한다. sourceSpans에서 현재 source의 원문 구간 ID를 반드시 선택하고 인용문을 다시 작성하지 않는다.'
+AUTO_INSTRUCTIONS = '\n'.join(RULES['instructions'])+'\n자동 생성 응답에서는 evidence 대신 evidenceSpanIds를 사용한다. sourceSpans에서 현재 source의 원문 구간 ID를 반드시 선택하고 인용문을 다시 작성하지 않는다.\nWeb-first: use only candidate webPath for menuPath. Do not invent menu groups. Unmatched document functions require separate placement review.'
 router = APIRouter(prefix='/api/v1/functional-menus', dependencies=[Depends(require_internal_token)])
 PROGRESS = OrderedDict()
 LOCK = asyncio.Lock()
+CHECKPOINT_ROOT = Path(__file__).parent / '.runtime' / 'functional-menu-jobs'
+
+def checkpoint_path(job_id):
+    return CHECKPOINT_ROOT / (hashlib.sha256(job_id.encode()).hexdigest()+'.json')
+
+def save_checkpoint(request, rows, issues, completed, total, complete=False):
+    merged=merge(rows)
+    assigned={tuple(row['menuPath']) for row in merged if row.get('rowType')!='MENU_OBSERVATION' and row.get('placementStatus')=='WEB_ANCHORED'}
+    merged=[row for row in merged if row.get('rowType')!='MENU_OBSERVATION' or tuple(row['menuPath']) not in assigned]
+    reported=list(issues)
+    if len(merged)>2000:reported.append({'code':'MENU_ROW_LIMIT','overflowRowCount':len(merged)-2000})
+    output={'jobId':request.jobId,'schemaVersion':'functional-menu-v1','rulesVersion':RULES['version'],
+        'generationMode':'REAL','completionStatus':'COMPLETE' if complete and not reported else 'PARTIAL',
+        'progress':{'completed':completed,'total':total},'rows':merged[:2000],'issues':reported[:100],
+        'issueCount':len(reported),'diagnosticsTruncated':len(reported)>100}
+    output['webStructure']=request.webStructure or structure(request.evidence,request.productName)
+    CHECKPOINT_ROOT.mkdir(parents=True,exist_ok=True,mode=0o700)
+    path=checkpoint_path(request.jobId);temporary=path.with_suffix('.tmp')
+    temporary.write_text(json.dumps(output,ensure_ascii=False),encoding='utf-8');temporary.chmod(0o600);temporary.replace(path)
+    return output
+
+def ground_proposal(raw, allowed, spans, required_source):
+    if not isinstance(raw,dict):raise ValueError('MENU_SCHEMA_INVALID')
+    row=json.loads(json.dumps(raw))
+    by_id={span['spanId']:span for span in spans}
+    selected=row.pop('evidenceSpanIds')
+    if not isinstance(selected,list) or any(key not in by_id for key in selected):
+        raise ValueError('MENU_SPAN_ID_INVALID')
+    row['evidence']=[{'sourceId':by_id[key]['sourceId'],'quote':by_id[key]['quote']} for key in selected]
+    if not any(ref['sourceId']==required_source for ref in row['evidence']):
+        raise ValueError('MENU_CURRENT_SOURCE_REQUIRED')
+    menu_sources={source['menuKey']:source for source in allowed.values() if source.get('menuKey')}
+    keys=row.get('matchedMenuKeys',[])
+    if not keys and row.get('menuPath'):
+        keys=[key for key,source in menu_sources.items() if web_path(source)==row['menuPath']][:1]
+    if not isinstance(keys,list) or any(not isinstance(key,str) for key in keys):raise ValueError('MENU_SCHEMA_INVALID')
+    known=list(dict.fromkeys(key for key in keys if key in menu_sources))[:7]
+    notes=list(row.get('reviewNotes',[]))[:5]
+    if len(known)!=len(set(keys)):
+        notes.append('제공된 화면 근거로 확인할 수 없는 메뉴 연결을 해제했습니다. 문서 기준으로 배치를 검토하세요.')
+        # Unverified menu citations must not make the document row look screen-linked.
+        row['evidence']=[ref for ref in row['evidence'] if not allowed[ref['sourceId']].get('menuKey') or allowed[ref['sourceId']]['menuKey'] in known]
+    for key in known:
+        source=menu_sources[key]
+        if not any(ref['sourceId']==source['id'] for ref in row['evidence']):
+            row['evidence'].append({'sourceId':source['id'],'quote':source['text'][:240]})
+    # Keep the current document and every selected menu within the citation limit.
+    required_ids={required_source,*[menu_sources[key]['id'] for key in known]}
+    row['evidence']=sorted(row['evidence'],key=lambda ref:ref['sourceId'] not in required_ids)[:8]
+    row['matchedMenuKeys']=known
+    if known:notes.append('화면 메뉴 근거는 프로그램이 연결했습니다. 기능과 메뉴의 의미적 일치는 검토 전 연결 제안입니다.')
+    row['reviewNotes']=notes[:8]
+    if not isinstance(row.get('menuDescription'),str) or not row['menuDescription'].strip().endswith('기능'):
+        raise ValueError('MENU_DESCRIPTION_SUFFIX_INVALID')
+    return anchor(validate_rows([row],allowed,required_source)[0],allowed)
+
+async def extract_source(provider, source, allowed, spans, schema, payload):
+    accepted=[];issues=[];instructions=AUTO_INSTRUCTIONS
+    for attempt in range(2):
+        try:response=await provider._call(instructions,payload,schema,num_predict=OUTPUT_TOKENS)
+        except Exception as error:
+            match=re.match(r'([A-Z_]{5,80})(?:$|:)',str(error))
+            issues.append({'sourceId':source['id'],'segmentStart':source.get('segmentStart',0),'attempt':attempt+1,
+                'code':match.group(1) if match else 'MENU_PROVIDER_UNAVAILABLE','fatal':not isinstance(error,(ValueError,TypeError,KeyError))})
+            return merge(accepted),issues
+        pending=[]
+        if not isinstance(response,dict) or not isinstance(response.get('rows'),list):
+            issues.append({'sourceId':source['id'],'segmentStart':source.get('segmentStart',0),'code':'MENU_SCHEMA_INVALID'})
+            return merge(accepted),issues
+        for index,raw in enumerate(response['rows']):
+            try:accepted.append(ground_proposal(raw,allowed,spans,source['id']))
+            except (ValueError,TypeError,KeyError) as error:
+                code=str(error) if re.fullmatch('[A-Z_]{5,80}',str(error)) else 'MENU_SCHEMA_INVALID'
+                issue={'sourceId':source['id'],'segmentStart':source.get('segmentStart',0),'rowIndex':index,
+                    'attempt':attempt+1,'code':code,'proposedRow':raw,'expectedSpanIds':[span['spanId'] for span in spans]}
+                if isinstance(error,ValidationError):issue['fields']=[{'path':list(item['loc']),'type':item['type'],'message':item['msg']} for item in error.errors(include_input=False,include_context=False)]
+                pending.append(issue)
+        actions=set(re.findall(r'(조회|검색|추가|생성|수정|삭제|실행|다운로드|설정)(?:하는|할|하고)',source['text'])) if source.get('role')=='FUNCTION_LIST' else set()
+        combined=' '.join(row['functionName']+' '+row['menuDescription'] for row in accepted)
+        missing=sorted(action for action in actions if action not in combined)
+        if not pending and not missing:return merge(accepted),[]
+        if attempt==0:
+            codes=sorted({issue['code'] for issue in pending})
+            instructions+='\n검증 재시도: 현재 문서의 근거 구간 ID를 반드시 선택하세요. 오류: '+','.join(codes)+'. 누락 동작: '+','.join(missing)
+            continue
+        issues.extend(pending)
+        for focus in missing:
+            focused=json.loads(json.dumps(schema));focused['properties']['rows']['minItems']=1
+            focused['properties']['rows']['items']['properties']['functionName']['pattern']=f'.*{focus}.*'
+            try:
+                targeted=await provider._call(AUTO_INSTRUCTIONS+f'\n현재 원문의 {focus} 기능만 작성하고 functionName에 {focus}를 포함하세요.',payload,focused,num_predict=OUTPUT_TOKENS)
+                additions=[ground_proposal(raw,allowed,spans,source['id']) for raw in targeted['rows']]
+                if not any(focus in row['functionName']+' '+row['menuDescription'] for row in additions):raise ValueError('MENU_FUNCTION_COVERAGE_INCOMPLETE')
+                accepted.extend(additions)
+            except (ValueError,TypeError,KeyError):
+                issues.append({'sourceId':source['id'],'segmentStart':source.get('segmentStart',0),'code':'MENU_FUNCTION_COVERAGE_INCOMPLETE','action':focus})
+    return merge(accepted),issues
 
 class Proposal(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -39,6 +137,7 @@ class Request(BaseModel):
     jobId: str
     productName: str = Field(min_length=1, max_length=120)
     evidence: list[dict] = Field(min_length=1, max_length=5000)
+    webStructure: dict | None = None
 
 def validate_rows(rows, sources, required_source=None):
     if not isinstance(rows, list) or len(rows) > 2000:
@@ -65,20 +164,25 @@ def validate_rows(rows, sources, required_source=None):
         result.append(row)
     return result
 
-def baseline(evidence):
-    """Existence-only menu rows. Does not infer the behaviour behind a button."""
-    rows = []
+def baseline(evidence, product=''):
+    rows=OrderedDict()
     for source in evidence:
-        if source['kind'] not in ('MENU','CONTROL'):
+        if source['kind']!='MENU':continue
+        path=web_path(source,product)
+        if not path:continue
+        key=tuple(path)
+        if key in rows:
+            prior=rows[key]
+            if len(prior['matchedMenuKeys'])<7:
+                prior['matchedMenuKeys'].append(source['menuKey'])
+                prior['evidence'].append({'sourceId':source['id'],'quote':source['text'][:240]})
             continue
-        path = [part for part in source.get('path', []) if part not in RULES['structuralLabels']]
-        name = path[-1] if path else source['text'][:120]
-        rows.append({'menuPath': path[:-1][:3], 'functionName': name, 'menuDescription': f'{name} 메뉴를 제공하는 기능',
-            'included': source['kind'] == 'MENU',
-            'location': source.get('location', 'UNKNOWN'), 'matchedMenuKeys': [source['menuKey']],
-            'evidence': [{'sourceId': source['id'], 'quote': source['text'][:300]}],
-            'reviewNotes': ['메뉴 존재 근거이며 세부 동작은 문서 대조와 사용자 검토 필요'] + (['깊은 원본 경로의 재분류 검토 필요'] if len(path) > 4 else [])})
-    return rows
+        rows[key]={'menuPath':path[:3],'functionName':path[-1],'menuDescription':f'{path[-1]} 화면을 제공하는 기능',
+            'included':len(path)<=3,'rowType':'MENU_OBSERVATION','placementStatus':'WEB_ANCHORED' if len(path)<=3 else 'UNASSIGNED',
+            'location':source.get('location','UNKNOWN'),'matchedMenuKeys':[source['menuKey']],
+            'evidence':[{'sourceId':source['id'],'quote':source['text'][:240]}],
+            'reviewNotes':['웹에서 관찰한 메뉴입니다. 문서 기능을 연결하기 전의 구조 항목입니다.']}
+    return list(rows.values())
 
 def prompt(request, source=None, candidates=None):
     payload = request.model_dump() if source is None else {'productName': request.productName, 'source': source, 'menuCandidates': candidates}
@@ -118,6 +222,11 @@ def call_spec(request, source, candidates):
     row['required'].remove('evidence');row['required'].append('evidenceSpanIds');del row['properties']['evidence']
     row['properties']['evidenceSpanIds']={'type':'array','minItems':1,'maxItems':8,'items':{'type':'string','enum':[span['spanId'] for span in spans]}}
     keys=[item['menuKey'] for item in allowed.values() if item.get('menuKey')]
+    paths=[[]]
+    for item in candidates:
+        path=web_path(item,request.productName)
+        if path and len(path)<=3 and path not in paths:paths.append(path)
+    row['properties']['menuPath']['enum']=paths
     if keys:
         row['properties']['matchedMenuKeys']['items']['enum']=keys
     else:
@@ -156,15 +265,22 @@ async def external_prompt(request: Request):
 async def progress(job_id: str):
     return PROGRESS.get(job_id, {'completed':0,'total':0})
 
+@router.get('/checkpoint/{job_id}')
+async def checkpoint(job_id: str):
+    path=checkpoint_path(job_id)
+    if not path.exists():raise HTTPException(404,'MENU_CHECKPOINT_NOT_FOUND')
+    return json.loads(path.read_text(encoding='utf-8'))
+
 async def generate(request: Request):
     provider = provider_from_env()
     sources = {item['id']: item for item in request.evidence}
     if len(sources) != len(request.evidence):
         raise HTTPException(422, 'MENU_DUPLICATE_SOURCE')
-    rows = baseline(request.evidence)
+    rows = baseline(request.evidence,request.productName)
     if provider.mode == 'MOCK':
-        return {'schemaVersion':'functional-menu-v1','rulesVersion':RULES['version'],'generationMode':'MOCK','rows':merge(rows)}
-    rows=baseline(request.evidence)
+        return {'schemaVersion':'functional-menu-v1','rulesVersion':RULES['version'],'generationMode':'MOCK','webStructure':request.webStructure or structure(request.evidence,request.productName),'rows':merge(rows)}
+    rows=baseline(request.evidence,request.productName)
+    issues=[]
     if not isinstance(provider, OllamaLlmProvider):
         raise HTTPException(503, 'MENU_PROVIDER_UNAVAILABLE')
     menus = [source for source in request.evidence if source['kind'] in ('MENU','CONTROL')]
@@ -174,6 +290,7 @@ async def generate(request: Request):
     PROGRESS[request.jobId] = {'completed':0,'total':len(analysis)}
     while len(PROGRESS) > 1024:
         PROGRESS.popitem(last=False)
+    save_checkpoint(request,rows,issues,0,len(analysis))
     try:
         async with LOCK:
             for index, source in enumerate(analysis):
@@ -190,45 +307,22 @@ async def generate(request: Request):
                     if estimated+600 <= provider.input_budget_for(OUTPUT_TOKENS) or not candidates:
                         break
                     candidates.pop()
-                for attempt in range(2):
-                    response = await provider._call(instructions,payload,schema,num_predict=OUTPUT_TOKENS)
-                    try:
-                        by_id={span['spanId']:span for span in spans}
-                        for row in response['rows']:
-                            selected=row.pop('evidenceSpanIds')
-                            row['evidence']=[{'sourceId':by_id[span]['sourceId'],'quote':by_id[span]['quote']} for span in selected]
-                        proposed=validate_rows(response.get('rows'),allowed,source['id'])
-                        if source.get('role') == 'FUNCTION_LIST':
-                            actions=set(re.findall(r'(조회|검색|추가|생성|수정|삭제|실행|다운로드|설정)(?:하는|할|하고)',source['text']))
-                            combined=' '.join(row['functionName']+' '+row['menuDescription'] for row in proposed)
-                            missing=[action for action in actions if action not in combined]
-                            if missing:
-                                raise ValueError('MENU_FUNCTION_COVERAGE_INCOMPLETE')
-                        break
-                    except (ValueError,TypeError,KeyError) as invalid:
-                        if attempt:
-                            if 'MENU_FUNCTION_COVERAGE_INCOMPLETE' in str(invalid):
-                                # A small model may repeatedly omit one verb. Ask a bounded,
-                                # schema-constrained question for each missing documented action.
-                                for focus in missing:
-                                    focused=json.loads(json.dumps(schema))
-                                    focused['properties']['rows']['minItems']=1
-                                    focused['properties']['rows']['items']['properties']['functionName']['pattern']=f'.*{focus}.*'
-                                    targeted=await provider._call(instructions+f'\n이번 요청은 현재 원문의 {focus} 기능만 작성한다. functionName에 {focus}를 포함한다.',payload,focused,num_predict=OUTPUT_TOKENS)
-                                    for row in targeted['rows']:
-                                        row['evidence']=[{'sourceId':by_id[span]['sourceId'],'quote':by_id[span]['quote']} for span in row.pop('evidenceSpanIds')]
-                                    additions=validate_rows(targeted['rows'],allowed,source['id'])
-                                    if not any(focus in row['functionName']+' '+row['menuDescription'] for row in additions):
-                                        raise ValueError('MENU_FUNCTION_COVERAGE_INCOMPLETE')
-                                    proposed.extend(additions)
-                                break
-                            raise ValueError('MENU_FUNCTION_COVERAGE_INCOMPLETE' if 'MENU_FUNCTION_COVERAGE_INCOMPLETE' in str(invalid) else 'MENU_EVIDENCE_INVALID') from None
-                        instructions += '\n검증 재시도: 제공된 원문 구간 ID만 선택하고, 현재 기능리스트에 명시된 조회·검색·추가·생성·수정·삭제·실행·다운로드·설정 중 존재하는 독립 기능을 빠짐없이 각각 별도 행으로 작성하세요.'
+                rejected=[]
+                try:
+                    proposed, rejected = await extract_source(provider,source,allowed,spans,schema,payload)
+                    issues.extend(rejected)
+                except (ValueError,TypeError,KeyError) as invalid:
+                    proposed=[]
+                    code=str(invalid) if re.fullmatch('[A-Z_]{5,80}',str(invalid)) else 'MENU_SCHEMA_INVALID'
+                    issues.append({'sourceId':source['id'],'segmentStart':source.get('segmentStart',0),'code':code})
                 rows.extend(proposed)
                 if len(rows) > 4000:
                     raise ValueError('MENU_ROW_LIMIT')
                 PROGRESS[request.jobId] = {'completed':index+1,'total':len(analysis)}
-        return {'schemaVersion':'functional-menu-v1','rulesVersion':RULES['version'],'generationMode':'REAL','rows':merge(rows)}
+                save_checkpoint(request,rows,issues,index+1,len(analysis))
+                if any(issue.get('fatal') for issue in rejected):
+                    return save_checkpoint(request,rows,issues,index+1,len(analysis))
+        return save_checkpoint(request,rows,issues,len(analysis),len(analysis),complete=True)
     except Exception as error:
         # Never return provider/source text in error responses.
         code = next((name for name in ('LLM_INPUT_BUDGET_EXCEEDED','LLM_OUTPUT_INCOMPLETE','MENU_EVIDENCE_INVALID','MENU_SCHEMA_INVALID','MENU_CURRENT_SOURCE_REQUIRED','MENU_MATCH_EVIDENCE_INVALID','MENU_ROW_LIMIT','MENU_FUNCTION_COVERAGE_INCOMPLETE') if name in str(error)), 'MENU_GENERATION_FAILED')
