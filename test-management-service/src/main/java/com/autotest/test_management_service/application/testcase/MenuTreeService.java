@@ -139,7 +139,7 @@ public class MenuTreeService {
                 || !proposedTree.path("nodes").isArray())
             throw error(HttpStatus.BAD_REQUEST, "MENU_TREE_INVALID", "외부 LLM 응답은 ui-menu-tree-v1 JSON 형식이어야 합니다.");
         var docs = readyDocuments(id, memberId);
-        if (!sourceType.equals(proposedTree.path("sourceType").asText(sourceType)))
+        if (!"UPLOADED".equals(sourceType) && !sourceType.equals(proposedTree.path("sourceType").asText(sourceType)))
             throw error(HttpStatus.BAD_REQUEST, "MENU_TREE_SOURCE_MISMATCH", "프롬프트와 JSON 응답의 화면 자료 유형이 다릅니다.");
         Set<String> seenIds = new HashSet<>();
         ArrayNode nodes = mapper.createArrayNode();
@@ -169,8 +169,9 @@ public class MenuTreeService {
     }
 
     private void validateSource(String sourceType, String sourceText) {
-        if (sourceType == null || !Set.of("DOM", "SCREENSHOT").contains(sourceType))
+        if (sourceType == null || !Set.of("DOM", "SCREENSHOT", "UPLOADED").contains(sourceType))
             throw error(HttpStatus.BAD_REQUEST, "MENU_TREE_SOURCE_INVALID", "화면 자료 유형을 선택해야 합니다.");
+        if ("UPLOADED".equals(sourceType)) return;
         if (sourceText != null && sourceText.length() > 500_000)
             throw error(HttpStatus.BAD_REQUEST, "MENU_TREE_SOURCE_TOO_LARGE", "DOM 자료가 너무 깁니다. 메뉴와 관련된 Elements만 붙여 넣어 주세요.");
         if ("DOM".equals(sourceType) && (sourceText == null || sourceText.isBlank()))
@@ -254,6 +255,10 @@ public class MenuTreeService {
             String nodeId = proposed.path("nodeId").asText("").trim();
             String title = proposed.path("title").asText("").trim();
             JsonNode evidence = proposed.path("evidence");
+            boolean uploaded = "UPLOADED".equals(sourceType);
+            if (uploaded && (!evidence.isArray() || evidence.isEmpty())) {
+                evidence = mapper.createArrayNode().add(title);
+            }
             if (!NODE_ID.matcher(nodeId).matches() || !seen.add(nodeId) || title.isBlank() || title.length() > 120
                     || !evidence.isArray() || evidence.isEmpty() || evidence.size() > 8)
                 throw error(HttpStatus.BAD_REQUEST, "MENU_TREE_INVALID", "메뉴 ID, 이름 또는 화면 근거가 올바르지 않습니다.");

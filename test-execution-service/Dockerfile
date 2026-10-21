@@ -10,7 +10,7 @@ COPY auth-service auth-service
 COPY report-service report-service
 COPY test-management-service test-management-service
 COPY test-execution-service test-execution-service
-RUN chmod +x gradlew
+RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
 RUN ./gradlew :test-execution-service:bootJar -x test --no-daemon
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app

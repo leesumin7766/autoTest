@@ -222,6 +222,23 @@ export function TcGenerationPanel({ submissionId, memberId, deliveryStatus, pref
     } catch (failure) { setMenuTreeError(failure instanceof Error ? failure.message : '외부 LLM 응답 저장 실패') }
     finally { setMenuTreeBusy(false) }
   }
+  const uploadMenuTree = async (file: File | undefined) => {
+    if (!file || !ready || menuTreeBusy) return
+    let tree: unknown
+    try { tree = JSON.parse(await file.text()) }
+    catch { setMenuTreeError('업로드한 파일이 올바른 JSON이 아닙니다.'); return }
+    setPreflightDialog(null); setMenuTreeBusy(true); setMenuTreeError(''); setMenuPrompt(null)
+    setTreeProgress('업로드한 메뉴 트리를 확인하고 있습니다…')
+    try {
+      const response = await fetch(`${menuTreeBase}/external-draft`, { method: 'POST', headers: {
+        'X-Member-Id': memberId, 'Content-Type': 'application/json' }, body: JSON.stringify({
+          sourceType: 'UPLOADED', sourceText: '', tree }) })
+      const data = await response.json() as { menuTree?: MenuTreeState; message?: string }
+      if (!response.ok) throw new Error(data.message || '업로드한 메뉴 트리를 저장하지 못했습니다.')
+      setMenuTreeState(data.menuTree ?? null); setEditingApprovedTree(false)
+    } catch (failure) { setMenuTreeError(failure instanceof Error ? failure.message : '메뉴 트리 업로드 실패') }
+    finally { setMenuTreeBusy(false) }
+  }
   const loadExternalPrompt = async (chunkIndex = 0) => {
     if (promptBusy || !ready || !menuTreeApproved || !tcDocumentsReady) return
     setPromptBusy(true); setPromptError(''); setPromptCopied(false)
@@ -321,6 +338,11 @@ export function TcGenerationPanel({ submissionId, memberId, deliveryStatus, pref
       <div className="dialog-actions"><button className="primary-button" disabled={menuTreeBusy || !menuResponse.trim()} onClick={() => void importMenuResponse()}>
         {menuTreeBusy ? '근거 확인 중…' : '응답을 근거 확인 후 초안으로 불러오기'}</button>
         <p>{menuSourceType === 'DOM' ? '각 노드의 화면 근거가 붙여 넣은 Elements 내용에 포함되는지 확인합니다.' : '캡처 근거는 자동 판독하지 않으므로 화면과 직접 대조해 검토하세요.'} 저장 후 메뉴 경로를 검토·승인해야 TC 프롬프트를 만들 수 있습니다.</p></div>
+    </div>}
+    {ready && !menuTreeState && !menuPrompt && !menuTreeBusy && <div className="external-prompt-actions">
+      <label htmlFor="menu-tree-upload">이미 만든 메뉴 트리(JSON)가 있다면 업로드하세요. 프롬프트 생성 없이 검토·승인 후 TC 초안을 만들 수 있습니다.</label>
+      <input id="menu-tree-upload" type="file" accept=".json,application/json"
+        onChange={event => { const input = event.currentTarget; void uploadMenuTree(input.files?.[0]).finally(() => { input.value = '' }) }} />
     </div>}
     {ready && menuTreeApproved && !tcDocumentsReady && <p role="status">TC 프롬프트를 만들려면 기능리스트와 매뉴얼이 정상 파싱되어야 합니다.</p>}
     {ready && menuTreeApproved && tcDocumentsReady && <div className="external-prompt-actions">
