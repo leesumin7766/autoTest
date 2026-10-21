@@ -1,20 +1,20 @@
 :root {
-  font-family: 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
-  color: #202e27;
-  background: #f8f9f6;
+  font-family: Inter, 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  color: #111827;
+  background: #ffffff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --ink: #202e27;
-  --green: #2f6851;
-  --coral: #d16c52;
-  --muted: #7e8981;
-  --line: #e1e6df;
-  font-size: 14px;
+  --ink: #111827;
+  --green: #ff6c37;
+  --coral: #ff6c37;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  font-size: 13px;
 }
 
 * { box-sizing: border-box; }
 body { min-width: 320px; min-height: 100vh; margin: 0; }
-button, input { font: inherit; }
-button:focus-visible, a:focus-visible { outline: 2px solid #d16c52; outline-offset: 3px; }
-::selection { color: white; background: #2f6851; }
+button, input, select, textarea { font: inherit; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid #ff6c37; outline-offset: 3px; }
+::selection { color: white; background: #d64b1b; }
