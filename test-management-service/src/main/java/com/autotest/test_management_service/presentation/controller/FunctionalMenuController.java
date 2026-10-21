@@ -11,11 +11,13 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/submissions/{submission}/functional-menu")
 public class FunctionalMenuController {
     private final FunctionalMenuService service;
+    private final com.autotest.test_management_service.application.testcase.UploadedMenuService uploads;
     public record Start(UUID crawlJobId,String productName,String mode){}
     public record Edit(int revision,JsonNode rows){}
     private ResponseEntity<?> ok(Object body){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body);}
     @GetMapping public ResponseEntity<?> status(@PathVariable UUID submission,@RequestHeader("X-Member-Id") long member,@RequestParam(required=false) UUID job){return ok(service.status(submission,member,job));}
     @PostMapping public ResponseEntity<?> start(@PathVariable UUID submission,@RequestHeader("X-Member-Id") long member,@RequestBody Start request){return ok(service.start(submission,member,request.crawlJobId(),request.productName(),request.mode()==null?"AUTO":request.mode()));}
+    @PostMapping(value="/upload",consumes=MediaType.MULTIPART_FORM_DATA_VALUE) public ResponseEntity<?> upload(@PathVariable UUID submission,@RequestHeader("X-Member-Id") long member,@RequestParam("file") org.springframework.web.multipart.MultipartFile file,@RequestParam(required=false) String productName) throws java.io.IOException{return ok(uploads.upload(submission,member,file.getOriginalFilename(),file.getBytes(),productName));}
     @PostMapping("/{job}/prompt") public ResponseEntity<?> prompt(@PathVariable UUID submission,@PathVariable UUID job,@RequestHeader("X-Member-Id") long member){return ok(service.prompt(submission,member,job));}
     @GetMapping("/{job}/evidence") public ResponseEntity<?> evidence(@PathVariable UUID submission,@PathVariable UUID job,@RequestHeader("X-Member-Id") long member,@RequestParam String sourceId){return ok(service.evidence(submission,member,job,sourceId));}
     @PostMapping("/{job}/import") public ResponseEntity<?> imported(@PathVariable UUID submission,@PathVariable UUID job,@RequestHeader("X-Member-Id") long member,@RequestBody Edit request){return ok(service.imported(submission,member,job,request.revision(),request.rows()));}
