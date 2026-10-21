@@ -11,6 +11,8 @@ type Job = { jobId: string; crawlJobId: string; productName: string; status: str
 type View = { job: Job | null; history: { jobId: string; productName: string; status: string }[]; crawls: { jobId: string; pageCount: number; createdAt: string; targetUrl?: string }[] }
 const locations: Record<string,string> = { HEADER: '상단', FOOTER: '하단', SIDEBAR: '측면', CONTENT: '본문·탭', UNKNOWN: '미분류' }
 const verification: Record<string,string> = { DOCUMENT_ONLY:'문서 근거 확인 · 화면 연결 미확인', SCREEN_OBSERVED:'화면에서 발견', MATCH_PROPOSED:'문서·화면 연결 제안', INCOMPLETE:'화면 확인 불완전' }
+const jobStatus: Record<string,string> = { GENERATING:'생성 중', DRAFT:'초안', APPROVED:'승인 완료', FAILED:'실패', CANCELED:'중단', INTERRUPTED:'중단됨' }
+const generationMode: Record<string,string> = { REAL:'자동 생성', AUTO:'자동 생성', EXTERNAL:'외부 LLM', MOCK:'개발용 모의 결과' }
 type MenuBranch={title:string;children:MenuBranch[]}
 function observedBranches(paths:string[][]){const roots:MenuBranch[]=[];for(const path of paths){let level=roots;for(const title of path){let item=level.find(node=>node.title===title);if(!item){item={title,children:[]};level.push(item)}level=item.children}}return roots}
 function renderBranches(nodes:MenuBranch[]){return <ul>{nodes.map(node=><li key={node.title}>{node.title}{node.children.length>0&&renderBranches(node.children)}</li>)}</ul>}
@@ -47,9 +49,10 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready }: { submiss
   const showEvidence = async (id: string) => { if (!job) return; const evidence=await request(`${base}/${job.jobId}/evidence?sourceId=${encodeURIComponent(id)}`);setSource(evidence);setImage('');modal.current?.showModal(); if(evidence.pageIndex!==undefined){const response=await fetch(`/api/submissions/${submissionId}/playwright-crawls/${job.crawlJobId}/pages/${evidence.pageIndex}/screenshot`,{headers:{'X-Member-Id':memberId}});if(response.ok)setImage(URL.createObjectURL(await response.blob()))} }
   if (!ready) return null
   return <section className="functional-menu-panel" aria-label="통합 메뉴트리 작성">
-    <h2>통합 메뉴트리 · 기능 설명 · Excel</h2>
+    <h2>통합 메뉴트리 · 기능 설명 · 엑셀</h2>
+    <details className="menu-generation-settings" open><summary>메뉴트리 생성 설정</summary>
     <p>화면 수집 결과 + 기능리스트 + 매뉴얼을 고정해 작성합니다. 제품명은 1depth, 분류는 2~4depth, 마지막 기능은 5depth에 출력합니다.</p>
-    <div className="playwright-grid"><label>Excel 1depth 제품명<input value={product} maxLength={120} onChange={event=>setProduct(event.target.value)} disabled={busy||running} /></label>
+    <div className="playwright-grid"><label>엑셀 1단계 제품명<input value={product} maxLength={120} onChange={event=>setProduct(event.target.value)} disabled={busy||running} /></label>
       <label>분석할 화면 수집 실행<select value={crawl || view.crawls[0]?.jobId || ''} disabled={busy||running} onChange={event=>setCrawl(event.target.value)}>
         {!view.crawls.length && <option value="">완료된 화면 수집이 필요합니다</option>}{view.crawls.map(item=><option key={item.jobId} value={item.jobId}>{item.targetUrl} · {new Date(item.createdAt).toLocaleString()} · {item.pageCount}개 · {item.jobId.slice(0,8)}</option>)}
       </select></label></div>
@@ -57,12 +60,13 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready }: { submiss
       <button type="button" className="quiet-button" disabled={busy||running||dirty||!product.trim()||!view.crawls.length} onClick={()=>void action(()=>start('EXTERNAL'))}>외부 LLM으로 작성</button>
       <button type="button" disabled={busy||dirty} onClick={()=>void action(()=>refresh())}>수집 결과·작업 새로고침</button></div>
     <p>업로드한 기능리스트·매뉴얼과 같은 제품의 수집 대상을 선택하세요.</p>
+    </details>
     {error&&<p className="error-copy" role="alert">{error}</p>}
-    {view.history.length>0&&<label>작성 이력<select value={selected||job?.jobId||''} disabled={busy||dirty} onChange={event=>{setSelected(event.target.value);setPrompt('');setExternal('')}}>{view.history.map(item=><option key={item.jobId} value={item.jobId}>{item.productName} · {item.status} · {item.jobId.slice(0,8)}</option>)}</select></label>}
+    {view.history.length>0&&<label>작성 이력<select value={selected||job?.jobId||''} disabled={busy||dirty} onChange={event=>{setSelected(event.target.value);setPrompt('');setExternal('')}}>{view.history.map(item=><option key={item.jobId} value={item.jobId}>{item.productName} · {jobStatus[item.status] || item.status} · {item.jobId.slice(0,8)}</option>)}</select></label>}
     {job&&<>
-      <p role="status">{job.productName} · {job.status} · {job.generationMode}{running&&` · ${job.progress?.completed||0}/${job.progress?.total||job.sources.length}개 근거 분석`}</p>
+      <p className="menu-job-status" role="status">{running && <span className="spinner" aria-hidden="true" />}{job.productName} · {jobStatus[job.status] || job.status} · {generationMode[job.generationMode] || job.generationMode}{running&&` · ${job.progress?.completed||0}/${job.progress?.total||job.sources.length}개 근거 분석`}</p>
       {job.targetUrl&&<p>고정한 수집 대상: {job.targetUrl}</p>}
-      {job.webStructure&&<details open><summary>실제 웹 메뉴 구조 · {job.productName}</summary>
+      {job.webStructure&&<details><summary>실제 웹 메뉴 구조 · {job.productName}</summary>
         <p>화면에서 관찰한 순서와 그룹이 분류 기준입니다. 상단바·하단바는 실제 영역이 확인된 경우에만 포함됩니다.</p>
         {renderBranches(observedBranches(job.webStructure.nodes.map(node=>node.path)))}
         <p>웹 위치 미확인 기능 {rows.filter(row=>row.placementStatus==='UNASSIGNED').length}개는 별도 배치 검토 대상입니다.</p></details>}
@@ -84,7 +88,7 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready }: { submiss
         <label>LLM JSON 응답<textarea rows={5} value={external} onChange={event=>setExternal(event.target.value)} placeholder={'{"rows":[...]}'} /></label>
         <button type="button" disabled={busy||!external.trim()} onClick={()=>void action(async()=>{const parsed=JSON.parse(external);apply(await request(`${base}/${job.jobId}/import`,{method:'POST',body:JSON.stringify({revision:job.revision,rows:parsed.rows})}))})}>근거 검증 후 가져오기</button></details>}
       {rows.length>0&&<><p>{rows.length}개 기능 · {rows.filter(row=>row.included).length}개 포함{dirty?' · 저장하지 않은 변경이 있습니다':''}</p>
-        <div className="functional-menu-table-wrap"><table className="functional-menu-table"><thead><tr><th>포함</th><th>1depth</th><th>2depth</th><th>3depth</th><th>4depth</th><th>5depth 기능</th><th>메뉴 설명</th><th>위치·확인 상태·근거</th></tr></thead>
+        <details open><summary>기능 목록 편집 · {rows.length}개</summary><div className="functional-menu-table-wrap"><table className="functional-menu-table"><thead><tr><th>포함</th><th>1단계</th><th>2단계</th><th>3단계</th><th>4단계</th><th>5단계 기능</th><th>메뉴 설명</th><th>위치·확인 상태·근거</th></tr></thead>
           <tbody>{rows.map((row,index)=><tr key={row.rowId}><td><input type="checkbox" checked={row.included} disabled={busy||running} onChange={event=>update(index,{included:event.target.checked})}/></td><td>{job.productName}</td>
             {job.webStructure&&row.placementStatus==='UNASSIGNED'?<td colSpan={3}><select aria-label={`${index+1}행 웹 메뉴 배치`} disabled={busy||running} value={JSON.stringify(row.menuPath)} onChange={event=>{const path=JSON.parse(event.target.value);update(index,{menuPath:path,included:path.length>0})}}>
               <option value="[]">웹 위치 미확인 · 문서 검토 항목</option>{job.webStructure.nodes.filter(node=>node.path.length<=3).map(node=><option key={JSON.stringify(node.path)} value={JSON.stringify(node.path)}>{node.path.join(' / ')}</option>)}</select></td>:
@@ -93,7 +97,7 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready }: { submiss
             <td><textarea aria-label={`${index+1}행 메뉴 설명`} rows={3} value={row.menuDescription} maxLength={600} disabled={busy||running} onChange={event=>update(index,{menuDescription:event.target.value})}/></td>
             <td><select value={row.location} disabled={busy||running} onChange={event=>update(index,{location:event.target.value})}>{Object.entries(locations).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select>
               <small>{verification[row.verificationStatus]||row.verificationStatus}</small><small>{row.evidenceStatus==='VALID'?'근거 참조 정상 · ':''}{row.connectionStatus==='PROPOSED'?'의미적 연결 검토 필요':row.connectionStatus==='NOT_LINKED'?'화면 메뉴 연결 미확인':''}</small>{row.evidence.map((ref,i)=><button type="button" className="text-button" key={i} disabled={busy} onClick={()=>void action(()=>showEvidence(ref.sourceId))}>근거 {i+1}: {ref.quote.slice(0,24)}</button>)}
-              {row.reviewNotes.map((note,i)=><small key={i}>{note}</small>)}</td></tr>)}</tbody></table></div>
+              {row.reviewNotes.map((note,i)=><small key={i}>{note}</small>)}</td></tr>)}</tbody></table></div></details>
         <div className="dialog-actions"><button type="button" disabled={busy||running||job.stale||!dirty} onClick={()=>void action(()=>save(false))}>수정 초안 저장</button>
           <button type="button" className="primary-button" disabled={busy||running||job.stale||job.generationMode==='MOCK'||job.output?.completionStatus==='PARTIAL'} onClick={()=>void action(()=>save(true))}>포함한 기능을 검토 완료·승인</button>
           <button type="button" disabled={busy||running||dirty||job.stale||job.status!=='DRAFT'} onClick={()=>void action(()=>download(true))}>초안 Excel</button>

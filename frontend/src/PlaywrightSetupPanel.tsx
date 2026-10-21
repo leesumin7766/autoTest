@@ -114,14 +114,18 @@ export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, p
 
   return <section className="playwright-setup" aria-label="Playwright 실행 준비">
     <h2>Playwright 접속 · 로그인 확인</h2>
-    <p className="playwright-flow">URL 입력 <span>→</span> Test Connection <span>→</span> 로그인 테스트 <span>→</span> 화면 수집</p>
+    <p className="playwright-flow">주소 입력 <span>→</span> 연결 테스트 <span>→</span> 로그인 테스트 <span>→</span> 화면 수집</p>
     <p className="playwright-description">기본은 현재 서버에서 실행합니다. 제품에 다른 PC에서만 접근할 수 있을 때 원격 실행 옵션을 켜세요.</p>
     {!ready && <div className="playwright-gate" role="status"><strong>{preflight?.decision === 'BLOCKED'
       ? 'Jev 검증이 차단되었습니다. 문서를 확인하고 다시 검증해 주세요.' : 'Jev 문서 검증이 통과되면 준비 설정을 입력할 수 있습니다.'}</strong></div>}
     {ready && <>
       {preflight && <PreflightWarningDetails warnings={preflight.warnings} diagnostics={preflight.diagnostics} />}
       {!loaded && !error && <p role="status">저장된 설정을 확인하고 있습니다…</p>}
-      {loaded && <form className="playwright-setup-form" onSubmit={save}>
+      {loaded && <form className="playwright-setup-form" onSubmit={save} onInvalidCapture={event => {
+        let parent = event.target as HTMLElement | null
+        while (parent) { if (parent instanceof HTMLDetailsElement) parent.open = true; parent = parent.parentElement }
+      }}>
+        <details className="setup-section" open><summary>접속 주소 · 연결 테스트</summary>
         <fieldset disabled={saving || checking}>
           <legend>1. URL · 연결 테스트</legend>
           <label className="playwright-confirmation"><input type="checkbox" checked={mode === 'REMOTE'}
@@ -133,7 +137,7 @@ export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, p
           <label className="playwright-confirmation"><input type="checkbox" checked={setup.testEnvironmentConfirmed}
             onChange={event => update('testEnvironmentConfirmed', event.target.checked)} />접속·로그인·화면 수집 권한이 있는 테스트 환경과 계정입니다.</label>
           <div><button type="button" className="quiet-button" disabled={!setup.targetUrl.trim() || !setup.testEnvironmentConfirmed}
-            onClick={() => void runCheck('CONNECTION')}>Test Connection</button></div>
+            onClick={() => void runCheck('CONNECTION')}>연결 테스트</button></div>
           {report('CONNECTION')}
           <details className="playwright-advanced"><summary>제품·계정 정보 (선택)</summary>
           <div className="playwright-grid">
@@ -144,6 +148,8 @@ export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, p
           </div>
           </details>
         </fieldset>
+        </details>
+        <details className="setup-section"><summary>로그인 정보 · 로그인 테스트</summary>
         <fieldset disabled={saving || checking}>
           <legend>2. 로그인 정보 · 로그인 테스트</legend>
           <label>로그인 방식 <select value={setup.loginMethod} onChange={event => {
@@ -194,11 +200,14 @@ export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, p
             onChange={event => update('loginInstructions', event.target.value)} /></label>
           <small>비밀번호는 전용 입력란에만 입력하세요. 메모에 비밀번호·쿠키·토큰을 적지 마세요.</small>
         </fieldset>
+        </details>
+        <details className="setup-section"><summary>로딩 대기 시간</summary>
         <fieldset disabled={saving || checking}>
           <label>페이지 로딩 최대 대기 시간 (초)<input type="number" required min={1} max={60}
             value={config.pageLoadTimeoutSeconds} onChange={event => updateAutomation('pageLoadTimeoutSeconds', Number(event.target.value))} /></label>
           <small>기본 30초, 최대 60초. 각 화면에서 로딩을 기다리는 한도이며, 로딩이 끝나면 바로 수집합니다. 전체 수집 시간 한도는 별도입니다.</small>
         </fieldset>
+        </details>
         <details className="playwright-advanced"><summary>고급 설정 · 수집 범위와 테스트 데이터</summary>
         <fieldset disabled={saving || checking}>
           <legend>3. 수집할 화면 범위</legend>

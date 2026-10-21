@@ -110,7 +110,7 @@ export const RemoteCrawlPanel = forwardRef<BrowserExecutionHandle, Props>(functi
 
   return <section className="remote-crawl-panel" aria-label="원격 화면 수집">
     <h3>{mode === 'REMOTE' ? '원격 실행 옵션 · 화면 수집' : '화면 수집 시작'}</h3>
-    <p>{mode === 'REMOTE' ? '원격 실행 PC에서도 위의 Test Connection·로그인 테스트 버튼으로 같은 검사를 수행합니다.' : '현재 서버의 Playwright로 실행합니다. 별도 실행기 등록이나 설치가 필요하지 않습니다.'}</p>
+    <p>{mode === 'REMOTE' ? '원격 실행 PC에서도 위의 연결 테스트·로그인 테스트 버튼으로 같은 검사를 수행합니다.' : '현재 서버의 Playwright로 실행합니다. 별도 실행기 등록이나 설치가 필요하지 않습니다.'}</p>
     {mode === 'REMOTE' && <>
     <details className="playwright-advanced"><summary>실행 PC 최초 등록 · 설치 방법</summary>
       <p>대상 제품에 접속 가능한 PC(예: 210.96.71.205)에 실행기를 설치하세요. 해당 PC는 관리 서버(예: 210.96.71.206:8080)에 접속할 수 있어야 합니다.</p>
@@ -153,7 +153,7 @@ export const RemoteCrawlPanel = forwardRef<BrowserExecutionHandle, Props>(functi
         setView(await request(`${base}/${activeJob!.jobId}/cancel`, { method: 'POST' })); await refresh()
       })}>수집 중단</button>}
     </div>
-    <p className="playwright-description">수집은 메뉴와 화면 조회를 중심으로 진행합니다. 로그인 이후 데이터 입력·삭제·결제 폼을 제출하지 않습니다. 아래 통합 메뉴트리에서 기능리스트·매뉴얼과 함께 분석할 수 있습니다.</p>
+    <p className="playwright-description">수집은 메뉴와 화면 조회를 중심으로 진행합니다. 로그인 이후 데이터 입력·삭제·결제 폼을 제출하지 않습니다. 메뉴트리 화면에서 기능리스트·매뉴얼과 함께 분석할 수 있습니다.</p>
     {view.job && <p role="status">{view.job.agentName} · {({ QUEUED: '실행기 작업 수신 대기', RUNNING: '화면 수집 중', COMPLETED: '수집 완료', FAILED: '수집 실패', CANCELED: '수집 중단' })[view.job.status]}
       {' · '}{view.job.pageCount}개 화면{view.job.stopReason && ` · ${stopMessages[view.job.stopReason] || view.job.stopReason}`}</p>}
     {view.job?.errorCode && <p className="error-copy" role="alert">{browserCheckMessage(view.job.errorCode)}</p>}
@@ -163,12 +163,12 @@ export const RemoteCrawlPanel = forwardRef<BrowserExecutionHandle, Props>(functi
       <p className="error-copy" role="status">수집이 종료됐지만 전체 메뉴 확인은 완료되지 않았습니다. 실패·미방문 항목을 검토한 후 메뉴트리를 작성하세요.</p>}
     {view.job && view.pages.length > 0 && <CapturedMenuTreePanel key={view.job.jobId} base={base} jobId={view.job.jobId}
       memberId={memberId} busy={busy} showPage={showPage} />}
-    {view.pages.length > 0 && <ul className="crawl-page-list">{view.pages.map(page => <li key={page.pageIndex}>
+    {view.pages.length > 0 && <details><summary>수집한 화면 · 근거 보기 ({view.pages.length}개)</summary><ul className="crawl-page-list">{view.pages.map(page => <li key={page.pageIndex}>
       <button type="button" disabled={busy} onClick={() => void showPage(page)}>{page.pageIndex + 1}. {page.title || '제목 없음'} · 화면·근거 보기</button>
       <small>{page.transition?.menuPath?.join(' → ') || '시작 화면'} · {page.screenState?.readiness === 'LOAD_TIMEOUT' ? '로딩 미완료 · 진단 캡처'
         : page.transition?.outcome === 'NO_STATE_CHANGE' ? '클릭 후 변화 미확인'
         : page.screenState?.readiness === 'READY' ? '로딩 완료 확인' : '이전 수집 · 상태 근거 없음'}</small>
-      <small>{page.url}</small></li>)}</ul>}
+      <small>{page.url}</small></li>)}</ul></details>}
     {error && <p className="error-copy" role="alert">{error}</p>}
     <dialog ref={preview} className="crawl-preview"><h3>{pageTitle}</h3>
       <button type="button" className="quiet-button" onClick={() => preview.current?.close()}>닫기</button>
