@@ -1,0 +1,1155 @@
+{
+  "job": {
+    "jobId": "1880009a-c4a6-451e-b8dc-f45d63337a1e",
+    "status": "COMPLETED",
+    "agentName": "현재 서버",
+    "pageCount": 21,
+    "errorCode": null,
+    "stopReason": "DONE",
+    "purpose": "CRAWL",
+    "executionMode": "LOCAL",
+    "result": null,
+    "crawlResult": {
+      "skipped": [],
+      "noChangeCount": 0,
+      "incompleteCount": 0,
+      "uniqueScreenCount": 21,
+      "navigationFailureCount": 0
+    }
+  },
+  "checks": {
+    "CONNECTION": {
+      "jobId": "9674f71a-e554-4238-81a9-95ab4515114b",
+      "status": "COMPLETED",
+      "agentName": "현재 서버",
+      "pageCount": 0,
+      "errorCode": null,
+      "stopReason": null,
+      "purpose": "CONNECTION",
+      "executionMode": "LOCAL",
+      "result": {
+        "elapsedMs": 554,
+        "httpStatus": 200,
+        "loginVerified": false
+      },
+      "crawlResult": null
+    },
+    "LOGIN": {
+      "jobId": "0b801fb8-1532-41fe-929c-fe40b8712ff4",
+      "status": "COMPLETED",
+      "agentName": "현재 서버",
+      "pageCount": 0,
+      "errorCode": null,
+      "stopReason": null,
+      "purpose": "LOGIN",
+      "executionMode": "LOCAL",
+      "result": {
+        "elapsedMs": 2604,
+        "httpStatus": 200,
+        "loginVerified": true
+      },
+      "crawlResult": null
+    }
+  },
+  "pages": [
+    {
+      "pageIndex": 0,
+      "url": "https://210.96.71.204:9090/system",
+      "title": "Overview - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/system",
+            "title": "Overview - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Overview"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/system/index.html#/",
+            "title": "Overview",
+            "blockers": [],
+            "headings": [
+              "localhost"
+            ],
+            "selected": [],
+            "textLength": 722
+          }
+        ],
+        "waitedMs": 2687,
+        "readiness": "READY",
+        "screenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      },
+      "transition": {
+        "steps": [],
+        "menuKey": "",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/system",
+        "menuPath": [],
+        "sourcePageIndex": -1,
+        "sourceScreenKey": ""
+      }
+    },
+    {
+      "pageIndex": 1,
+      "url": "https://210.96.71.204:9090/system",
+      "title": "Overview - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/system",
+            "title": "Overview - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Overview"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/system/index.html#/",
+            "title": "Overview",
+            "blockers": [],
+            "headings": [
+              "localhost"
+            ],
+            "selected": [],
+            "textLength": 731
+          }
+        ],
+        "waitedMs": 1601,
+        "readiness": "READY",
+        "screenKey": "f2907e3a43832fc215836fec0bd824f497970d41695b0d1c91fc2ef7a1a67bac"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Overview",
+            "menuKey": "a53a34b98ef87ad3bcd03221fce347508153a37ea03d3a917287a4905cb4fcd1",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "a53a34b98ef87ad3bcd03221fce347508153a37ea03d3a917287a4905cb4fcd1",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/system",
+        "menuPath": [
+          "Global",
+          "System",
+          "Overview"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 2,
+      "url": "https://210.96.71.204:9090/system/logs",
+      "title": "Logs - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/system/logs",
+            "title": "Logs - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Logs"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/system/logs.html#/",
+            "title": "Journal",
+            "blockers": [],
+            "headings": [],
+            "selected": [],
+            "textLength": 1413
+          }
+        ],
+        "waitedMs": 1688,
+        "readiness": "READY",
+        "screenKey": "96bb530256c82143e2a6d2e9841296dd1b4adef972d969b0f4dd287a25aa6b4b"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Logs",
+            "menuKey": "32c85f1cc4f145c0d486d3fc354d8b2faa494ad36919ee3f1ee28efc7707ea57",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "32c85f1cc4f145c0d486d3fc354d8b2faa494ad36919ee3f1ee28efc7707ea57",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/system/logs",
+        "menuPath": [
+          "Global",
+          "System",
+          "Logs"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 3,
+      "url": "https://210.96.71.204:9090/storage",
+      "title": "Storage - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/storage",
+            "title": "Storage - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Storage"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/storage/index.html#/",
+            "title": "Storage",
+            "blockers": [],
+            "headings": [],
+            "selected": [],
+            "textLength": 781
+          }
+        ],
+        "waitedMs": 2199,
+        "readiness": "READY",
+        "screenKey": "331a392d3f8ae3264ddc675f32e5f39de21dfc4276283e36df4668bd0891cd73"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Storage",
+            "menuKey": "2ebb92ae559f8d15012d6484a05eee7b6a46d65c93994d6a652dd8db4af6868a",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "2ebb92ae559f8d15012d6484a05eee7b6a46d65c93994d6a652dd8db4af6868a",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/storage",
+        "menuPath": [
+          "Global",
+          "System",
+          "Storage"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 4,
+      "url": "https://210.96.71.204:9090/network",
+      "title": "Networking - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/network",
+            "title": "Networking - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Networking"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/network/index.html#/",
+            "title": "Networking",
+            "blockers": [],
+            "headings": [
+              "Firewall",
+              "Interfaces"
+            ],
+            "selected": [],
+            "textLength": 389
+          }
+        ],
+        "waitedMs": 3539,
+        "readiness": "READY",
+        "screenKey": "8426c6861c255e9802cb154b24090bbf0148cbe9bcd19f8f1e2b6d956a2da0bc"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Networking",
+            "menuKey": "c0135706c7ce0d098d5d1db522724359a5f91fea5929dc844d30ab3dbaef4afa",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "c0135706c7ce0d098d5d1db522724359a5f91fea5929dc844d30ab3dbaef4afa",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/network",
+        "menuPath": [
+          "Global",
+          "System",
+          "Networking"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 5,
+      "url": "https://210.96.71.204:9090/podman",
+      "title": "Podman containers - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/podman",
+            "title": "Podman containers - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Podman containers"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/podman/index.html#/",
+            "title": "Podman containers",
+            "blockers": [],
+            "headings": [
+              "Images",
+              "Containers"
+            ],
+            "selected": [],
+            "textLength": 111
+          }
+        ],
+        "waitedMs": 2165,
+        "readiness": "READY",
+        "screenKey": "07059cd86df387146b9a3438ef6aec8c8cbfee4f46ae6ce80d1123dcdcaea25f"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Podman containers",
+            "menuKey": "0380c9057944268ad870af89e1686a7fd5f7e694059e03ef7faf0ba29b5e7505",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "0380c9057944268ad870af89e1686a7fd5f7e694059e03ef7faf0ba29b5e7505",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/podman",
+        "menuPath": [
+          "Global",
+          "System",
+          "Podman containers"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 6,
+      "url": "https://210.96.71.204:9090/machines",
+      "title": "Virtual machines - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/machines",
+            "title": "Virtual machines - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Virtual machines"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/machines/index.html#/",
+            "title": "Virtual machines management",
+            "blockers": [],
+            "headings": [
+              "Virtual machines"
+            ],
+            "selected": [],
+            "textLength": 112
+          }
+        ],
+        "waitedMs": 2487,
+        "readiness": "READY",
+        "screenKey": "1c7dd0f85ca02576348023e8e9abfeced5cb8820351a06dc19d5506f72b61d27"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Virtual machines",
+            "menuKey": "3ee75804166da4f501199d85efd4878bf70c882f317bbe10e272b5c12e152306",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "3ee75804166da4f501199d85efd4878bf70c882f317bbe10e272b5c12e152306",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/machines",
+        "menuPath": [
+          "Global",
+          "System",
+          "Virtual machines"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 7,
+      "url": "https://210.96.71.204:9090/users",
+      "title": "Accounts - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/users",
+            "title": "Accounts - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Accounts"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/users/index.html#/",
+            "title": "Local accounts",
+            "blockers": [],
+            "headings": [
+              "Groups",
+              "Accounts"
+            ],
+            "selected": [],
+            "textLength": 1529
+          }
+        ],
+        "waitedMs": 2772,
+        "readiness": "READY",
+        "screenKey": "80781ff913bda499582606f9d38b1d07a9f1b8cb6224f8ed51c2e41ba73bde2a"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Accounts",
+            "menuKey": "3cee40b53b36196551be7e658acdae72454ed35c7012c2171dd42d00c54a2e17",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "3cee40b53b36196551be7e658acdae72454ed35c7012c2171dd42d00c54a2e17",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/users",
+        "menuPath": [
+          "Global",
+          "System",
+          "Accounts"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 8,
+      "url": "https://210.96.71.204:9090/system/services",
+      "title": "Services - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/system/services",
+            "title": "Services - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Services"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/",
+            "title": "Services",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Services"
+            ],
+            "textLength": 18193
+          }
+        ],
+        "waitedMs": 3249,
+        "readiness": "READY",
+        "screenKey": "404143669516f13bc2312b8ab1137633253a239587aeb35a84350eac6d98f440"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Services",
+            "menuKey": "8e76dd1006536391afa65f981eaf6c931f96637333af42c635e8a0bfe8e2d5ec",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "8e76dd1006536391afa65f981eaf6c931f96637333af42c635e8a0bfe8e2d5ec",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/system/services",
+        "menuPath": [
+          "Global",
+          "System",
+          "Services"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 9,
+      "url": "https://210.96.71.204:9090/apps",
+      "title": "Applications - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/apps",
+            "title": "Applications - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Applications"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/apps/index.html#/",
+            "title": "Applications",
+            "blockers": [],
+            "headings": [
+              "Applications"
+            ],
+            "selected": [],
+            "textLength": 405
+          }
+        ],
+        "waitedMs": 2139,
+        "readiness": "READY",
+        "screenKey": "837cf632efd7a94c620c0fb2b386e1796d6d5a06f3f2a1cf8a3714439ceafd2a"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Applications",
+            "menuKey": "3e4dc1b5d7d2d7f35fbfe64d546ec63731062ab61b2f2764f20327b1c32c8606",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "3e4dc1b5d7d2d7f35fbfe64d546ec63731062ab61b2f2764f20327b1c32c8606",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/apps",
+        "menuPath": [
+          "Global",
+          "Tools",
+          "Applications"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 10,
+      "url": "https://210.96.71.204:9090/sosreport",
+      "title": "Diagnostic reports - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/sosreport",
+            "title": "Diagnostic reports - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Diagnostic reports"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/sosreport/index.html#/",
+            "title": "Diagnostic reports",
+            "blockers": [],
+            "headings": [
+              "System diagnostics",
+              "Administrative access required"
+            ],
+            "selected": [],
+            "textLength": 143
+          }
+        ],
+        "waitedMs": 6182,
+        "readiness": "READY",
+        "screenKey": "aa1d45d43f537f8979fb8c7d157937f5301535e717922c902ada4c8b166b2e20"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Diagnostic reports",
+            "menuKey": "d3246368eee870250f1602832919bdd0767928f2c210d31fdd211eec5b6bc220",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "d3246368eee870250f1602832919bdd0767928f2c210d31fdd211eec5b6bc220",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/sosreport",
+        "menuPath": [
+          "Global",
+          "Tools",
+          "Diagnostic reports"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 11,
+      "url": "https://210.96.71.204:9090/kdump",
+      "title": "Kernel dump - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/kdump",
+            "title": "Kernel dump - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Kernel dump"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/kdump/index.html#/",
+            "title": "Kernel dump",
+            "blockers": [],
+            "headings": [
+              "Kernel crash dump"
+            ],
+            "selected": [],
+            "textLength": 115
+          }
+        ],
+        "waitedMs": 1676,
+        "readiness": "READY",
+        "screenKey": "08afe0bef68e65b5124dac953d98b93d57f41ec5285ded963c8bcc3c5b0daefc"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Kernel dump",
+            "menuKey": "db44513e7ac5122a8713dd1def600e6b5f02e2915d61454952391e752100e93f",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "db44513e7ac5122a8713dd1def600e6b5f02e2915d61454952391e752100e93f",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/kdump",
+        "menuPath": [
+          "Global",
+          "Tools",
+          "Kernel dump"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 12,
+      "url": "https://210.96.71.204:9090/selinux",
+      "title": "SELinux - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/selinux",
+            "title": "SELinux - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "SELinux"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/selinux/index.html#/",
+            "title": "SELinux troubleshoot",
+            "blockers": [],
+            "headings": [
+              "SELinux policy",
+              "System modifications",
+              "SELinux access control errors"
+            ],
+            "selected": [],
+            "textLength": 786
+          }
+        ],
+        "waitedMs": 1641,
+        "readiness": "READY",
+        "screenKey": "7c107c8fd3a88d064b2e1ecaf1840d59bd24843573b33b74e9b90d30e9631c83"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "SELinux",
+            "menuKey": "dcc68561ff7f182a4c0aaa841897ffba3a0e9eac4f4c5482341c6a707cc44851",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "dcc68561ff7f182a4c0aaa841897ffba3a0e9eac4f4c5482341c6a707cc44851",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/selinux",
+        "menuPath": [
+          "Global",
+          "Tools",
+          "SELinux"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 13,
+      "url": "https://210.96.71.204:9090/updates",
+      "title": "Software updates - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/updates",
+            "title": "Software updates - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Software updates"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/updates/index.html#/",
+            "title": "Software updates",
+            "blockers": [],
+            "headings": [
+              "Status",
+              "Settings",
+              "Available updates",
+              "Update history"
+            ],
+            "selected": [],
+            "textLength": 17400
+          }
+        ],
+        "waitedMs": 2810,
+        "readiness": "READY",
+        "screenKey": "436ab2d43dbb0af4a6f112475003b3d9cd9a171c93589616f12ee4d70987a525"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Software updates",
+            "menuKey": "35e5368f02c8bba9db4ed7e275a3a9ace2787b09b42d32b5f3ab56410dd555bc",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "35e5368f02c8bba9db4ed7e275a3a9ace2787b09b42d32b5f3ab56410dd555bc",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/updates",
+        "menuPath": [
+          "Global",
+          "Tools",
+          "Software updates"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 14,
+      "url": "https://210.96.71.204:9090/subscriptions",
+      "title": "Subscriptions - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/subscriptions",
+            "title": "Subscriptions - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Subscriptions"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/subscriptions/index.html#/",
+            "title": "Subscriptions",
+            "blockers": [],
+            "headings": [
+              "Access denied"
+            ],
+            "selected": [],
+            "textLength": 82
+          }
+        ],
+        "waitedMs": 1674,
+        "readiness": "READY",
+        "screenKey": "98a05c353dd25d1b046764f119f8199d7b6d1e2608e387576ad234ffb2c2bc72"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Subscriptions",
+            "menuKey": "7ac712aa814d6f827e75277f3469dec99f5afb6cc8c9a5adf5e42ce3e47be30c",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "7ac712aa814d6f827e75277f3469dec99f5afb6cc8c9a5adf5e42ce3e47be30c",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/subscriptions",
+        "menuPath": [
+          "Global",
+          "Tools",
+          "Subscriptions"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 15,
+      "url": "https://210.96.71.204:9090/system/terminal",
+      "title": "Terminal - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/system/terminal",
+            "title": "Terminal - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Terminal"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/system/terminal.html#/",
+            "title": "Terminal",
+            "blockers": [],
+            "headings": [],
+            "selected": [],
+            "textLength": 170
+          }
+        ],
+        "waitedMs": 2167,
+        "readiness": "READY",
+        "screenKey": "9b309b47fc20ae52f20394535d6a7942e13875b5659862b32b185b279271acc5"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Terminal",
+            "menuKey": "a27b6820178cc76b298c4006b162da998a9767f1834927fd69b562afa991dab6",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          }
+        ],
+        "menuKey": "a27b6820178cc76b298c4006b162da998a9767f1834927fd69b562afa991dab6",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/system/terminal",
+        "menuPath": [
+          "Global",
+          "Tools",
+          "Terminal"
+        ],
+        "sourcePageIndex": 0,
+        "sourceScreenKey": "58171de144de08c98a9d73406dc639c4f5896db645fdd73c7522a922b12186d9"
+      }
+    },
+    {
+      "pageIndex": 16,
+      "url": "https://210.96.71.204:9090/system/services#/",
+      "title": "Services - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/system/services#/",
+            "title": "Services - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Services"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/",
+            "title": "Services",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Services"
+            ],
+            "textLength": 18193
+          }
+        ],
+        "waitedMs": 1729,
+        "readiness": "READY",
+        "screenKey": "5c6c2cadcd8d6bd3ed0325c954a12c588e388410355bc9b0794f3260cf1c4032"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Services",
+            "menuKey": "8e76dd1006536391afa65f981eaf6c931f96637333af42c635e8a0bfe8e2d5ec",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          },
+          {
+            "label": "Services",
+            "menuKey": "fcc331dbb71cf0e6964423bdbf3738d850a1804f283a541d03d8d3afbefed94b",
+            "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+          }
+        ],
+        "menuKey": "fcc331dbb71cf0e6964423bdbf3738d850a1804f283a541d03d8d3afbefed94b",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/system/services#/",
+        "menuPath": [
+          "Global",
+          "System",
+          "Services",
+          "Local",
+          "Services"
+        ],
+        "sourcePageIndex": 8,
+        "sourceScreenKey": "404143669516f13bc2312b8ab1137633253a239587aeb35a84350eac6d98f440"
+      }
+    },
+    {
+      "pageIndex": 17,
+      "url": "https://210.96.71.204:9090/system/services#/",
+      "title": "Services - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/system/services#/",
+            "title": "Services - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Services"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/",
+            "title": "Services",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Targets"
+            ],
+            "textLength": 4908
+          }
+        ],
+        "waitedMs": 1659,
+        "readiness": "READY",
+        "screenKey": "9dc6f49d48f8b3d2f1acd23b43b861a56c2851646eb06bfdc1e95e286ae44372"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Services",
+            "menuKey": "8e76dd1006536391afa65f981eaf6c931f96637333af42c635e8a0bfe8e2d5ec",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          },
+          {
+            "label": "Targets",
+            "menuKey": "d9a6e197d03352da4679401fdc1e31bd59dcddba38bae1399a9dd91d444e0a7d",
+            "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+          }
+        ],
+        "menuKey": "d9a6e197d03352da4679401fdc1e31bd59dcddba38bae1399a9dd91d444e0a7d",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/system/services#/",
+        "menuPath": [
+          "Global",
+          "System",
+          "Services",
+          "Local",
+          "Targets"
+        ],
+        "sourcePageIndex": 8,
+        "sourceScreenKey": "404143669516f13bc2312b8ab1137633253a239587aeb35a84350eac6d98f440"
+      }
+    },
+    {
+      "pageIndex": 18,
+      "url": "https://210.96.71.204:9090/system/services#/",
+      "title": "Services - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/system/services#/",
+            "title": "Services - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Services"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/",
+            "title": "Services",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Sockets"
+            ],
+            "textLength": 5150
+          }
+        ],
+        "waitedMs": 1660,
+        "readiness": "READY",
+        "screenKey": "a4ae503463cc5d7675680fef6af33c826f51c29989e5098926b105dd795c5acb"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Services",
+            "menuKey": "8e76dd1006536391afa65f981eaf6c931f96637333af42c635e8a0bfe8e2d5ec",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          },
+          {
+            "label": "Sockets",
+            "menuKey": "0fe361730f3976624848afad313a0dcf79513c66164d01448f7227860f0d4367",
+            "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+          }
+        ],
+        "menuKey": "0fe361730f3976624848afad313a0dcf79513c66164d01448f7227860f0d4367",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/system/services#/",
+        "menuPath": [
+          "Global",
+          "System",
+          "Services",
+          "Local",
+          "Sockets"
+        ],
+        "sourcePageIndex": 8,
+        "sourceScreenKey": "404143669516f13bc2312b8ab1137633253a239587aeb35a84350eac6d98f440"
+      }
+    },
+    {
+      "pageIndex": 19,
+      "url": "https://210.96.71.204:9090/system/services#/",
+      "title": "Services - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/system/services#/",
+            "title": "Services - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Services"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/",
+            "title": "Services",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Timers"
+            ],
+            "textLength": 2112
+          }
+        ],
+        "waitedMs": 1632,
+        "readiness": "READY",
+        "screenKey": "15935e80fce15dedf5867b9787ad55d845c72de27168ab8f37fcaaff1d224753"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Services",
+            "menuKey": "8e76dd1006536391afa65f981eaf6c931f96637333af42c635e8a0bfe8e2d5ec",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          },
+          {
+            "label": "Timers",
+            "menuKey": "d63d9f44544a87f142ed613613c2bb46e5e573f2726157def516d5e4a2e81772",
+            "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+          }
+        ],
+        "menuKey": "d63d9f44544a87f142ed613613c2bb46e5e573f2726157def516d5e4a2e81772",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/system/services#/",
+        "menuPath": [
+          "Global",
+          "System",
+          "Services",
+          "Local",
+          "Timers"
+        ],
+        "sourcePageIndex": 8,
+        "sourceScreenKey": "404143669516f13bc2312b8ab1137633253a239587aeb35a84350eac6d98f440"
+      }
+    },
+    {
+      "pageIndex": 20,
+      "url": "https://210.96.71.204:9090/system/services#/",
+      "title": "Services - tta@localhost",
+      "screenState": {
+        "frames": [
+          {
+            "url": "https://210.96.71.204:9090/system/services#/",
+            "title": "Services - tta@localhost",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Services"
+            ],
+            "textLength": 270
+          },
+          {
+            "url": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/",
+            "title": "Services",
+            "blockers": [],
+            "headings": [],
+            "selected": [
+              "Paths"
+            ],
+            "textLength": 592
+          }
+        ],
+        "waitedMs": 1613,
+        "readiness": "READY",
+        "screenKey": "b4b107debd5f110c58d723f96483ac48f37b74a16adb046c074b16cca21062cf"
+      },
+      "transition": {
+        "steps": [
+          {
+            "label": "Services",
+            "menuKey": "8e76dd1006536391afa65f981eaf6c931f96637333af42c635e8a0bfe8e2d5ec",
+            "frameUrl": "https://210.96.71.204:9090/system"
+          },
+          {
+            "label": "Paths",
+            "menuKey": "6e35e32299e5297bf380e331cd9079dd5509f1d99685f45a5dc17d76f34d03da",
+            "frameUrl": "https://210.96.71.204:9090/cockpit/@localhost/system/services.html#/"
+          }
+        ],
+        "menuKey": "6e35e32299e5297bf380e331cd9079dd5509f1d99685f45a5dc17d76f34d03da",
+        "outcome": "CONFIRMED",
+        "finalUrl": "https://210.96.71.204:9090/system/services#/",
+        "menuPath": [
+          "Global",
+          "System",
+          "Services",
+          "Local",
+          "Paths"
+        ],
+        "sourcePageIndex": 8,
+        "sourceScreenKey": "404143669516f13bc2312b8ab1137633253a239587aeb35a84350eac6d98f440"
+      }
+    }
+  ]
+}

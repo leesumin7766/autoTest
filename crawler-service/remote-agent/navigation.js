@@ -23,40 +23,54 @@ async function navigation(page, policy) {
           return parts.join(' > ');
         };
         const entries = [], seen = new Set();
+        const finish = () => entries.sort((a,b)=>a._node===b._node?0:(a._node.compareDocumentPosition(b._node)&Node.DOCUMENT_POSITION_FOLLOWING)?-1:1)
+          .map(({_node,...item},order)=>({...item,order}));
         for (const root of document.querySelectorAll(selectors)) {
-          if (root.closest('.pagination,[data-slot="pagination"]') || /pagination|paging|페이지\s*(이동|네이션|번호)/i.test(root.getAttribute('aria-label') || '')) continue;
+          if (root.closest('.pagination,[data-slot="pagination"]') || /pagination|paging|breadcrumb|페이지\s*(이동|네이션|번호)|현재\s*위치/i.test(root.getAttribute('aria-label') || '')) continue;
           for (const node of root.querySelectorAll('a,button,[role="menuitem"],[role="tab"]')) {
             if (seen.has(node) || !visible(node) || !label(node) || node.getAttribute('aria-haspopup') === 'listbox') continue;
+            if (/^(collapse sidebar|expand sidebar|사이드바\s*(접기|펼치기))$/i.test(label(node))) continue;
             if (node.closest(selectors) !== root) continue;
             seen.add(node);
             const parents = [];
             for (let ancestor = node.parentElement; ancestor && ancestor !== root; ancestor = ancestor.parentElement) {
+              const heading = [...ancestor.children].find(child => child !== node && visible(child) &&
+                (child.matches('h2,h3,h4,[role="heading"]') || (child.matches('button') && child.nextElementSibling?.contains(node) &&
+                  (child.hasAttribute('aria-expanded') || child.nextElementSibling.matches('[role="group"],[role="menu"],ul') || Boolean(child.nextElementSibling.querySelector('a,[role="menuitem"]'))))));
+              if (heading && label(heading) && !parents.includes(label(heading))) parents.unshift(label(heading));
               if (ancestor.matches('section[aria-labelledby],[role="group"][aria-labelledby]')) {
                 const heading = document.getElementById(ancestor.getAttribute('aria-labelledby'));
-                if (heading && label(heading)) parents.unshift(label(heading));
+                if (heading && label(heading) && !parents.includes(label(heading))) parents.unshift(label(heading));
               } else if (ancestor.matches('li,[role="treeitem"]') && ownLabel(ancestor) !== node) {
-                const parent = ownLabel(ancestor); if (parent) parents.unshift(label(parent));
+                const parent = ownLabel(ancestor); if (parent && !parents.includes(label(parent))) parents.unshift(label(parent));
               }
             }
             const href = node.getAttribute('href');
-            const location = node.closest('header,[role="banner"],.ct-topnav-content') ? 'HEADER' : node.closest('footer,[role="contentinfo"]') ? 'FOOTER'
+            const header = node.closest('header,[role="banner"],.ct-topnav-content');
+            const footer = node.closest('footer,[role="contentinfo"]');
+            const bar = header && !header.closest('main,article,aside,.sidebar,#sidebar') ? 'HEADER'
+              : footer && !footer.closest('main,article,aside,.sidebar,#sidebar') ? 'FOOTER' : '';
+            const location = bar ? bar
               : node.closest('aside,.sidebar,#sidebar') || root.matches('nav,[role="navigation"],[role="menu"],[role="menubar"]') ? 'SIDEBAR' : 'CONTENT';
-            const group = node.hasAttribute('aria-expanded') && (node.getAttribute('aria-controls') || node.nextElementSibling?.matches('ul,[role="group"],[role="menu"]'));
+            const group = node.matches('button') && node.nextElementSibling &&
+              (node.nextElementSibling.matches('ul,[role="group"],[role="menu"]') || Boolean(node.nextElementSibling.querySelector('a,[role="menuitem"]')));
             const tab = node.getAttribute('role') === 'tab' || root.matches('[role="tablist"],.pf-m-subnav');
             const section = root.getAttribute('aria-label') || (tab ? '탭' : '메뉴');
             entries.push({ path: [section.slice(0, 160), ...parents, label(node)].slice(0, 12),
               url: href && href !== '#' ? node.href : '',
               kind: group && !['HEADER','FOOTER'].includes(location) ? 'GROUP' : tab ? 'TAB' : href && href !== '#' ? 'LINK' : 'BUTTON',
               selected: node.getAttribute('aria-selected') === 'true' || node.getAttribute('aria-current') === 'page',
-              location, canExplore: location !== 'HEADER' && !node.form && !root.matches('[role="toolbar"]') && !/administrat|elevat|superuser|권한|관리.*접근|collapse sidebar|expand sidebar|dark mode|light mode|theme|language|한국어|english|다크 모드|라이트 모드|테마|언어|사이드바/i.test(label(node)),
-              selector: selector(node), order: entries.length });
-            if (entries.length >= 500) return entries;
+              location, barConfirmed: Boolean(bar), hierarchyVersion: 2,
+              canExplore: location !== 'HEADER' && !node.form && !root.matches('[role="toolbar"]') && !/administrat|elevat|superuser|권한|관리.*접근|collapse sidebar|expand sidebar|dark mode|light mode|theme|language|한국어|english|다크 모드|라이트 모드|테마|언어|사이드바/i.test(label(node)),
+              selector: selector(node), order: entries.length, _node:node });
+            if (entries.length >= 500) return finish();
           }
         }
-        return entries;
+        return finish();
       });
       if (frame === page.mainFrame()) contextPath = items.find(item => item.selected && item.kind === 'LINK')?.path || [];
       for (const item of items) {
+        if (frame === page.mainFrame() && item.kind === 'TAB' && contextPath.length) item.path = [...contextPath,...item.path].slice(0,12);
         if (frame !== page.mainFrame() && contextPath.length) item.path = [...contextPath, ...item.path].slice(0, 12);
         if (item.path.some(part => dangerous.test(part))) item.canExplore = false;
         if (item.url) { try { if (!policy.page(item.url)) { item.canExplore = false; item.url = ''; } } catch { item.canExplore = false; item.url = ''; } }
@@ -97,7 +111,7 @@ async function expandNavigation(page, policy) {
     for (let index = 0; index < Math.min(await groups.count(), 20); index++) {
       const group = groups.nth(index);
       const safe = await group.evaluate(node => !node.form && !node.hasAttribute('aria-haspopup') &&
-        (node.nextElementSibling?.matches('ul,[role="group"],[role="menu"]') || document.getElementById(node.getAttribute('aria-controls'))?.matches('ul,[role="group"],[role="menu"]'))).catch(() => false);
+        (node.nextElementSibling?.matches('ul,[role="group"],[role="menu"]') || Boolean(node.nextElementSibling?.querySelector('a,[role="menuitem"]')) || document.getElementById(node.getAttribute('aria-controls'))?.matches('ul,[role="group"],[role="menu"]'))).catch(() => false);
       if (safe && await group.isVisible() && !dangerous.test(await group.innerText())) await group.click({ timeout: 1500 }).catch(() => {});
     }
   }

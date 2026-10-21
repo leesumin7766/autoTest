@@ -1,0 +1,146 @@
+[
+  {
+    "pageIndex": 0,
+    "url": "https://210.96.71.204:9090/system",
+    "title": "Overview - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 1,
+    "url": "https://210.96.71.204:9090/cockpit/@localhost/shell/index.html",
+    "title": "Overview - tta@localhost",
+    "textLength": 270,
+    "menuItems": 15,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 2,
+    "url": "https://210.96.71.204:9090/system/logs",
+    "title": "Logs - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 3,
+    "url": "https://210.96.71.204:9090/storage",
+    "title": "Storage - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 4,
+    "url": "https://210.96.71.204:9090/network",
+    "title": "Networking - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 5,
+    "url": "https://210.96.71.204:9090/podman",
+    "title": "Podman containers - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 6,
+    "url": "https://210.96.71.204:9090/machines",
+    "title": "Virtual machines - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 7,
+    "url": "https://210.96.71.204:9090/users",
+    "title": "Accounts - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 8,
+    "url": "https://210.96.71.204:9090/system/services",
+    "title": "Services - tta@localhost",
+    "textLength": 304,
+    "menuItems": 21,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 9,
+    "url": "https://210.96.71.204:9090/apps",
+    "title": "Applications - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 10,
+    "url": "https://210.96.71.204:9090/sosreport",
+    "title": "Diagnostic reports - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 11,
+    "url": "https://210.96.71.204:9090/kdump",
+    "title": "Kernel dump - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 12,
+    "url": "https://210.96.71.204:9090/selinux",
+    "title": "SELinux - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 13,
+    "url": "https://210.96.71.204:9090/updates",
+    "title": "Software updates - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 14,
+    "url": "https://210.96.71.204:9090/subscriptions",
+    "title": "Subscriptions - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  },
+  {
+    "pageIndex": 15,
+    "url": "https://210.96.71.204:9090/system/terminal",
+    "title": "Terminal - tta@localhost",
+    "textLength": 304,
+    "menuItems": 16,
+    "loadingText": false,
+    "errorText": false
+  }
+]

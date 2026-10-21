@@ -16,12 +16,33 @@ test('preferences remain observed and semantic menu replay survives DOM reorderi
     const policy = { origins: new Set(['https://fixture.example']), page: () => true };
     const nodes = await navigation(page, policy);
     assert.ok(!nodes.some(node=>node.path.at(-1)==='Next page'));
-    for (const label of ['Collapse sidebar','한국어','Dark Mode']) assert.equal(nodes.find(node=>node.path.at(-1)===label).canExplore,false);
+    assert.ok(!nodes.some(node=>node.path.at(-1)==='Collapse sidebar'));
+    for (const label of ['한국어','Dark Mode']) assert.equal(nodes.find(node=>node.path.at(-1)===label).canExplore,false);
     const details=nodes.find(node=>node.path.at(-1)==='Details');
     await page.locator('aside nav').evaluate(node=>node.prepend(document.createElement('button')));
     await clickNavigation(page,details._action,policy,Date.now()+5000);
     assert.equal(await page.locator('h1').innerText(),'Details loaded');
   } finally { await browser.close(); }
+});
+
+test('web groups retain their children and only real page bars are marked', async () => {
+  const browser=await chromium.launch({headless:true});
+  try{
+    const page=await browser.newPage();await page.route('https://fixture.example/**',route=>route.fulfill({body:'<html></html>',contentType:'text/html'}));await page.goto('https://fixture.example/');
+    await page.setContent('<header><button>검색</button></header><aside><nav><a href="/dashboard">대시보드</a><div><button aria-expanded="true">운영</button><div><a href="/live">실시간</a><a href="/logs">로그</a></div></div></nav><div><button>테마 전환</button><div><button>언어 전환</button></div></div></aside><main><header><button>화면 제목 버튼</button></header></main>');
+    const policy={origins:new Set(['https://fixture.example']),page:()=>true};
+    let nodes=await navigation(page,policy);
+    assert.ok(nodes.some(node=>node.kind==='GROUP'&&node.path.at(-1)==='운영'));
+    assert.ok(nodes.some(node=>node.path.join('/')==='메뉴/운영/실시간'));
+    assert.ok(nodes.find(node=>node.path.at(-1)==='검색').barConfirmed);
+    assert.equal(nodes.find(node=>node.path.at(-1)==='화면 제목 버튼').barConfirmed,false);
+    assert.equal(nodes.find(node=>node.path.at(-1)==='테마 전환').barConfirmed,false);
+    assert.ok(nodes.some(node=>node.path.join('/')==='메뉴/언어 전환'));
+    assert.ok(nodes.findIndex(node=>node.path.at(-1)==='대시보드')<nodes.findIndex(node=>node.path.at(-1)==='테마 전환'));
+    assert.ok(!nodes.some(node=>node.location==='FOOTER'));
+    await page.evaluate(()=>document.body.insertAdjacentHTML('beforeend','<footer><a href="/help">도움말</a></footer>'));
+    nodes=await navigation(page,policy);assert.ok(nodes.some(node=>node.location==='FOOTER'&&node.barConfirmed));
+  }finally{await browser.close();}
 });
 
 test('same-URL iframe tabs keep separate click evidence and await asynchronous content', { timeout: 90000 }, async () => {

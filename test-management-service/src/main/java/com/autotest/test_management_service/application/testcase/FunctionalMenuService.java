@@ -38,7 +38,7 @@ public class FunctionalMenuService {
         this.jdbc=jdbc;this.mapper=mapper;this.persistence=persistence;this.submissions=submissions;this.setups=setups;this.validator=validator;this.excel=excel;
         this.tx=new TransactionTemplate(manager);this.aiUrl=aiUrl;this.token=token;
     }
-    @EventListener(ApplicationReadyEvent.class) public void recover(){jdbc.update("UPDATE functional_menu_jobs SET status='FAILED',error_code='INTERRUPTED',updated_at=now() WHERE status='GENERATING'");}
+    @EventListener(ApplicationReadyEvent.class) public void recover(){jdbc.update("UPDATE functional_menu_jobs SET status=CASE WHEN output IS NULL THEN 'FAILED' ELSE 'DRAFT' END,output=CASE WHEN output IS NULL THEN NULL ELSE jsonb_set(output,'{completionStatus}','\"PARTIAL\"') END,error_code='INTERRUPTED',updated_at=now() WHERE status='GENERATING'");}
     @jakarta.annotation.PreDestroy public void close(){executor.shutdownNow();}
     private ProductDescriptionException error(HttpStatus status,String code,String text){return new ProductDescriptionException(status,code,text);}
     private void owner(UUID id,long member){var found=submissions.findById(SubmissionId.of(id)).orElseThrow(()->error(HttpStatus.NOT_FOUND,"SUBMISSION_NOT_FOUND","문서 세트를 찾을 수 없습니다."));if(found.memberId().value()!=member)throw error(HttpStatus.FORBIDDEN,"FORBIDDEN","이 문서 세트에 접근할 수 없습니다.");}
@@ -72,10 +72,10 @@ public class FunctionalMenuService {
             String readiness=parse(state).path("readiness").asText("UNVERIFIED");
             chunks(evidence,page.path("bodyText").asText(),mapper.createObjectNode().put("kind","SCREEN").put("pageIndex",index).put("url",page.path("url").asText()).put("readiness",readiness),"screen:"+index);
             for(JsonNode nav:page.path("navigation")){
-                if("GROUP".equals(nav.path("kind").asText()))continue;
                 String key=nav.path("menuKey").asText();if(key.isBlank() || !seen.add(key))continue;
-                ObjectNode item=mapper.createObjectNode().put("id","menu:"+key).put("kind","MENU").put("menuKey",key).put("pageIndex",index)
+                ObjectNode item=mapper.createObjectNode().put("id","menu:"+key).put("kind","GROUP".equals(nav.path("kind").asText())?"MENU_GROUP":"MENU").put("menuKey",key).put("pageIndex",index)
                         .put("url",nav.path("url").asText()).put("location",nav.path("location").asText("UNKNOWN")).put("readiness",readiness);
+                item.put("barConfirmed",nav.path("barConfirmed").asBoolean()).put("hierarchyVersion",nav.path("hierarchyVersion").asInt());
                 item.set("path",nav.path("path").deepCopy());item.put("text",String.join(" → ",mapper.convertValue(nav.path("path"),new com.fasterxml.jackson.core.type.TypeReference<List<String>>(){})));
                 located|=!"UNKNOWN".equals(item.path("location").asText());evidence.add(item);
             }
@@ -88,10 +88,14 @@ public class FunctionalMenuService {
                 if(!seen.add(key))continue;
                 var item=evidence.addObject().put("id","control:"+key).put("kind","CONTROL").put("menuKey",key).put("pageIndex",index).put("location",control.path("location").asText("CONTENT"))
                         .put("readiness",readiness).put("text",label);
-                var path=item.putArray("path");for(JsonNode part:page.path("transition").path("menuPath"))path.add(part.asText());path.add(label);
+                JsonNode parent=page.path("transition").path("menuPath");
+                if(!parent.isArray()||parent.isEmpty())for(JsonNode nav:page.path("navigation"))if(nav.path("selected").asBoolean()&&"LINK".equals(nav.path("kind").asText())){parent=nav.path("path");break;}
+                var path=item.putArray("path");for(JsonNode part:parent)path.add(part.asText());path.add(label);
             }
         }
-        if(!located)warnings.add("상단·하단 위치 정보가 없는 이전 수집입니다. 최신 실행기로 재수집하면 위치별 메뉴를 포함할 수 있습니다.");
+        input.set("webStructure",WebMenuStructure.build(mapper,evidence,product));
+        boolean hierarchy=false;for(JsonNode source:evidence)if(source.path("hierarchyVersion").asInt()>=2)hierarchy=true;
+        if(!hierarchy)warnings.add("이전 실행기의 수집입니다. 실제 메뉴 그룹·상단바·하단바 확인을 위해 최신 실행기로 재수집하세요. 없는 영역은 추정하지 않습니다.");
         warnings.add("메뉴·문서 연결과 메뉴 설명은 사용자 검토가 필요한 제안입니다. 클릭 확인은 기능의 합격 판정이 아닙니다.");
         if(evidence.size()>5000 || input.toString().getBytes(StandardCharsets.UTF_8).length>10*1024*1024)throw error(HttpStatus.UNPROCESSABLE_ENTITY,"MENU_INPUT_TOO_LARGE","입력 한도(5,000개 근거·10MiB)를 초과했습니다. 수집 범위를 조정하세요. 자료를 임의로 잘라내지 않았습니다.");
         return input;
@@ -112,15 +116,32 @@ public class FunctionalMenuService {
         if("AUTO".equals(mode)){
             var task=new FutureTask<Void>(()->{try{ObjectNode result=(ObjectNode)post("generate",request(job,input),Duration.ofMinutes(45));
                 if(!VERSION.equals(result.path("schemaVersion").asText())||!VERSION.equals(result.path("rulesVersion").asText())||!Set.of("REAL","MOCK").contains(result.path("generationMode").asText()))throw error(HttpStatus.BAD_GATEWAY,"MENU_RULE_VERSION_CHANGED","작성 규칙 버전 또는 생성 방식이 일치하지 않습니다.");
-                ArrayNode rows=validator.validate(ensureMenus(result.path("rows"),input),input,null);result.set("rows",rows);
+                validateGenerated(result,input);
                 jdbc.update("UPDATE functional_menu_jobs SET status='DRAFT',generation_mode=?,output=?::jsonb,revision=revision+1,updated_at=now() WHERE job_id=? AND status='GENERATING'",result.path("generationMode").asText(),result.toString(),job);
             }catch(Exception ex){String code=ex instanceof ProductDescriptionException p?p.code():"MENU_GENERATION_FAILED";
-                jdbc.update("UPDATE functional_menu_jobs SET status='FAILED',error_code=?,updated_at=now() WHERE job_id=? AND status='GENERATING'",code,job);
+                ObjectNode partial=checkpoint(job,input);
+                if(partial!=null){partial.put("completionStatus","PARTIAL");jdbc.update("UPDATE functional_menu_jobs SET status='DRAFT',generation_mode='REAL',output=?::jsonb,error_code=?,revision=revision+1,updated_at=now() WHERE job_id=? AND status='GENERATING'",partial.toString(),code,job);}
+                else jdbc.update("UPDATE functional_menu_jobs SET status=CASE WHEN output IS NULL THEN 'FAILED' ELSE 'DRAFT' END,error_code=?,updated_at=now() WHERE job_id=? AND status='GENERATING'",code,job);
             }finally{tasks.remove(job);}return null;});tasks.put(job,task);executor.execute(task);
         }
         return status(id,member,job);
     }
-    private ObjectNode request(UUID job,JsonNode input){ObjectNode body=mapper.createObjectNode().put("jobId",job.toString()).put("productName",input.path("productName").asText());body.set("evidence",input.path("evidence"));return body;}
+    private ObjectNode request(UUID job,JsonNode input){ObjectNode body=mapper.createObjectNode().put("jobId",job.toString()).put("productName",input.path("productName").asText());body.set("evidence",input.path("evidence"));if(input.has("webStructure"))body.set("webStructure",input.path("webStructure"));return body;}
+    private void validateGenerated(ObjectNode output,JsonNode input){
+        ArrayNode valid=mapper.createArrayNode();ArrayNode issues=output.path("issues").isArray()?(ArrayNode)output.path("issues").deepCopy():mapper.createArrayNode();int count=output.path("issueCount").asInt(issues.size());
+        for(JsonNode row:ensureMenus(output.path("rows"),input))try{valid.addAll(validator.validate(mapper.createArrayNode().add(row),input,null));}
+        catch(ProductDescriptionException rejected){count++;if(issues.size()<100)issues.add(mapper.createObjectNode().put("code",rejected.code()).set("proposedRow",row));}
+        output.set("rows",valid);output.set("issues",issues);output.put("issueCount",count);
+        if(count>0)output.put("completionStatus","PARTIAL");
+    }
+    private ObjectNode checkpoint(UUID job,JsonNode input){
+        if(Thread.currentThread().isInterrupted())return null;
+        try{var response=http.send(HttpRequest.newBuilder(URI.create(aiUrl+"/api/v1/functional-menus/checkpoint/"+job)).timeout(Duration.ofSeconds(5)).header("X-Internal-Token",token).GET().build(),HttpResponse.BodyHandlers.ofString());
+            if(response.statusCode()!=200)return null;ObjectNode value=(ObjectNode)parse(response.body());
+            if(!job.toString().equals(value.path("jobId").asText())||!VERSION.equals(value.path("rulesVersion").asText()))return null;
+            validateGenerated(value,input);return value;
+        }catch(Exception unavailable){return null;}
+    }
     private JsonNode post(String path,JsonNode body,Duration timeout){
         if(token.isBlank())throw error(HttpStatus.SERVICE_UNAVAILABLE,"INTERNAL_AUTH_NOT_CONFIGURED","생성 서비스 인증 설정이 없습니다.");
         try{var response=http.send(HttpRequest.newBuilder(URI.create(aiUrl+"/api/v1/functional-menus/"+path)).timeout(timeout).header("X-Internal-Token",token).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body.toString())).build(),HttpResponse.BodyHandlers.ofString());
@@ -133,11 +154,15 @@ public class FunctionalMenuService {
     private ArrayNode ensureMenus(JsonNode rows,JsonNode input){
         if(!rows.isArray())throw error(HttpStatus.BAD_REQUEST,"MENU_ROWS_INVALID","rows 배열이 필요합니다.");
         ArrayNode result=rows.deepCopy();Set<String> matched=new HashSet<>();for(JsonNode row:rows)for(JsonNode key:row.path("matchedMenuKeys"))matched.add(key.asText());
-        for(JsonNode source:input.path("evidence"))if(Set.of("MENU","CONTROL").contains(source.path("kind").asText())&&!matched.contains(source.path("menuKey").asText())){
+        boolean webFirst=input.has("webStructure");Set<String> occupied=new HashSet<>();
+        for(JsonNode source:input.path("evidence"))if(matched.contains(source.path("menuKey").asText())&&source.has("webPath"))occupied.add(source.path("webPath").toString());
+        for(JsonNode source:input.path("evidence"))if("MENU".equals(source.path("kind").asText())&&!matched.contains(source.path("menuKey").asText())){
+            if(webFirst && (!source.has("webPath") || source.path("webPath").isEmpty() || !occupied.add(source.path("webPath").toString())))continue;
             var path=new ArrayList<String>();for(JsonNode part:source.path("path"))if(!Set.of("Global","Local","메뉴","탭").contains(part.asText()))path.add(part.asText());
             String name=path.isEmpty()?source.path("text").asText():path.removeLast();
             var row=result.addObject().put("functionName",name).put("menuDescription",name+" 메뉴를 제공하는 기능").put("location",source.path("location").asText("UNKNOWN")).put("included","MENU".equals(source.path("kind").asText()));
             row.set("menuPath",mapper.valueToTree(path.stream().limit(3).toList()));row.putArray("matchedMenuKeys").add(source.path("menuKey").asText());
+            if(webFirst){row.set("menuPath",source.path("webPath").deepCopy());row.put("rowType","MENU_OBSERVATION");}
             row.putArray("evidence").addObject().put("sourceId",source.path("id").asText()).put("quote",source.path("text").asText().substring(0,Math.min(300,source.path("text").asText().length())));
             row.putArray("reviewNotes").add("실제 메뉴 존재 근거입니다. 세부 동작과 분류는 검토가 필요합니다.");
         }
@@ -162,6 +187,11 @@ public class FunctionalMenuService {
         JsonNode input=job.path("snapshot");job.set("warnings",input.path("warnings"));job.put("targetUrl",input.path("targetUrl").asText());
         var sources=job.putArray("sources");for(JsonNode source:input.path("evidence")){ObjectNode metadata=source.deepCopy();metadata.remove("text");sources.add(metadata);}
         if("GENERATING".equals(job.path("status").asText())){try{var progress=http.send(HttpRequest.newBuilder(URI.create(aiUrl+"/api/v1/functional-menus/progress/"+selected)).timeout(Duration.ofSeconds(2)).header("X-Internal-Token",token).GET().build(),HttpResponse.BodyHandlers.ofString());if(progress.statusCode()==200)job.set("progress",parse(progress.body()));}catch(Exception ignored){}}
+        if("GENERATING".equals(job.path("status").asText())){
+            ObjectNode saved=checkpoint(selected,job.path("snapshot"));
+            if(saved!=null){job.set("output",saved);jdbc.update("UPDATE functional_menu_jobs SET output=?::jsonb WHERE job_id=? AND status='GENERATING'",saved.toString(),selected);}
+        }
+        if(job.path("snapshot").has("webStructure"))job.set("webStructure",job.path("snapshot").path("webStructure"));
         job.remove(List.of("snapshot","documentDigest"));response.set("job",job);return response;
     }
     public JsonNode prompt(UUID id,long member,UUID job){var stored=stored(id,member,job);return post("prompt",request(job,stored.path("snapshot")),Duration.ofSeconds(30));}
@@ -176,6 +206,7 @@ public class FunctionalMenuService {
             if(!Set.of("DRAFT","APPROVED").contains(old.path("status").asText()))throw error(HttpStatus.CONFLICT,"MENU_NOT_READY","검토 가능한 초안이 없습니다.");
             setups.get(id,member);if(!digest(id).equals(old.path("documentDigest").asText()))throw error(HttpStatus.CONFLICT,"MENU_STALE","문서가 변경되어 다시 생성해야 합니다.");
             if(approve&&"MOCK".equals(old.path("generationMode").asText()))throw error(HttpStatus.CONFLICT,"MENU_MOCK_NOT_APPROVABLE","모의 결과는 최종 승인할 수 없습니다. 실제 생성 또는 외부 LLM 결과를 사용하세요.");
+            if(approve&&"PARTIAL".equals(old.path("output").path("completionStatus").asText()))throw error(HttpStatus.CONFLICT,"MENU_PARTIAL_NOT_APPROVABLE","미완료 구간이 있는 부분 초안입니다. 진단을 확인하고 전체 결과를 보완한 뒤 승인하세요.");
             ArrayNode valid=validator.validate(rows,old.path("snapshot"),old.path("output").path("rows"));
             if(approve&&java.util.stream.StreamSupport.stream(valid.spliterator(),false).noneMatch(row->row.path("included").asBoolean()))throw error(HttpStatus.BAD_REQUEST,"MENU_EMPTY","한 개 이상의 기능을 포함하세요.");
             ObjectNode output=old.path("output").deepCopy();output.set("rows",valid);

@@ -296,6 +296,10 @@ class PlaywrightSetupIntegrationTest {
         ((ObjectNode)row.path("evidence").get(0)).put("quote","도움말");
         var response=mapper.readTree(mvc.perform(post(endpoint+"/import").header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(imported.toString())).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         var edit=mapper.createObjectNode().put("revision",response.path("job").path("revision").asInt());edit.set("rows",response.path("job").path("output").path("rows"));
+        jdbc.update("UPDATE functional_menu_jobs SET output=jsonb_set(output,'{completionStatus}','\"PARTIAL\"') WHERE job_id=?",UUID.fromString(job));
+        mvc.perform(put(endpoint+"/approval").header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(edit.toString())).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("MENU_PARTIAL_NOT_APPROVABLE"));
+        mvc.perform(get(endpoint+"/download?draft=true").header("X-Member-Id",8101)).andExpect(status().isOk());
+        jdbc.update("UPDATE functional_menu_jobs SET output=jsonb_set(output,'{completionStatus}','\"COMPLETE\"') WHERE job_id=?",UUID.fromString(job));
         mvc.perform(put(endpoint+"/approval").header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(edit.toString())).andExpect(status().isOk()).andExpect(jsonPath("$.job.status").value("APPROVED"));
         mvc.perform(put(endpoint+"/draft").header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(edit.toString())).andExpect(status().isConflict());
         byte[] bytes=mvc.perform(get(endpoint+"/download").header("X-Member-Id",8101)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();

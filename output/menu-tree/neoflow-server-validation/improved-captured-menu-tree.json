@@ -1,0 +1,2147 @@
+{
+  "schemaVersion": "captured-menu-tree-v2",
+  "reviewRequired": true,
+  "source": "PLAYWRIGHT_DOM",
+  "nodes": [
+    {
+      "nodeId": "05a1a729-1fe7-3425-9bf8-15114aaf50c3",
+      "menuKey": "",
+      "title": "메뉴",
+      "kind": "GROUP",
+      "url": "",
+      "status": "GROUP",
+      "children": [
+        {
+          "nodeId": "f9a38f16-96e8-3e23-a454-d87b59908cba",
+          "menuKey": "c40dc106921aa6ce0a29d9f50dbd597ff863133cd68daaf37a1ccb88dea2f16a",
+          "title": "Collapse sidebar",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "20aef4c6-8dc4-34af-bf45-85b8f253fafd",
+          "menuKey": "b5dfb8674912ad6a3b5ab685c13c6abaa7e9183a370e60dfd5ff8fa65516276b",
+          "title": "Dark Mode",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "11e022a1-84e0-390c-9451-81d7d414fe2d",
+          "menuKey": "dfac83d7fe705e693f08bfac3e0ae0e7605e273ed734be9001efeab25d6112fc",
+          "title": "한국어",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "75eb44e3-049f-3887-ac46-9dedf4d326c1",
+          "menuKey": "8121ece7b9a29e53e85fdee583e6bd151abd5a9d144987656708f86d656f87b4",
+          "title": "A admin admin@neoflowsuite.com",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 13,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 17,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 18,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 1,
+              "screenKey": "acbb734032bce8554c71c78e7ca432776842481fcf850cfae2ee958412d371a7",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 1
+        },
+        {
+          "nodeId": "f59b306e-63fe-3503-a06f-466cdd132849",
+          "menuKey": "fe6d1fecb57c581bfe08d89a1eef58d924bc84c4cd754e2273f298d19f1eb316",
+          "title": "Dashboard",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/dashboard",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 2,
+              "screenKey": "d17e7aa601321154dff066a45d7ea33ce920db309827ba3afcd097a957c4c2d7",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 2
+        },
+        {
+          "nodeId": "962686ec-8bf9-3416-ba54-30581dbd310e",
+          "menuKey": "e4ec76d32d47c498e81c1e943b8470f524bc6bbc1ec350afce9a48cbb4e55c1b",
+          "title": "Jobs",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/jobs",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 3,
+              "screenKey": "a8bad8755d8010cf5d61f0ba07f0678885ebc3254a0adf4a1b73e232dd2737e6",
+              "url": "https://211.233.211.228/jobs",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 3
+        },
+        {
+          "nodeId": "9662b810-e8ed-3bc5-86df-c793747b77a2",
+          "menuKey": "063348c8b76261c0f7aff361b231928dc80d6581582c7a084b8e36e3069ffaa6",
+          "title": "Schedules",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/schedules",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 4,
+              "screenKey": "da85a4d8cbc6fcec726a647262a731fe19c3eacbe344b9f57506df1e3147f72f",
+              "url": "https://211.233.211.228/schedules",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 4
+        },
+        {
+          "nodeId": "2156fce5-570c-397d-8bcb-404bc28dd672",
+          "menuKey": "2cc2de7aced4763b622db6327b9de4d4f934996cc99a519b0df4320b87217391",
+          "title": "DAGs",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/dags",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 5,
+              "screenKey": "d9ce014b34a4d1a3e05bc4906b8c83a489a460b62e1ea4a8470150786728c5b6",
+              "url": "https://211.233.211.228/dags",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 5
+        },
+        {
+          "nodeId": "1569e1ec-b26c-3c0b-9390-da6d075f71b3",
+          "menuKey": "a99229877c1a0ecb3fa91a8c5482f73cde262bb6cb1a3af885cdd3c6d5d4599c",
+          "title": "Lineage",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/lineage",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 6,
+              "screenKey": "346b5a041d4e6f156d57eccdc16052a2dc93290a4599326e26aef46ed1135677",
+              "url": "https://211.233.211.228/lineage",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 6
+        },
+        {
+          "nodeId": "c1753f4e-54e7-34c1-8077-cbf344a0796b",
+          "menuKey": "18c4b0bc2b88c2a72c426597736b523d8ac0affd1efb1759180c999416503acc",
+          "title": "OPERATIONS",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 7,
+              "screenKey": "ec2bf282f1f2f464ba7ce4537f27b1c879206be6101172c3d920fb033ab867f7",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 7
+        },
+        {
+          "nodeId": "d1e64a5b-095a-3b74-9acd-f6050db38f30",
+          "menuKey": "3389ee59498e5af718c12f1c22fd0ec58ae479cc6d766e036952410417997e42",
+          "title": "Live",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/executions/live",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            },
+            {
+              "pageIndex": 13,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 8,
+              "screenKey": "e6d038a43af0e148be9f6edf10831a76fdb8b510a74271607b19ea34ea9fa912",
+              "url": "https://211.233.211.228/executions/live",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 8
+        },
+        {
+          "nodeId": "e691bd7c-5be6-3e16-9cac-6a755e488d1d",
+          "menuKey": "f9258e7c1486af52d9c44159b1248b06ed49e4b4e8c610a54012cef35c49bb6f",
+          "title": "Performance",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/performance",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            },
+            {
+              "pageIndex": 13,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 9,
+              "screenKey": "9bb7edc1e590439c69c6f142c093f97d4dbacdafa59fff34bb5ad07a554dbddf",
+              "url": "https://211.233.211.228/performance",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 9
+        },
+        {
+          "nodeId": "76381cb1-7031-3984-b266-4626ca6734da",
+          "menuKey": "adf1b7e27b009cc7cdfa001505207afb8a5c8fdd67976b936069b2212fd60a70",
+          "title": "Logs",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/logs",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            },
+            {
+              "pageIndex": 13,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 10,
+              "screenKey": "0b276ba6e6d73654ff0342d3b9daa38ccf1fc3ea7e12bbc3f347eab508b78825",
+              "url": "https://211.233.211.228/logs",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 10
+        },
+        {
+          "nodeId": "5b39f0d3-1d8c-3e35-b63e-a2a2082e88d3",
+          "menuKey": "64eeaac11a552294d0deb3ec258af20e444c776fe502fcb21f535405dc02db0e",
+          "title": "Login History",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/login-history",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            },
+            {
+              "pageIndex": 13,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 11,
+              "screenKey": "9324bc615ad56e77330be8a3535c2e9ca853d6c0c7749e42c1dc93e332d96112",
+              "url": "https://211.233.211.228/login-history",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 11
+        },
+        {
+          "nodeId": "8e94bd97-cb35-3f4b-a1de-22a438f62e8e",
+          "menuKey": "9654972cc03db2875bc3b4a32d769e43ad5830c453a74ba9de01be92e3d5544c",
+          "title": "Audit",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/audit",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            },
+            {
+              "pageIndex": 13,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 12,
+              "screenKey": "764ea909befd8ab90fbaf1c63f7d01f8f969913535c7f7ca6b342f0a7781f1ad",
+              "url": "https://211.233.211.228/audit",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 12
+        },
+        {
+          "nodeId": "50f4445c-2870-3fc4-9f4b-8bf4a9e774da",
+          "menuKey": "02d2ab74913762606e74d3d1ea0b8bb0a4ed7f1c597ad0a12f9e3b8481618591",
+          "title": "CONFIGURATION",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 13,
+              "screenKey": "ce87f4a747f34645ef83fda574599ff6647030628fa37647e31af79f5a07524d",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 13
+        },
+        {
+          "nodeId": "ee2ab062-6201-321f-89e8-076165265a82",
+          "menuKey": "f722a5d5386ffab35177841e6fb8a9cda0d47defcf08791161d36f078d3bd046",
+          "title": "Users",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/users",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 14,
+              "screenKey": "ef9512737de3e480c2fbbee093e133269a1b639f780006800d77092192fddd8b",
+              "url": "https://211.233.211.228/users",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 14
+        },
+        {
+          "nodeId": "a08bc118-f4d9-3705-9fad-58ba094329d5",
+          "menuKey": "0d0b188f59480dc0f3e3a72f2040c779e3c654830ce5192380b1d150c4c45d56",
+          "title": "Notifications",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/notifications",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 15,
+              "screenKey": "0acba66a9e7b1f05d43fb9bf54dbf18d1cfc5258946e8b874886161ccd721dc7",
+              "url": "https://211.233.211.228/notifications",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 15
+        },
+        {
+          "nodeId": "1d21af20-d301-3887-abd0-abc2460d1f80",
+          "menuKey": "b02b60d3de69dc6c75c65c0c9d0a6d1b548e228558c992f3e7b64ab0536583a3",
+          "title": "Alerts",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/alerts",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 16,
+              "screenKey": "c2ca9e030059f0370c2fb2d6e43286e7129deeb75721adb4aaf3fe2d983c5a8f",
+              "url": "https://211.233.211.228/alerts",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 16
+        },
+        {
+          "nodeId": "00d3e543-84d1-3f36-8a1c-dda212ea08d5",
+          "menuKey": "f473b11e2e0dbbe7f745a3ce51a882fae0bd2bdaabcee93af57b5af9df46fe3c",
+          "title": "Settings",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 17,
+              "screenKey": "e1674d1225919a62fcf403014c1aee9d52107da26049ecc542b0393be1eef30b",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 17
+        },
+        {
+          "nodeId": "edaa987f-a2fd-3658-ad85-d3aac7606a7c",
+          "menuKey": "7ecf8c89e3f6b78ee83361c931cd7faebeccf31c9348121ed3a48ab9064ffba5",
+          "title": "Search... ⌘ K",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "068335d1-f595-3d3f-bc54-f2ba30a089ab",
+          "menuKey": "43669dadf34943ad4d3c5342847d1301de1a41386f74f2485d1299cebb0da741",
+          "title": "187 notification(s)",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "23f6015d-a3d8-33e6-a136-cbc294fa876d",
+          "menuKey": "b869f1043a2d2869ccac4122772bc92de675847550876f2e01404844cf19c73f",
+          "title": "A admin admin@neoflowsuite.com",
+          "kind": "GROUP",
+          "url": "",
+          "status": "GROUP",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "1226ca27-3f7c-320d-925d-c5b327c7c1a0",
+          "menuKey": "f0bbcb4e6687aa43738b690f9992d89fe4216741f2613afc6889e1b6cf4b70b2",
+          "title": "Settings",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "86634ede-cbba-3194-afa5-8f1d47f7b5db",
+          "menuKey": "8f28a7f13dccde1d4359fedfc5303b9a78febebf8a78dba714f5b3a442af51bf",
+          "title": "Dark Mode",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "cff56c47-efc3-3363-bd9a-35406cdae8d5",
+          "menuKey": "b813e7bb36fec5664b158b0e81f9619bfab8658972cc17c9c589dc632ecae941",
+          "title": "한국어",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "aeb462a5-b4d1-35c9-a449-490e311da2c8",
+          "menuKey": "f13691ebae21a2f023fd3884a61b67feb2699cbabb2d2b3f86b52d50faaedb5a",
+          "title": "Log out",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 18,
+              "screenKey": "58c56e285556b7f680ea4fdfccefd4b5a5216d9aace658a6dbeafb79ed0ec4ef",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 18
+        },
+        {
+          "nodeId": "d971c1c0-886a-34e6-b3f5-ae9cba158b45",
+          "menuKey": "74e5d54c18b5727dbcfbd8e589f099388937ae9b00b80191c3b3581272c4a95b",
+          "title": "A admin admin@neoflowsuite.com",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/schedules"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/lineage"
+            },
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            },
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 10,
+              "frameUrl": "https://211.233.211.228/logs"
+            },
+            {
+              "pageIndex": 11,
+              "frameUrl": "https://211.233.211.228/login-history"
+            },
+            {
+              "pageIndex": 14,
+              "frameUrl": "https://211.233.211.228/users"
+            },
+            {
+              "pageIndex": 15,
+              "frameUrl": "https://211.233.211.228/notifications"
+            },
+            {
+              "pageIndex": 16,
+              "frameUrl": "https://211.233.211.228/alerts"
+            },
+            {
+              "pageIndex": 21,
+              "frameUrl": "https://211.233.211.228/performance"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 19,
+              "screenKey": "8e55d1e46170e2e31fcec55f9eda37654e785ee167b318c604cc68d1a03133ad",
+              "url": "https://211.233.211.228/schedules",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 19
+        },
+        {
+          "nodeId": "3df9d25f-ac9b-342b-800d-c5e1db76ce8d",
+          "menuKey": "71f1543e559571b8f8da55ba94e6b8fdd42248ab5e0ac6a0b9ca2e545665fd2e",
+          "title": "General",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/settings",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 17,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 24,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 25,
+              "frameUrl": "https://211.233.211.228/settings/global-properties"
+            },
+            {
+              "pageIndex": 26,
+              "frameUrl": "https://211.233.211.228/webhooks"
+            },
+            {
+              "pageIndex": 27,
+              "frameUrl": "https://211.233.211.228/tokens"
+            },
+            {
+              "pageIndex": 30,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 32,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 33,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 24,
+              "screenKey": "d7740ef8a8c1db8c19d8baa7ca4246a4dd8cf97449efcd62acebde70d2cfced6",
+              "url": "https://211.233.211.228/settings",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 24
+        },
+        {
+          "nodeId": "3dc2a44f-3336-31e6-9f55-c18e15b8e508",
+          "menuKey": "f5fa745f0a36f3bd0d432e5b40fcdc381cbb48b747ff297668524070eedeb663",
+          "title": "Global Properties",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/settings/global-properties",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 17,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 24,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 25,
+              "frameUrl": "https://211.233.211.228/settings/global-properties"
+            },
+            {
+              "pageIndex": 26,
+              "frameUrl": "https://211.233.211.228/webhooks"
+            },
+            {
+              "pageIndex": 27,
+              "frameUrl": "https://211.233.211.228/tokens"
+            },
+            {
+              "pageIndex": 30,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 32,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 33,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 25,
+              "screenKey": "baf036908913804bafc520202dc957353d92a2f390074eeee94769eb2f75c387",
+              "url": "https://211.233.211.228/settings/global-properties",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 25
+        },
+        {
+          "nodeId": "41aa8ab6-f1d9-33ad-bf35-cfbb1f501561",
+          "menuKey": "c11bf394872c9c7809380b3ba7a47cc06e46b63bc884a51ccda3c241128f8a0d",
+          "title": "Webhooks",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/webhooks",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 17,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 24,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 25,
+              "frameUrl": "https://211.233.211.228/settings/global-properties"
+            },
+            {
+              "pageIndex": 26,
+              "frameUrl": "https://211.233.211.228/webhooks"
+            },
+            {
+              "pageIndex": 27,
+              "frameUrl": "https://211.233.211.228/tokens"
+            },
+            {
+              "pageIndex": 30,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 32,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 33,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 26,
+              "screenKey": "d40e4b43f91c8916937263cc667a0be8a41dcd95b73c3637c1f68ea15f2e113d",
+              "url": "https://211.233.211.228/webhooks",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 26
+        },
+        {
+          "nodeId": "ceba6e36-43b7-3662-a1d6-6c1c25b660e6",
+          "menuKey": "28743200f04de854f7e3af0cb34d1f27265a309d5154448ec298cab9dc896453",
+          "title": "API Tokens",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/tokens",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 17,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 24,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 25,
+              "frameUrl": "https://211.233.211.228/settings/global-properties"
+            },
+            {
+              "pageIndex": 26,
+              "frameUrl": "https://211.233.211.228/webhooks"
+            },
+            {
+              "pageIndex": 27,
+              "frameUrl": "https://211.233.211.228/tokens"
+            },
+            {
+              "pageIndex": 30,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 32,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 33,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 27,
+              "screenKey": "1b99ccee0fb5c15fc10f1ffdc5c1464f08ec5695d806e1d5186b6068ecd9121e",
+              "url": "https://211.233.211.228/tokens",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 27
+        },
+        {
+          "nodeId": "3be84726-e57a-38e2-9d30-7e8d56e9e89c",
+          "menuKey": "57cfea92db6ff28152218a1f6c7b6356b6e3cfe22ab5720da329222dc386f255",
+          "title": "A admin admin@neoflowsuite.com",
+          "kind": "GROUP",
+          "url": "",
+          "status": "GROUP",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 19,
+              "frameUrl": "https://211.233.211.228/schedules"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "141dba3f-2003-374d-9211-ecb068838a5d",
+          "menuKey": "baf5898cef568727eb1d4b1f89271f856694c19b3b31e30703cccfe56729928c",
+          "title": "Settings",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 19,
+              "frameUrl": "https://211.233.211.228/schedules"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "b5c4cb13-9716-336f-b007-ce252581381a",
+          "menuKey": "b5c91990aba7e3b771e1b089b0de3ec9c9202f25c75fb0a8990dd638ed2998e4",
+          "title": "Dark Mode",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 19,
+              "frameUrl": "https://211.233.211.228/schedules"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "359b006e-6e0e-3806-b900-ccccdc8c6e78",
+          "menuKey": "9a61ae3d6c6721bfb5eabc5439f0218a7053276a166b697d9add9c4daa6f69d9",
+          "title": "한국어",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 19,
+              "frameUrl": "https://211.233.211.228/schedules"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "6729147e-f95c-35e4-89fb-42a124adb43a",
+          "menuKey": "be8a84cef70cfbf720c4007b9ab8452cef8d0b70e8945feb85c17d8aca81d033",
+          "title": "Log out",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 19,
+              "frameUrl": "https://211.233.211.228/schedules"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 28,
+              "screenKey": "da85a4d8cbc6fcec726a647262a731fe19c3eacbe344b9f57506df1e3147f72f",
+              "url": "https://211.233.211.228/schedules",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 28
+        },
+        {
+          "nodeId": "665cc077-d4ea-3b25-860c-e9c945febef6",
+          "menuKey": "c8c2ed71a3e18f3f8b86da563ffa29c6082555fa64462eba0e7cb9f656217fd2",
+          "title": "A admin admin@neoflowsuite.com",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 20,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 31,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 29,
+              "screenKey": "9d5bc0b724511d419bcb77152f4e680983d9ad4445ac76445576a637a2cdc86a",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 29
+        },
+        {
+          "nodeId": "9cfb9d93-8604-3ea0-a64f-9c45a6fd178b",
+          "menuKey": "0fb9b7ec49cd13bffd8ac12270150d93f33e9236be5b2be238e7fe36125f7ca2",
+          "title": "A admin admin@neoflowsuite.com",
+          "kind": "GROUP",
+          "url": "",
+          "status": "GROUP",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 29,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "dc9e2a19-90f7-31aa-a439-70f500fccd77",
+          "menuKey": "e08f1ca60810e7ae60d0657aa6411e3338912733cefc5a20567e723193853a49",
+          "title": "Settings",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 29,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "75b9e218-fd21-35aa-bda4-0f4f7f157f95",
+          "menuKey": "9348b38aea75a6bbf32b3c177418ae4214b65fcbebc9e527377c7e72476c7774",
+          "title": "Dark Mode",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 29,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "8dcba0e3-cbce-3360-8806-969e91709a35",
+          "menuKey": "70affbdffd02faa0a0426da82a7faed0ee44980205cb244da29df9ab45074dac",
+          "title": "한국어",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 29,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "99aef799-8f25-3bf3-8ad2-a8d1744f4aad",
+          "menuKey": "201faf25e582f5eb937620fffc564b308574609f0000e60903baab194d4a21c5",
+          "title": "Log out",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 29,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 31,
+              "screenKey": "aa0cf6ee3403dcd5bbf099792eed5daeaae5401e602500cbb5e00ba7ee90de6b",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 31
+        },
+        {
+          "nodeId": "e9a7eef6-a93b-34c6-aaab-3dbdc54315a5",
+          "menuKey": "97c6342ccf09f2914bbdb955d1c0e32fc402f3c1b271da1a4204c50c555a8cc9",
+          "title": "A admin admin@neoflowsuite.com",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 30,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 33,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 32,
+              "screenKey": "194bf74c682667b7caf0373d308b22286cda01357d08d0e4eac03aadbf990a4e",
+              "url": "https://211.233.211.228/settings",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 32
+        },
+        {
+          "nodeId": "56b6cabf-f36e-3fe0-86f7-a391430d75ab",
+          "menuKey": "b96085dbcc0c0aa56a53108e9ca86df31fd5bf6c68e6895245a0361af30d4329",
+          "title": "A admin admin@neoflowsuite.com",
+          "kind": "GROUP",
+          "url": "",
+          "status": "GROUP",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 32,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "9ab1a995-4d46-33fe-9e8c-0635f86a7f6b",
+          "menuKey": "14b459b79978a8d7302d76e8a5794099a87ad308e6780878aa619a71a18f1b7b",
+          "title": "Settings",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 32,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "b106dce4-86e5-331e-b307-59fc2e25bdd1",
+          "menuKey": "9cab68777b18ce76c18a3da34781c4e5c45329f52261736b315d03d912bc958e",
+          "title": "Dark Mode",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 32,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "dd751eb7-2e28-3d6b-8c22-7d5c1d573211",
+          "menuKey": "530c72f051f0b5dd2d3e5f2297dd82afa045c8c11647e2b9efa6d9960fd279fd",
+          "title": "한국어",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 32,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "3f605b89-c085-3855-b454-c4b6de723d3e",
+          "menuKey": "e06850716e8fa38b2b7cd596dba7c5f32e5af01fb16a20b73537f8c75c96b9f2",
+          "title": "Log out",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 32,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 33,
+              "screenKey": "d7740ef8a8c1db8c19d8baa7ca4246a4dd8cf97449efcd62acebde70d2cfced6",
+              "url": "https://211.233.211.228/settings",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 33
+        }
+      ],
+      "sources": [],
+      "screens": []
+    },
+    {
+      "nodeId": "3df289e6-5494-3555-a55c-b59615923300",
+      "menuKey": "",
+      "title": "Breadcrumb",
+      "kind": "GROUP",
+      "url": "",
+      "status": "GROUP",
+      "children": [
+        {
+          "nodeId": "83629f09-91aa-3489-bc2c-99e66e8fcd10",
+          "menuKey": "282209876a197bb6b72a4e9b751f7671deac63cc41dd0fe42c2af01794b8ce4f",
+          "title": "Executions",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/executions",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 8,
+              "frameUrl": "https://211.233.211.228/executions/live"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 20,
+              "screenKey": "c0c851f0e4744b1e94782ca3b951d5f958b92007fd523d6491f7ae5fdcbe4311",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 20
+        },
+        {
+          "nodeId": "c13c224d-769e-3834-900b-cad72beebaa3",
+          "menuKey": "726cd51e1e93162268439b31b5cb9760f8307015bc804dd0aab15eedd38b562e",
+          "title": "Settings",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/settings",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 25,
+              "frameUrl": "https://211.233.211.228/settings/global-properties"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 30,
+              "screenKey": "d7740ef8a8c1db8c19d8baa7ca4246a4dd8cf97449efcd62acebde70d2cfced6",
+              "url": "https://211.233.211.228/settings",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 30
+        }
+      ],
+      "sources": [],
+      "screens": []
+    },
+    {
+      "nodeId": "87039bda-d930-371c-85aa-8083e7e7a173",
+      "menuKey": "",
+      "title": "탭",
+      "kind": "GROUP",
+      "url": "",
+      "status": "GROUP",
+      "children": [
+        {
+          "nodeId": "717cc2bc-fc4f-3767-924a-3b83d55e021a",
+          "menuKey": "b92a8bb98dd4d7284168dae7e108fb825f790255a09c4c28b1602c57011d61e6",
+          "title": "Overview",
+          "kind": "TAB",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 21,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 22,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 23,
+              "frameUrl": "https://211.233.211.228/performance"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 21,
+              "screenKey": "b5a6b2f4fe57917c4058f2f62b617adb534fbab5e015de036381e255eda970c6",
+              "url": "https://211.233.211.228/performance",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 21
+        },
+        {
+          "nodeId": "ba518ba1-798f-3aaa-8ecc-5c558d0717e6",
+          "menuKey": "7887e24d7a21a1278d379ea40d8c7b9f402676f67d91bcff7a8f52abb771218c",
+          "title": "JVM & CPU",
+          "kind": "TAB",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 21,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 22,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 23,
+              "frameUrl": "https://211.233.211.228/performance"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 22,
+              "screenKey": "5d632187dfbc1ed8389289da88d826f10b77ac785212d7c5d2cbec031bbd9b7d",
+              "url": "https://211.233.211.228/performance",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 22
+        },
+        {
+          "nodeId": "df2f0c6e-f2da-31e9-9284-4a53bc6da64a",
+          "menuKey": "e9049a2950e5495e80d50b186c9a580a07b2907f38905bb1e44e00f8dabcd9bb",
+          "title": "Database",
+          "kind": "TAB",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 9,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 21,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 22,
+              "frameUrl": "https://211.233.211.228/performance"
+            },
+            {
+              "pageIndex": 23,
+              "frameUrl": "https://211.233.211.228/performance"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 23,
+              "screenKey": "a3e88c30215eda9dcf8fde1ce6281f0ac5f5b465c8d28a50f4aa87631d1e8dbc",
+              "url": "https://211.233.211.228/performance",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 23
+        }
+      ],
+      "sources": [],
+      "screens": []
+    }
+  ],
+  "nodeCount": 57,
+  "pagesWithNavigation": 31,
+  "truncated": false,
+  "pagesWithoutNavigation": 3,
+  "confirmedMenuCount": 33,
+  "incompleteMenuCount": 0,
+  "jobId": "26d8bfba-86e1-437e-8e4a-00ecb74388e0",
+  "crawlStatus": "COMPLETED"
+}

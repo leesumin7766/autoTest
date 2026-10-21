@@ -3,11 +3,54 @@ import os
 import unittest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from functional_menu import Request, baseline, validate_rows, prompt, generate, budget_segments, call_spec, request_size, AUTO_INSTRUCTIONS
+from functional_menu import Request, baseline, validate_rows, prompt, generate, budget_segments, call_spec, request_size, AUTO_INSTRUCTIONS, ground_proposal, checkpoint_path
+from tempfile import TemporaryDirectory
+from pathlib import Path
+from web_menu import structure, anchor
 from product_description.ollama_provider import OllamaLlmProvider
 from main import app
 
 class FunctionalMenuTest(unittest.TestCase):
+    def test_web_hierarchy_owns_groups_and_optional_bars(self):
+        evidence=[{'id':'live','kind':'MENU','menuKey':'live','path':['메뉴','운영','실시간'],'text':'운영 실시간','location':'SIDEBAR'},
+            {'id':'theme','kind':'MENU','menuKey':'theme','path':['메뉴','테마 전환'],'text':'테마 전환','location':'SIDEBAR'},
+            {'id':'search','kind':'MENU','menuKey':'search','path':['메뉴','검색'],'text':'검색','location':'HEADER','barConfirmed':True}]
+        tree=structure(evidence,'NeoFlow Server');paths=[node['path'] for node in tree['nodes']]
+        self.assertIn(['운영','실시간'],paths);self.assertIn(['테마 전환'],paths);self.assertIn(['상단바','검색'],paths)
+        self.assertFalse(any('하단바' in path for path in paths))
+        row=anchor({'menuPath':['Excel 1depth'],'matchedMenuKeys':['live'],'reviewNotes':[]},{s['id']:s for s in evidence})
+        self.assertEqual(row['menuPath'],['운영','실시간'])
+        unknown=anchor({'menuPath':['임의 그룹'],'matchedMenuKeys':[],'reviewNotes':[]},{})
+        self.assertFalse(unknown['included']);self.assertEqual(unknown['placementStatus'],'UNASSIGNED')
+    def test_selected_menu_gets_program_evidence_without_semantic_confirmation(self):
+        request=Request(jobId='grounding',productName='Example',evidence=self.sources)
+        allowed,spans,_,_=call_spec(request,self.sources[1],[self.sources[0]])
+        raw={key:value for key,value in self.row.items() if key!='evidence'}
+        raw['evidenceSpanIds']=[next(span['spanId'] for span in spans if span['sourceId']=='doc-a')]
+        result=ground_proposal(raw,allowed,spans,'doc-a')
+        self.assertEqual(result['matchedMenuKeys'],['a'])
+        self.assertEqual({ref['sourceId'] for ref in result['evidence']},{'menu-a','doc-a'})
+        self.assertTrue(any('검토 전' in note for note in result['reviewNotes']))
+        raw['matchedMenuKeys']=['invented-menu']
+        document_only=ground_proposal(raw,allowed,spans,'doc-a')
+        self.assertEqual(document_only['matchedMenuKeys'],[])
+        self.assertEqual([ref['sourceId'] for ref in document_only['evidence']],['doc-a'])
+
+    def test_invalid_row_does_not_discard_valid_rows_and_checkpoint(self):
+        class MixedModel(OllamaLlmProvider):
+            def __init__(self):pass
+            def input_budget_for(self,*args):return 100000
+            async def _call(self,instructions,payload,schema,num_predict=None):
+                row={'menuPath':[],'functionName':'서비스 조회','menuDescription':'서비스 목록을 조회하는 기능','location':'UNKNOWN','matchedMenuKeys':[],
+                    'evidenceSpanIds':[payload['sourceSpans'][0]['spanId']],'reviewNotes':[]}
+                return {'rows':[row,{**row,'evidenceSpanIds':['nonexistent-span']}]}
+        request=Request(jobId='partial-test',productName='Example',evidence=self.sources)
+        with TemporaryDirectory() as directory,patch('functional_menu.CHECKPOINT_ROOT',Path(directory)),patch('functional_menu.provider_from_env',return_value=MixedModel()):
+            result=asyncio.run(generate(request))
+            self.assertEqual(result['completionStatus'],'PARTIAL')
+            self.assertTrue(any(row['functionName']=='서비스 조회' for row in result['rows']))
+            self.assertEqual(result['issues'][0]['code'],'MENU_SPAN_ID_INVALID')
+            self.assertTrue(checkpoint_path(request.jobId).exists())
     def test_long_korean_sources_fit_model_budget_without_losing_text(self):
         text='작업의 스케줄을 조회하는 기능입니다.\n'*120
         source={'id':'doc:long-korean','kind':'DOCUMENT','role':'MANUAL','text':text}

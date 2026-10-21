@@ -1,0 +1,1487 @@
+{
+  "schemaVersion": "captured-menu-tree-v2",
+  "reviewRequired": true,
+  "source": "PLAYWRIGHT_DOM",
+  "nodes": [
+    {
+      "nodeId": "05a1a729-1fe7-3425-9bf8-15114aaf50c3",
+      "menuKey": "",
+      "title": "메뉴",
+      "kind": "GROUP",
+      "url": "",
+      "status": "GROUP",
+      "children": [
+        {
+          "nodeId": "f9a38f16-96e8-3e23-a454-d87b59908cba",
+          "menuKey": "c40dc106921aa6ce0a29d9f50dbd597ff863133cd68daaf37a1ccb88dea2f16a",
+          "title": "Collapse sidebar",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 1,
+              "screenKey": "22db89259c45bd6724df09ccd2ba71c4c768581663d4a876a791f36e342b0593",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 1
+        },
+        {
+          "nodeId": "20aef4c6-8dc4-34af-bf45-85b8f253fafd",
+          "menuKey": "b5dfb8674912ad6a3b5ab685c13c6abaa7e9183a370e60dfd5ff8fa65516276b",
+          "title": "Dark Mode",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 2,
+              "screenKey": "e6b4467c78eab26fe902c2e97519d42b53bb71f7c6b34c9a3236451020a57022",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 2
+        },
+        {
+          "nodeId": "11e022a1-84e0-390c-9451-81d7d414fe2d",
+          "menuKey": "dfac83d7fe705e693f08bfac3e0ae0e7605e273ed734be9001efeab25d6112fc",
+          "title": "한국어",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 3,
+              "screenKey": "ce13ada7c9bdf9a23abf32c172278b140383313a2a70d1e9a285dbc606c3e20b",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 3
+        },
+        {
+          "nodeId": "75eb44e3-049f-3887-ac46-9dedf4d326c1",
+          "menuKey": "8121ece7b9a29e53e85fdee583e6bd151abd5a9d144987656708f86d656f87b4",
+          "title": "A admin admin@neoflowsuite.com",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 4,
+              "screenKey": "70bce8b04788d76a18e9cc2fa816e526377ef16e47fd55d02b5ac1a9dafe5f2a",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 4
+        },
+        {
+          "nodeId": "f59b306e-63fe-3503-a06f-466cdd132849",
+          "menuKey": "fe6d1fecb57c581bfe08d89a1eef58d924bc84c4cd754e2273f298d19f1eb316",
+          "title": "Dashboard",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/dashboard",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "962686ec-8bf9-3416-ba54-30581dbd310e",
+          "menuKey": "e4ec76d32d47c498e81c1e943b8470f524bc6bbc1ec350afce9a48cbb4e55c1b",
+          "title": "Jobs",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/jobs",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "9662b810-e8ed-3bc5-86df-c793747b77a2",
+          "menuKey": "063348c8b76261c0f7aff361b231928dc80d6581582c7a084b8e36e3069ffaa6",
+          "title": "Schedules",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/schedules",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "2156fce5-570c-397d-8bcb-404bc28dd672",
+          "menuKey": "2cc2de7aced4763b622db6327b9de4d4f934996cc99a519b0df4320b87217391",
+          "title": "DAGs",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/dags",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "1569e1ec-b26c-3c0b-9390-da6d075f71b3",
+          "menuKey": "a99229877c1a0ecb3fa91a8c5482f73cde262bb6cb1a3af885cdd3c6d5d4599c",
+          "title": "Lineage",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/lineage",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "c1753f4e-54e7-34c1-8077-cbf344a0796b",
+          "menuKey": "18c4b0bc2b88c2a72c426597736b523d8ac0affd1efb1759180c999416503acc",
+          "title": "OPERATIONS",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "d1e64a5b-095a-3b74-9acd-f6050db38f30",
+          "menuKey": "3389ee59498e5af718c12f1c22fd0ec58ae479cc6d766e036952410417997e42",
+          "title": "Live",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/executions/live",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "e691bd7c-5be6-3e16-9cac-6a755e488d1d",
+          "menuKey": "f9258e7c1486af52d9c44159b1248b06ed49e4b4e8c610a54012cef35c49bb6f",
+          "title": "Performance",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/performance",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "76381cb1-7031-3984-b266-4626ca6734da",
+          "menuKey": "adf1b7e27b009cc7cdfa001505207afb8a5c8fdd67976b936069b2212fd60a70",
+          "title": "Logs",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/logs",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "5b39f0d3-1d8c-3e35-b63e-a2a2082e88d3",
+          "menuKey": "64eeaac11a552294d0deb3ec258af20e444c776fe502fcb21f535405dc02db0e",
+          "title": "Login History",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/login-history",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "8e94bd97-cb35-3f4b-a1de-22a438f62e8e",
+          "menuKey": "9654972cc03db2875bc3b4a32d769e43ad5830c453a74ba9de01be92e3d5544c",
+          "title": "Audit",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/audit",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "50f4445c-2870-3fc4-9f4b-8bf4a9e774da",
+          "menuKey": "02d2ab74913762606e74d3d1ea0b8bb0a4ed7f1c597ad0a12f9e3b8481618591",
+          "title": "CONFIGURATION",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "ee2ab062-6201-321f-89e8-076165265a82",
+          "menuKey": "f722a5d5386ffab35177841e6fb8a9cda0d47defcf08791161d36f078d3bd046",
+          "title": "Users",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/users",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "a08bc118-f4d9-3705-9fad-58ba094329d5",
+          "menuKey": "0d0b188f59480dc0f3e3a72f2040c779e3c654830ce5192380b1d150c4c45d56",
+          "title": "Notifications",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/notifications",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "1d21af20-d301-3887-abd0-abc2460d1f80",
+          "menuKey": "b02b60d3de69dc6c75c65c0c9d0a6d1b548e228558c992f3e7b64ab0536583a3",
+          "title": "Alerts",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/alerts",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "00d3e543-84d1-3f36-8a1c-dda212ea08d5",
+          "menuKey": "f473b11e2e0dbbe7f745a3ce51a882fae0bd2bdaabcee93af57b5af9df46fe3c",
+          "title": "Settings",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "edaa987f-a2fd-3658-ad85-d3aac7606a7c",
+          "menuKey": "7ecf8c89e3f6b78ee83361c931cd7faebeccf31c9348121ed3a48ab9064ffba5",
+          "title": "Search... ⌘ K",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "de6d545f-cbe2-3240-a3c3-0a658a66b6aa",
+          "menuKey": "b122a7509e889aff1be314d6df0968112100f489e11a7bc241ef17662512e84c",
+          "title": "185 notification(s)",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 0,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 7,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "d14a6f74-7c7f-3b32-be42-d6fb35bcc4ee",
+          "menuKey": "d2daa6175c301f1f34f9dff9e565196a716881d487f67758d08cbc178bce161c",
+          "title": "Expand sidebar",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "fc94f93d-d04d-3578-843c-23b2658e5cfe",
+          "menuKey": "3849a264303cfa2d863518920cd5e8bd2bc6d5981716a147b727b9f4243e6b32",
+          "title": "A",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 1,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "ec9a6e19-4735-3f91-8a0a-9b3a13cb6355",
+          "menuKey": "539e79c5c70e3cd2ac5cf5d00e2fef6f533f967135a287c82ed3067a8cbcaa02",
+          "title": "Light Mode",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 2,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "62d81f61-a7ba-3bda-92b7-176c99f23343",
+          "menuKey": "b49b2dccd3468e71ed4038b5e007fc94504936021dff2e59ef6089c385e736b9",
+          "title": "사이드바 접기",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "cba10e8d-7456-3472-a278-8959dbbdbfe8",
+          "menuKey": "7a2c95e265cb77f19214823e286ee4dd282f48fd056ec7fe18c74efaa0298dba",
+          "title": "라이트 모드",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "268f6013-0e1d-342b-ae63-a1b3fbd98684",
+          "menuKey": "5f2998543722321b3a4974476adf1174fc532b714537a8c7d79a08619a29b3da",
+          "title": "English",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "a0736b25-5ebe-3fad-a15f-d20946fa57eb",
+          "menuKey": "91df1cff3059c0c0cfe5393047b60e02dedd43629460fcc7b25e4198f0497a63",
+          "title": "대시보드",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/dashboard",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "7ce84827-22ee-369a-b0b1-d54a026f33bd",
+          "menuKey": "95ee58af621478121c58f6e021f4e5b8b50944f71b9b72453bdb14ecfd62c726",
+          "title": "작업",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/jobs",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "999e1611-c6e7-39aa-b5ef-1c4a7b2c5f05",
+          "menuKey": "f6c7ea4765cb2698015bd360f139c047218c4e98580bff4ab1435bc5173f3f92",
+          "title": "스케줄",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/schedules",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "74313ba0-d95e-3c61-bd87-8c696b2a4feb",
+          "menuKey": "56cb356c3355a443555f0565c8c3c85e380757819ed5695e39dcc4127194cd97",
+          "title": "DAG",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/dags",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "11960bbe-0e19-3140-bf1a-b235b4512f32",
+          "menuKey": "e19755d31564b6b5b484b5b3c6696e48bc17b0175781d3e46b4f3cab3e6646af",
+          "title": "데이터 리니지",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/lineage",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "0edf0595-19fb-3702-b037-1e7682b878ee",
+          "menuKey": "987da9d707d33cefaad76a75e8207e86c836d8d6b5940d1f408bed5e057b749c",
+          "title": "운영",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "a40bd9f4-1ee9-34f4-be2c-25547dc2f48c",
+          "menuKey": "33f4dcd0dcb8f1e41ca96a9f41545dfbff6d56deb26b7711bdf39d2811138962",
+          "title": "실시간",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/executions/live",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "5bc7a0c6-5fe0-31b7-b184-41ddb51705cf",
+          "menuKey": "0820c3eb6ccef6587fbb95eead02ed4b344f26a9eee34af4b0dabb5c74e7e6ff",
+          "title": "성능",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/performance",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "b920e1fb-070c-3ae5-af98-92138d603c3a",
+          "menuKey": "e60e06cd7a1a0e92f8ced35e61dff909f318bae7b98f15ea1d5e537c32945059",
+          "title": "로그",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/logs",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "88f4d992-0bf5-3284-a170-abb36400ef29",
+          "menuKey": "a9bfdfd86a84a29009ccc9394ed6e74f57f855655cae4eb30ebeb5a6549a54ca",
+          "title": "로그인 기록",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/login-history",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "6a906fde-25f9-3061-aacf-99d9b4eeabb1",
+          "menuKey": "69b5411347e389bc3030ab0165ac30d0c86254d9a0453b4261a4149ed2db3fc4",
+          "title": "감사",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/audit",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "cc453e19-ee49-31cd-b9d0-5326a8a9b83f",
+          "menuKey": "434039e35122f7cb58225691f500d40272fc9225b2570e3fdf1466fa683a08ed",
+          "title": "설정 관리",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "8c6b32b1-0d96-3265-87a6-02b9de4e1bef",
+          "menuKey": "e622f6a375b6592ae014cc271000931482a2f98223c74120d22a8717f9402510",
+          "title": "사용자 관리",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/users",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "2ab95d9e-4420-3e43-a2e3-82f12610ffdb",
+          "menuKey": "6e475f122fc50a0bf527f1a3af9753650673a88ff1a9aa284406b2b23514084f",
+          "title": "알림",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/notifications",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "b316ab1a-3e04-3744-96e0-e08d9394e28b",
+          "menuKey": "b5d3f14bd8256a08748470fa17132abf771c59c03328f699e72da061fd534054",
+          "title": "경고 규칙",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/alerts",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "fa1e6fa4-3c34-316d-b577-28ac730dd2eb",
+          "menuKey": "ed6bbfa921a863aa8cc4b2ccf560c47dc5ab3680a19c179d43736f2893c5908d",
+          "title": "설정",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "c1c597b4-8669-32b7-9816-de806804688d",
+          "menuKey": "509c0b5d5c067430c63b8aa9a97d0e665ca6e078152bfc231dd2251eb210abe1",
+          "title": "검색... ⌘ K",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "01f5a258-fb39-310b-846f-35fb65bf0b67",
+          "menuKey": "8f83846659ac1cffeb010ab8795c4800dfaa198637ce3c53b834c1d0d2c5e881",
+          "title": "알림 185개",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 3,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            },
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            },
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "23f6015d-a3d8-33e6-a136-cbc294fa876d",
+          "menuKey": "b869f1043a2d2869ccac4122772bc92de675847550876f2e01404844cf19c73f",
+          "title": "A admin admin@neoflowsuite.com",
+          "kind": "GROUP",
+          "url": "",
+          "status": "GROUP",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "0a29dfea-4603-3684-94d7-16942e31565f",
+          "menuKey": "5da6dabcf4a3ba50d62c5817c2fbb73246162bf0b1002042113a81cb748b1411",
+          "title": "설정",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 5,
+              "screenKey": "945c094225664968d85757a8f7af3060e4b9200449782ef8404e856dbda2a394",
+              "url": "https://211.233.211.228/settings",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 5
+        },
+        {
+          "nodeId": "e4d17483-a13e-317e-a78a-a9041726c6a6",
+          "menuKey": "6fb977b90867f580636375b0b3243ca97032692ab2a8298e35b59745329e79de",
+          "title": "라이트 모드",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 6,
+              "screenKey": "e4eb83f0f9b21de3c263897c04bc68fc542b1a70a4d3b4d97129dac2329d21a0",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 6
+        },
+        {
+          "nodeId": "153b3fa2-cd74-3f87-b12f-17094b3500dc",
+          "menuKey": "abc3166e97ebec6a93bd5feca8b8e3a99b38364f543a0cbf02386adfcd67504a",
+          "title": "English",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "CAPTURED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": [
+            {
+              "pageIndex": 7,
+              "screenKey": "2e86e23d709a0b0c8b423ecd4c0a787126e8a040d3bdecae9bb322dbab3bb7aa",
+              "url": "https://211.233.211.228/dashboard",
+              "status": "CAPTURED"
+            }
+          ],
+          "pageIndex": 7
+        },
+        {
+          "nodeId": "1cb8afb6-7c69-32ef-b6a7-ecc62247f36a",
+          "menuKey": "a65f798923a45980c1f7ea9fc3c11a6a546c407d541eba4146e5ac71ca210d56",
+          "title": "로그아웃",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 4,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "f632b1cb-52f9-308a-b39c-d52dd63b8fb4",
+          "menuKey": "6251285f08bf56561663fd96b6b9deeaf7f8a48060a4e89b84b3c40cc5e7d19b",
+          "title": "A admin admin@neoflowsuite.com",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "31431d21-9b50-30fb-9300-fb7aa1cb7a6f",
+          "menuKey": "004280669604e1ee05bce709a6605b016ee492bc6cc17c8f596a81a47cda7a6d",
+          "title": "일반",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/settings",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "479d58a9-c7b6-3d65-8945-4f853cf3f0cf",
+          "menuKey": "1234f5e99fcb4621e4a702d4375386c2d4ef258098602e0aa681b6c68846bc15",
+          "title": "공통 설정",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/settings/global-properties",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "532316bb-7007-3066-b339-9e891768ba6b",
+          "menuKey": "f70f30185cda7ff012443ca33e4c5e97740601c051e0c39b05bac570174854c3",
+          "title": "웹훅",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/webhooks",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "ffdfbdbf-bfa3-355e-b29d-aa67cbad72ba",
+          "menuKey": "e4cfb71a06e8b5aa54e276d4cfd56fd4d0606c3fbf917bb021c256ff547d646f",
+          "title": "API 토큰",
+          "kind": "LINK",
+          "url": "https://211.233.211.228/tokens",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 5,
+              "frameUrl": "https://211.233.211.228/settings"
+            }
+          ],
+          "screens": []
+        },
+        {
+          "nodeId": "62c70320-b06f-3a6d-b228-5676e0b2ef11",
+          "menuKey": "abde3004d7e147c93f82d8a5e77b746fee74955885fb855d5d86130eceb7eabc",
+          "title": "다크 모드",
+          "kind": "BUTTON",
+          "url": "",
+          "status": "UNVISITED",
+          "children": [],
+          "sources": [
+            {
+              "pageIndex": 6,
+              "frameUrl": "https://211.233.211.228/dashboard"
+            }
+          ],
+          "screens": []
+        }
+      ],
+      "sources": [],
+      "screens": []
+    }
+  ],
+  "nodeCount": 58,
+  "pagesWithNavigation": 8,
+  "truncated": false,
+  "pagesWithoutNavigation": 0,
+  "confirmedMenuCount": 7,
+  "incompleteMenuCount": 0,
+  "jobId": "f00875a9-9700-400e-968f-7f10f84a25c9",
+  "crawlStatus": "COMPLETED"
+}

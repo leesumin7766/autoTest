@@ -35,7 +35,21 @@ public class FunctionalMenuValidator {
             if(name.isBlank() || name.length()>160 || description.isBlank() || description.length()>600 || !description.endsWith("기능")) invalid("MENU_DESCRIPTION_INVALID","메뉴 설명은 600자 이내의 ~하는 기능 형식으로 작성하세요.");
             String location=raw.path("location").asText("UNKNOWN");
             if(!Set.of("HEADER","FOOTER","SIDEBAR","CONTENT","UNKNOWN").contains(location)) invalid("MENU_LOCATION_INVALID","메뉴 위치가 올바르지 않습니다.");
-            JsonNode evidence=basis.path("evidence"), keys=basis.path("matchedMenuKeys");
+            JsonNode evidence=basis.path("evidence"); JsonNode requestedKeys=basis.path("matchedMenuKeys");
+            ArrayNode keys=mapper.createArrayNode(), attached=mapper.createArrayNode();
+            if(evidence.isArray())evidence.forEach(ref->attached.add(ref.deepCopy()));
+            boolean disconnected=false,automatic=false;
+            if(requestedKeys.isArray()) for(JsonNode key:requestedKeys) {
+                JsonNode menu=sources.values().stream().filter(source->!source.path("menuKey").asText().isBlank() && source.path("menuKey").asText().equals(key.asText())).findFirst().orElse(null);
+                if(menu==null || keys.size()>=7){disconnected=true;continue;}
+                if(java.util.stream.StreamSupport.stream(keys.spliterator(),false).anyMatch(k->k.asText().equals(key.asText())))continue;
+                keys.add(key.asText());
+                if(java.util.stream.StreamSupport.stream(attached.spliterator(),false).noneMatch(ref->ref.path("sourceId").asText().equals(menu.path("id").asText()))) {
+                    String text=menu.path("text").asText();attached.add(mapper.createObjectNode().put("sourceId",menu.path("id").asText()).put("quote",text.substring(0,Math.min(240,text.length()))));automatic=true;
+                }
+            }
+            if(!requestedKeys.isArray())invalid("MENU_EVIDENCE_INVALID","메뉴 연결 목록이 필요합니다.");
+            evidence=attached;
             if(!evidence.isArray() || evidence.isEmpty() || evidence.size()>8 || !keys.isArray() || keys.size()>8) invalid("MENU_EVIDENCE_INVALID","각 기능에는 1~8개 원문 근거가 필요합니다.");
             Set<String> allowedKeys=new HashSet<>(); boolean document=false,screen=false,incomplete=false;
             ArrayNode verified=mapper.createArrayNode();
@@ -49,13 +63,32 @@ public class FunctionalMenuValidator {
                 verified.add(mapper.createObjectNode().put("sourceId",source.path("id").asText()).put("quote",quote));
             }
             for(JsonNode key:keys) if(!allowedKeys.contains(key.asText())) invalid("MENU_MATCH_EVIDENCE_INVALID","연결한 메뉴의 원문 근거가 필요합니다.");
+            boolean webFirst="web-first-v1".equals(snapshot.path("webStructure").path("version").asText());
+            boolean placed=!webFirst;boolean manual=false;
+            if(webFirst){
+                JsonNode deepest=mapper.createArrayNode();List<JsonNode> anchors=new ArrayList<>();
+                for(JsonNode key:keys)for(JsonNode source:sources.values())if(source.path("menuKey").asText().equals(key.asText())&&!source.path("webPath").isEmpty())anchors.add(source.path("webPath"));
+                for(JsonNode candidate:anchors)if(candidate.size()>deepest.size())deepest=candidate;
+                placed=!deepest.isEmpty()&&deepest.size()<=3;
+                for(JsonNode candidate:anchors)for(int i=0;i<candidate.size();i++)if(i>=deepest.size()||!candidate.get(i).equals(deepest.get(i)))placed=false;
+                if(placed)path=deepest.deepCopy();
+                else if(originals!=null && document && raw.path("included").asBoolean(false)){
+                    for(JsonNode node:snapshot.path("webStructure").path("nodes"))if(node.path("path").equals(path)&&path.size()<=3){placed=true;manual=true;break;}
+                }
+                if(!placed){path=mapper.createArrayNode();keys.removeAll();}
+            }
             ObjectNode row=mapper.createObjectNode().put("rowId",id).put("functionName",name).put("menuDescription",description)
-                    .put("location",location).put("included",raw.path("included").asBoolean(true)).put("reviewStatus","NEEDS_REVIEW")
-                    .put("verificationStatus",incomplete?"INCOMPLETE":document&&screen?"MATCH_PROPOSED":document?"DOCUMENT_ONLY":"SCREEN_OBSERVED");
+                    .put("location",location).put("included",placed&&raw.path("included").asBoolean(true)).put("reviewStatus","NEEDS_REVIEW")
+                    .put("verificationStatus",incomplete?"INCOMPLETE":document&&screen&&!keys.isEmpty()?"MATCH_PROPOSED":document?"DOCUMENT_ONLY":"SCREEN_OBSERVED");
+            row.put("evidenceStatus","VALID").put("connectionStatus",keys.isEmpty()?"NOT_LINKED":"PROPOSED");
+            if(webFirst)row.put("rowType",document?"FUNCTION":"MENU_OBSERVATION").put("placementStatus",!placed?"UNASSIGNED":manual?"MANUAL_PLACEMENT":"WEB_ANCHORED");
             row.set("menuPath",path.deepCopy());row.set("evidence",verified);row.set("matchedMenuKeys",keys.deepCopy());
             JsonNode notes=raw.path("reviewNotes");
             ArrayNode cleanNotes=mapper.createArrayNode();
             if(notes.isArray()) for(JsonNode note:notes) { if(cleanNotes.size()>=8 || note.asText().length()>500) invalid("MENU_NOTES_INVALID","검토 메모는 500자 이내, 최대 8개입니다."); cleanNotes.add(note.asText()); }
+            if(disconnected){if(cleanNotes.size()>=8)cleanNotes.remove(7);cleanNotes.add("화면 근거를 확인하지 못한 메뉴 연결을 해제했습니다. 문서 기준으로 검토하세요.");}
+            if(automatic){if(cleanNotes.size()>=8)cleanNotes.remove(7);cleanNotes.add("프로그램이 제공된 메뉴 근거를 첨부했습니다. 의미적 연결 확인은 검토 전입니다.");}
+            if(webFirst&&!placed){if(cleanNotes.size()>=8)cleanNotes.remove(7);cleanNotes.add("웹 메뉴에서 위치를 확인하지 못해 메뉴트리에서 제외했습니다. 별도 배치 검토가 필요합니다.");}
             row.set("reviewNotes",cleanNotes);result.add(row);
         }
         return result;
