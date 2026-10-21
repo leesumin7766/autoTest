@@ -1,0 +1,63 @@
+{
+  "sourceSha256": "0585229797048c3302a74b1048e66d1d45d9956ac0853144d5d0af03728feeb4",
+  "products": [
+    {
+      "sheet": "메뉴트리",
+      "features": 133,
+      "types": {
+        "로그인": 1,
+        "부가기능": 71,
+        "주요기능": 61
+      },
+      "testCases": 1283,
+      "missingDescriptionFeaturesPreserved": 0,
+      "allFeaturesCovered": true,
+      "allResultsBlank": true,
+      "excelAndJsonConsistent": true
+    },
+    {
+      "sheet": "메그메뉴트리의 사본",
+      "features": 86,
+      "types": {
+        "부가기능": 41,
+        "주요기능": 45
+      },
+      "testCases": 842,
+      "missingDescriptionFeaturesPreserved": 3,
+      "allFeaturesCovered": true,
+      "allResultsBlank": true,
+      "excelAndJsonConsistent": true
+    },
+    {
+      "sheet": "나일소프트-메뉴트리의 사본",
+      "features": 172,
+      "types": {
+        "로그인": 3,
+        "주요기능": 94,
+        "부가기능": 75
+      },
+      "testCases": 1670,
+      "missingDescriptionFeaturesPreserved": 0,
+      "allFeaturesCovered": true,
+      "allResultsBlank": true,
+      "excelAndJsonConsistent": true
+    },
+    {
+      "sheet": "메뉴트리-에잇바이트의 사본",
+      "features": 44,
+      "types": {
+        "로그인": 1,
+        "부가기능": 8,
+        "주요기능": 8,
+        "CRUD": 27
+      },
+      "testCases": 482,
+      "missingDescriptionFeaturesPreserved": 0,
+      "allFeaturesCovered": true,
+      "allResultsBlank": true,
+      "excelAndJsonConsistent": true
+    }
+  ],
+  "totalTestCases": 4277,
+  "passed": true
+}

@@ -119,7 +119,7 @@ const origin = process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173'
     assert.equal(await page.getByLabel('통합 메뉴트리 프롬프트').inputValue(), '검증용 외부 LLM 프롬프트')
     await page.getByLabel('LLM JSON 응답').fill(JSON.stringify({ rows: [{ ...row, functionName: '외부 응답 기능' }] }))
     await page.getByRole('button', { name: '근거 검증 후 가져오기' }).click()
-    await page.getByLabel('1행 기능명').waitFor()
+    await page.waitForFunction(() => document.querySelector('input[aria-label="1행 기능명"]')?.value === '외부 응답 기능')
     assert.equal(await page.getByLabel('1행 기능명').inputValue(), '외부 응답 기능')
     job = { ...job, output: { ...job.output, completionStatus: 'PARTIAL' } }
     await page.getByRole('button', { name: '수집 결과·작업 새로고침' }).click()
