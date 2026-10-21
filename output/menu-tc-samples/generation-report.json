@@ -1,0 +1,73 @@
+{
+  "sourceFile" : "menu sample.xlsx",
+  "sourceSha256" : "0585229797048c3302a74b1048e66d1d45d9956ac0853144d5d0af03728feeb4",
+  "templateVersion" : "menu-tc-v1",
+  "products" : [ {
+    "sheet" : "메뉴트리",
+    "features" : 133,
+    "testCases" : 1283,
+    "workbook" : "product-1.xlsx",
+    "json" : "product-1.json",
+    "classificationCounts" : {
+      "로그인" : 1,
+      "주요기능" : 61,
+      "부가기능" : 71,
+      "CRUD" : 0,
+      "commonCaseCount" : 68
+    },
+    "skippedRows" : [ {
+      "row" : 139,
+      "reason" : "빈 행·기능구분 없는 구조 행·구분 행"
+    } ],
+    "workbookSha256" : "20ce5d3265ee54be0199c8428c9c20f68db5bc1ba7eb8a91498de42b70408010",
+    "jsonSha256" : "0c8fd643f25015aa7da6f2b3f6ff3e1f6b5784d86ddd19ba6b3d1d3177827ce3"
+  }, {
+    "sheet" : "메그메뉴트리의 사본",
+    "features" : 86,
+    "testCases" : 842,
+    "workbook" : "product-2.xlsx",
+    "json" : "product-2.json",
+    "classificationCounts" : {
+      "로그인" : 0,
+      "주요기능" : 45,
+      "부가기능" : 41,
+      "CRUD" : 0,
+      "commonCaseCount" : 68
+    },
+    "skippedRows" : [ ],
+    "workbookSha256" : "356ef3baec6a7f54e0539f76c31751c7b79c2e39ace23ef473dc5747e379ca2d",
+    "jsonSha256" : "ff6085aa3a8240f61c4d1f217d13d0be6004a54940a779bf62192b461167dbe6"
+  }, {
+    "sheet" : "나일소프트-메뉴트리의 사본",
+    "features" : 172,
+    "testCases" : 1670,
+    "workbook" : "product-3.xlsx",
+    "json" : "product-3.json",
+    "classificationCounts" : {
+      "로그인" : 3,
+      "주요기능" : 94,
+      "부가기능" : 75,
+      "CRUD" : 0,
+      "commonCaseCount" : 68
+    },
+    "skippedRows" : [ ],
+    "workbookSha256" : "5b85efdd0a44b1410bf768b9dbd6bffcec94acc0333009bceb72cc2339f703af",
+    "jsonSha256" : "5a5ccf4f4746108c3b2864b650768fc1ef1d2175ad41d00b24db86bd2e9c5438"
+  }, {
+    "sheet" : "메뉴트리-에잇바이트의 사본",
+    "features" : 44,
+    "testCases" : 482,
+    "workbook" : "product-4.xlsx",
+    "json" : "product-4.json",
+    "classificationCounts" : {
+      "로그인" : 1,
+      "주요기능" : 8,
+      "부가기능" : 8,
+      "CRUD" : 27,
+      "commonCaseCount" : 68
+    },
+    "skippedRows" : [ ],
+    "workbookSha256" : "81e4cc7b837683155cc12c21392ae2cd277ab32538c2947f2e0a99f269f0a62f",
+    "jsonSha256" : "ff142081a9a2ae3f55ba83df833f0d9a5fbc2bb03751d30ae3d5c3175dc5fc3c"
+  } ]
+}

@@ -1,0 +1,1368 @@
+{
+  "version": "menu-tc-v1",
+  "origin": "사용자 제공 TC 예시의 시험 항목. 결과·제품별 계층·실제 결함은 가져오지 않음",
+  "groups": {
+    "LOGIN": [
+      {
+        "ruleId": "LOGIN-01",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "인증성",
+        "scenario": "사용자취급설명서에 기술된 인증 방법이 프로그램에 구현되어 있는지 확인",
+        "inputs": "로그인\nID/PW. 생체인증, PIN",
+        "expectedResult": "동일한 인증 방법으로 구현되어있음",
+        "defectExample": {
+          "summary": "생체인증 미제공",
+          "severity": "M",
+          "content": "사용자취급설명서에는 생체인증, ID/PW 인증이 제공된다고 기술되어 있지만, 프로그램에는 로그인 인증만 제공되어 불일치함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-02",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "아이디/비밀번호 정보가 접근통제되지않는 형식(예:txt)으로 제공되지 않고 접근통제 되는지 확인",
+        "inputs": "로그인",
+        "expectedResult": "아이디/비밀번호 정보가 접근통제됨",
+        "defectExample": {
+          "summary": "사용자 계정 정보 접근통제 오류",
+          "severity": "H",
+          "content": "아이디/비밀번호가 텍스트 파일로 저장되어, 비인가자가 해당 파일 열람을 통해 비밀번호 확인이 가능함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-03",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "보안을 필요로 하는 입력데이터(예: 비밀번호)가 특수문자(예: *)로 표시되는지 확인",
+        "inputs": "로그인",
+        "expectedResult": "보안을 필요로 하는 입력 데이터가 특수문자로 표시됨",
+        "defectExample": {
+          "summary": "비밀번호 입력값 표시 오류",
+          "severity": "H",
+          "content": "비밀번호 변경 시, 비밀번호가 특수문자(*)로 표시되지 않고, 평문(예: abc123)으로 표시됨"
+        }
+      },
+      {
+        "ruleId": "LOGIN-04",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "유효한 아이디/비밀번호로 로그인되는지 확인",
+        "inputs": "로그인",
+        "expectedResult": "유효한 아이디/비밀번호로 로그인되고 해당 권한에 해당하는 메뉴가 표시됨",
+        "defectExample": {
+          "summary": "로그인 오류",
+          "severity": "H",
+          "content": "유효한 관리자 계정 정보로 로그인 하였지만, 화면이 로그인 진행 중 상태로 표시되고 로그인되지 않음"
+        }
+      },
+      {
+        "ruleId": "LOGIN-05",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "유효하지 않은 아이디/비밀번호로 로그인되지 않는지 확인",
+        "inputs": "로그인",
+        "expectedResult": "로그인되지 않고 안내메시지가 표시됨",
+        "defectExample": {
+          "summary": "로그인 오류",
+          "severity": "H",
+          "content": "잘못된 비밀번호를 입력하여도 로그인이 가능함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-06",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "로그인되지 않은 상태에서 권한이 필요한 URL 주소 접근이 불가능한지 확인",
+        "inputs": "로그인",
+        "expectedResult": "권한이 필요한 URL 주소 접근이 불가능하고 로그인 유도 또는 안내메시지가 제공됨",
+        "defectExample": {
+          "summary": "접근통제 오류",
+          "severity": "H",
+          "content": "로그인 하지 않은 상태이지만, 웹 브라우저 주소창에 관리자 접속 URL 주소를 직접 입력하여 접속한 경우, 비인가자의 관리자 페이지 접근이 가능함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-07",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "보안설정 기능이 동작하는지 확인",
+        "inputs": "로그인",
+        "expectedResult": "보안설정값에 따라 동작함",
+        "defectExample": {
+          "summary": "보안설정 기능 오류",
+          "severity": "H",
+          "content": "접근 가능한 IP주소를 설정한 경우, 해당 IP 주소에서만 시험대상제품에 접속 가능하여야 하지만, 해당 IP주소에서 접속이 불가능하고, 허용되지 않은 IP주소에서 접속이 가능함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-08",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "권한별로 설정된 접근제어에 맞게 로그인되는지 확인",
+        "inputs": "로그인\n사용자 권한",
+        "expectedResult": "권한별로 접근제어에 맞게 로그인됨",
+        "defectExample": {
+          "summary": "권한별 기능 제공 오류",
+          "severity": "H",
+          "content": "[프로그램]\n최고 관리자 권한이 아닌 모니터링 관리자 권한으로 로그인한 경우, '정책 설정' 기능이 제공되지 않아야하지만 제공됨"
+        }
+      },
+      {
+        "ruleId": "LOGIN-09",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "관리자 아이디로 동시 로그인되는지 확인",
+        "inputs": "로그인\n관리자 동시 로그인 제공하는 경우",
+        "expectedResult": "관리자 아이디로 동시 로그인 됨",
+        "defectExample": {
+          "summary": "관리자 동시 접속 오류",
+          "severity": "M",
+          "content": "관리자 웹페이지에 접속 할 수 있는 관리자는 1명이지만, 2명이 동시 로그인이 가능함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-10",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "비밀번호가 암호화되어 전송되는지 확인",
+        "inputs": "로그인",
+        "expectedResult": "비밀번호가 평문으로 저장되지 않고 암호화되어 전송됨",
+        "defectExample": {
+          "summary": "암호화되지 않은 비밀번호 전송",
+          "severity": "H",
+          "content": "웹 브라우저에서 입력된 비밀번호가 암호화되지 않고 평문(예:abc)으로 전송되어 네트워크 패킷 분석 도구(와이어샤크 등)을 통해 비밀번호 조회가 가능함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-11",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "비밀번호가 암호화되어 저장되는지 확인",
+        "inputs": "로그인",
+        "expectedResult": "비밀번호가 평문으로 저장되지 않고 암호화되어 저장됨",
+        "defectExample": {
+          "summary": "암호화되지 않은 비밀번호 저장",
+          "severity": "H",
+          "content": "비밀번호가 암호화되지 않고 평문으로 저장됨\n국내 암호화 가이드라인에 따라 단방향 알고리즘(SHA-256, 512 등) 적용을 권장함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-12",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "비밀번호가 안전한 해시 알고리즘으로 암호화되는지 확인",
+        "inputs": "로그인",
+        "expectedResult": "비밀번호가  단방향 알고리즘(SHA-256, 512 등)으로 암호화됨",
+        "defectExample": {
+          "summary": "취약한 암호화 알고리즘 사용",
+          "severity": "H",
+          "content": "비밀번호가 보안에 취약한 암호화 알고리즘(MD5)을 사용하여 저장됨"
+        }
+      },
+      {
+        "ruleId": "LOGIN-13",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "비밀번호가 암호화되는지 확인",
+        "inputs": "로그인",
+        "expectedResult": "비밀번호가  단방향 알고리즘(SHA-256, 512 등)으로 암호화됨",
+        "defectExample": {
+          "summary": "잘못된 비밀번호 암호화",
+          "severity": "M",
+          "content": "사용자 비밀번호가 안전한 단방향 알고리즘(예: SHA-256)으로 암화화해야 하지만, 대칭키 알고리즘(AES-256)으로 잘못 암호화됨"
+        }
+      },
+      {
+        "ruleId": "LOGIN-14",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "비밀번호가 솔트 값(랜덤 데이터)을 적용하여 암호화되는지 확인\n**다른 계정 2개를 동일한 비밀번호로 변경하여 솔트값 적용여부 확인",
+        "inputs": "로그인",
+        "expectedResult": "솔트값을 적용하여 암호화됨",
+        "defectExample": {
+          "summary": "비밀번호 솔트 값(salt) 기능 미제공",
+          "severity": "M",
+          "content": "[프로그램]\n솔트 값(랜덤 데이터)없이 비밀번호가 단방향 암호화되어, 비밀번호 평문 추적이 가능함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-15",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "로그인 입력필드에 SQL문을 삽입하여 비인가자 로그인이 불가한지 확인\n\n[JSP 환경]\nid : ' and 1 = 1 --\npassword : null\n[PHP 환경]\nid : ' and 1 = 1 #\npassword : null",
+        "inputs": "로그인",
+        "expectedResult": "SQL입력으로 로그인이 불가함",
+        "defectExample": {
+          "summary": "SQL 입력 처리 오류",
+          "severity": "H",
+          "content": "비밀번호 입력필드에 SQL 문(예: ' OR '1' = '1)입력 시, 권한이 없는 사용자 ID로 로그인이 가능함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-16",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "책임성",
+        "scenario": "사용자 접속 이력이 로그(감사로그)로 기록되는지 확인\n**감사로그: 발생시각, 사용자 정보, 이벤트명, 이벤트 결과",
+        "inputs": "로그인",
+        "expectedResult": "사용자 접속 이력이 로그로 기록됨",
+        "defectExample": {
+          "summary": "사용자 감사 추적 오류",
+          "severity": "M",
+          "content": "사용자 로그인 등 중요 이벤트가 감사 로그에 기록되지 않음"
+        }
+      },
+      {
+        "ruleId": "LOGIN-17",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "인증성",
+        "scenario": "잘못된 계정정보(ID/PW)로 로그인 시도를 제한없이 할수 있는지 확인",
+        "inputs": "로그인",
+        "expectedResult": "반복된 인증시도 시, 해당 계정의 로그인이 제한됨",
+        "defectExample": {
+          "summary": "반복된\n 로그인 시도\n 제한 기능\n 미제공",
+          "severity": "M",
+          "content": "[프로그램]\n잘못된 비밀번호를 입력하여 로그인 시도를 5회 이상 반복 시 해당 로그인 계정이 잠기지 않음"
+        }
+      },
+      {
+        "ruleId": "LOGIN-18",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "인증성",
+        "scenario": "잘못된 계정정보(ID/PW)로 로그인 시도가 제한된 경우, 재접속해도 제한되는지 확인",
+        "inputs": "로그인",
+        "expectedResult": "해당 계정의 로그인이 제한됨",
+        "defectExample": {
+          "summary": "반복된 로그인 시도 제한 기능 오류",
+          "severity": "M",
+          "content": "잘못된 비밀번호를 입력하여 로그인 시도를 5회 이상 반복 시, 로그인 계정이 잠겼지만 재실행 후 로그인 시도가 가능함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-19",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "로그아웃 버튼 클릭 시 로그아웃되는지 확인",
+        "inputs": "로그아웃",
+        "expectedResult": "접속정보가 유지되지 않고 로그아웃됨",
+        "defectExample": {
+          "summary": "로그아웃 기능 오류",
+          "severity": "H",
+          "content": "로그아웃 기능이 정상 동작하지 않아, 로그인 상태로 항상 유지됨"
+        }
+      },
+      {
+        "ruleId": "LOGIN-20",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "세션타임아웃 기능이 동작함\n-중요기능 2~5분\n-위험도 낮은 경우 15~30분 설정",
+        "inputs": "세션타임아웃",
+        "expectedResult": "설정된 시간 이후 세션이 종료됨",
+        "defectExample": {
+          "summary": "세션타임아웃 기능 오류",
+          "severity": "M",
+          "content": "[프로그램]\n세션 타임아웃 기능이 설정된 시간 이후에도 동작하지 않음"
+        }
+      },
+      {
+        "ruleId": "LOGIN-21",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "인증성",
+        "scenario": "기본 비밀번호 변경을 요구하는지 확인",
+        "inputs": "기본 비밀번호 제공",
+        "expectedResult": "관리자 기본 비밀번호의 변경을 요구함",
+        "defectExample": {
+          "summary": "관리자 기본 비밀번호 변경 기능 미제공",
+          "severity": "M",
+          "content": "[프로그램]\n제품 설치 시 관리자 기본 비밀번호를 제공하는 제품으로, 비밀번호 보안을 위해 비밀번호 변경을 요구하지 않음"
+        }
+      },
+      {
+        "ruleId": "LOGIN-22",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "인증성",
+        "scenario": "국내 비밀번호 작성 가이드라인에 따르는 비밀번호 설정이 가능한지 확인 \n- 영대문자, 영소문자, 숫자, 특수문자 중 3종류/8자리 이상 구성",
+        "inputs": "비밀번호 ",
+        "expectedResult": "국내 비밀번호 작성 가이드라인에 따라 비밀번호가 설정됨",
+        "defectExample": {
+          "summary": "비밀번호 설정 기능 오류",
+          "severity": "M",
+          "content": "[프로그램]\n3자리 길이의 짧은 문자열로 비밀번호(예:111) 설정이 가능함\n국내 비밀번호 작성 가이드라인에 따라, 문자, 숫자, 특수문자 등의 조합으로 8자리 이상의 비밀번호 사용을 권장함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-23",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "인증성",
+        "scenario": "비밀번호를 변경하는 경우, 비밀번호/비밀번호 확인 입력필드에 상이한 값을 입력한 경우 변경되는지 확인",
+        "inputs": "비밀번호 ",
+        "expectedResult": "비밀번호/비밀번호 확인 입력필드에 상이한 값을 입력한 경우, 비밀번호가 변경되지 않음",
+        "defectExample": {
+          "summary": "비밀번호\n 확인 기능 오류",
+          "severity": "M",
+          "content": "비밀번호 입력필드와 비밀번호 확인 입력필드에 서로 다른 값을 입력하였지만 비밀번호 변경이 가능함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-24",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "인증성",
+        "scenario": "기존 비밀번호 확인 과정 없이 비밀번호 변경이 가능한지 확인",
+        "inputs": "비밀번호 ",
+        "expectedResult": "기존 비밀번호 확인 과정없이 비밀번호가 변경되지 않음",
+        "defectExample": {
+          "summary": "비밀번호\n 확인 기능 미제공",
+          "severity": "M",
+          "content": "[프로그램]\n기존 비밀번호 확인 과정 없이 비밀번호 변경이 가능함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-25",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "인증성",
+        "scenario": "개인정보 수정시, 재인증이 요구되는지 확인",
+        "inputs": "개인정보 수정",
+        "expectedResult": "재인증이 요구됨",
+        "defectExample": {
+          "summary": "개인정보\n 수정시\n 재인증 \n 절차 부재",
+          "severity": "M",
+          "content": "[프로그램]\n재인증 절차 없이 개인정보 수정(비밀번호, 연락처 등)이 가능함"
+        }
+      },
+      {
+        "ruleId": "LOGIN-26",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "로그에 중요정보(비밀번호, 고유식별번호, 개인정보 등)가 암호화되어 저장되는지 확인",
+        "inputs": "개인정보",
+        "expectedResult": "로그에 중요정보가 암호화되어 저장됨",
+        "defectExample": {
+          "summary": "암호화되지 않은 개인정보 저장",
+          "severity": "H",
+          "content": "사용자 접근 허용/차단 로그에서 사용자 개인정보(예: 주민번호)가 저장됨"
+        }
+      },
+      {
+        "ruleId": "LOGIN-27",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "개인정보가 암호화되어 저장되는지 확인",
+        "inputs": "개인정보",
+        "expectedResult": "개인정보가 평문으로 저장되지 않고 암호화되어 저장됨",
+        "defectExample": {
+          "summary": "암호화되지 않은 개인정보 저장",
+          "severity": "H",
+          "content": "사용자 정보가 암호화되지 않고 평문으로 저장됨"
+        }
+      }
+    ],
+    "FEATURE": [
+      {
+        "ruleId": "FEATURE-01",
+        "qualityCharacteristic": "기능적합성",
+        "subCharacteristic": "기능정확성",
+        "scenario": "부가 기능이 목적에 맞게 정상적으로 동작하는지 확인",
+        "inputs": "부가 기능 경우",
+        "expectedResult": "기능이 목적에 맞게 동작함",
+        "defectExample": {
+          "summary": "AAA\n기능 미제공",
+          "severity": "M",
+          "content": "[일반적인 상황에서는 기능이 정상 동작하지만, 데이터 및 특정 상황에서만 기능이 동작하지 않는 경우]\n'AAA' 기능이 동작하지 않음\n\n<시험절차>\n1. 'BBB' 메뉴를 클릭함\n2. 'CCC' 값을 입력 후, 'AAA' 기능을 수행함\n3. 오류 메시지가 발생하고 'AAA' 기능이 동작하지 않음"
+        }
+      },
+      {
+        "ruleId": "FEATURE-02",
+        "qualityCharacteristic": "사용성",
+        "subCharacteristic": "학습성",
+        "scenario": "안내메시지가 명확하게 제공하는지 확인",
+        "inputs": "안내메시지를 제공하는 경우",
+        "expectedResult": "안내메시지를 이해하기 쉽고 명확하게 제공함",
+        "defectExample": {
+          "summary": "명확하지 않은\n안내메시지\n제공",
+          "severity": "M",
+          "content": "[프로그램>AAA>BBB]\n사용이 불가한 버튼을 선택하는 경우, \"권한이 없습니다.\"라는 잘못된 안내메시지가 제공됨"
+        }
+      },
+      {
+        "ruleId": "FEATURE-03",
+        "qualityCharacteristic": "사용성",
+        "subCharacteristic": "운영성",
+        "scenario": "안내메시지가 기능 실행 목적과 동일하게 제공하는지 확인",
+        "inputs": "안내메시지를 제공하는 경우",
+        "expectedResult": "안내메시지를 실행 목적에 맞게 제공함",
+        "defectExample": {
+          "summary": "잘못된\n안내메시지\n제공",
+          "severity": "M",
+          "content": "[프로그램>AAA>BBB]\n사용이 불가한 버튼을 선택하는 경우, \"권한이 없습니다.\"라는 잘못된 안내메시지가 제공됨"
+        }
+      },
+      {
+        "ruleId": "FEATURE-04",
+        "qualityCharacteristic": "사용성",
+        "subCharacteristic": "운영성",
+        "scenario": "실행 상태 정보를 표시하는지 확인",
+        "inputs": "시간이 소요되는 기능",
+        "expectedResult": "실행 상태 정보를 표시함",
+        "defectExample": {
+          "summary": "진행 상태\n미표시",
+          "severity": "M",
+          "content": "[프로그램>AAA]\n진행 상태바가 제공되지 않아, 진행 상태를 알 수 없음"
+        }
+      },
+      {
+        "ruleId": "FEATURE-05",
+        "qualityCharacteristic": "사용성",
+        "subCharacteristic": "운영성",
+        "scenario": "실행 취소하는 경우, 취소되는지 확인",
+        "inputs": "취소",
+        "expectedResult": "실행이 취소되고 이전 상태로 표시됨",
+        "defectExample": {
+          "summary": "실행 취소 오류",
+          "severity": "M",
+          "content": "실행 취소되지 않음"
+        }
+      },
+      {
+        "ruleId": "FEATURE-06",
+        "qualityCharacteristic": "기능적합성",
+        "subCharacteristic": "기능정확성",
+        "scenario": "***업로드 기능을 제공하는 경우\n업로드 가능한 파일의 확장자와 크기, 최대 개수에 대한 정보가 제공되고 그에 따라 정상적으로 동작하는지 확인",
+        "inputs": "업로드",
+        "expectedResult": "업로드 제약에 따라 업로드를 제공함",
+        "defectExample": {
+          "summary": "업로드 기능 오류",
+          "severity": "M",
+          "content": "제약없이 업로드가 가능함"
+        }
+      },
+      {
+        "ruleId": "FEATURE-07",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "***업로드 기능을 제공하는 경우\n실행 가능한 스크립트 파일이 업로드되지 않는지 확인\n예: asp, jsp, php",
+        "inputs": "업로드",
+        "expectedResult": "스크립트 파일이 업로드 되지 않음",
+        "defectExample": {
+          "summary": "실행파일 업로드 방지 오류",
+          "severity": "H",
+          "content": "실행 가능한 스크립트 파일(예: asp, jsp, php) 업로드가 가능함"
+        }
+      },
+      {
+        "ruleId": "FEATURE-08",
+        "qualityCharacteristic": "기능적합성",
+        "subCharacteristic": "기능정확성",
+        "scenario": "***입력필드 제공하는 경우\n필수입력값에 대한 정보가 제공되고 정상적으로 동작하는지 확인",
+        "inputs": "입력필드 제공",
+        "expectedResult": "필수 입력값이 제공됨",
+        "defectExample": {
+          "summary": "필수입력사항 미제공",
+          "severity": "M",
+          "content": "[프로그램]\n필수입력값에 대한 정보가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "FEATURE-09",
+        "qualityCharacteristic": "기능적합성",
+        "subCharacteristic": "기능정확성",
+        "scenario": "***입력필드 제공하는 경우\n입력필드 제약사항에 대한 정보가 제공되고 정상적으로 동작하는지 확인\n(예: 숫자, 영문 **자 이상 등)",
+        "inputs": "입력필드 제공",
+        "expectedResult": "입력필드 제약사항에 따라 동작함",
+        "defectExample": {
+          "summary": "입력필드 오류",
+          "severity": "M",
+          "content": "[프로그램]\n입력필드 제약사항에 대한 정보가 제공되지 않고, 제약없이 입력됨\n(예: 숫자, 영문 **자 이상 등)"
+        }
+      }
+    ],
+    "COMMON": [
+      {
+        "ruleId": "COMMON-01",
+        "qualityCharacteristic": "기능적합성",
+        "subCharacteristic": "기능완전성",
+        "scenario": "사용자취급설명서에 기술된 기능이 프로그램에 구현되어 있는지 확인",
+        "inputs": "공통",
+        "expectedResult": "기능이 구현되어있음",
+        "defectExample": {
+          "summary": "AAA\n기능 미제공",
+          "severity": "M",
+          "content": "[프로그램]\n[사용자취급설명서]\n사용자취급설명서에는 'AAA'기능이 제공된다고 기술되어 있지만, 실제 프로그램에서는 'AAA' 기능이 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-02",
+        "qualityCharacteristic": "기능적합성",
+        "subCharacteristic": "기능적절성",
+        "scenario": "시험대상 범위 외의 기능이 불필요하게 제공하는 확인",
+        "inputs": "시험범위 외 기능이 제공되는 경우",
+        "expectedResult": "불필요한 기능을 제공하지 않음",
+        "defectExample": {
+          "summary": "불필요한\n기능 제공",
+          "severity": "M",
+          "content": "[프로그램]\n제품 범위에 해당하지 않는 기능('ZZZ')이 불필요하게 제공됨"
+        }
+      },
+      {
+        "ruleId": "COMMON-03",
+        "qualityCharacteristic": "사용성",
+        "subCharacteristic": "학습성",
+        "scenario": "프로그램에서 제공하는 기능에 대한 설명이 사용자취급설명서에 제공되는지 확인",
+        "inputs": "공통",
+        "expectedResult": "기능 정보를 정상적으로 제공됨",
+        "defectExample": {
+          "summary": "기능 정보\n미제공",
+          "severity": "M",
+          "content": "[사용자취급설명서]\n프로그램에서는 AAA 기능이 제공되지만, 사용자취급설명서에서는 해당 기능에 대한 설명이 제공되지 않음\n-\n-"
+        }
+      },
+      {
+        "ruleId": "COMMON-04",
+        "qualityCharacteristic": "사용성",
+        "subCharacteristic": "적절인식성",
+        "scenario": "기능의 사용 목적이 제공되는지 확인",
+        "inputs": "제품설명서",
+        "expectedResult": "주요 사용 목적이 제공됨",
+        "defectExample": {
+          "summary": "주요 사용\n목적 미제공",
+          "severity": "M",
+          "content": "[제품설명서]\n주요 사용 목적이 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-05",
+        "qualityCharacteristic": "사용성",
+        "subCharacteristic": "운영성",
+        "scenario": "메뉴명, 기능명 등 용어가 일관성 있게 사용하는지 확인\n**누구나 알수있는 용어의 경우 제외(예: 이름/성명, 수정/변경 등)",
+        "inputs": "공통",
+        "expectedResult": "메뉴명, 기능명을 일관적으로 사용함",
+        "defectExample": {
+          "summary": "비일관적인 기능명 사용",
+          "severity": "M",
+          "content": "[프로그램>AAA>BBB]\n[사용자취급설명서]\n메뉴명이 A, B 등과 같이 비일관적으로 사용됨"
+        }
+      },
+      {
+        "ruleId": "COMMON-06",
+        "qualityCharacteristic": "사용성",
+        "subCharacteristic": "운영성",
+        "scenario": "***기능 맞춤화 제공하는 경우\n기능 맞춤화 기능이 동작하는지 확인",
+        "inputs": "기능 활성화/비활성화",
+        "expectedResult": "기능 맞춤화 기능이 동작함",
+        "defectExample": {
+          "summary": "활성화 오류",
+          "severity": "M",
+          "content": "[프로그램>AAA>BBB]\nAAA 기능을 활성화하는 경우, 표시되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-07",
+        "qualityCharacteristic": "사용성",
+        "subCharacteristic": "운영성",
+        "scenario": "***인터페이스 맞춤화 제공하는 경우\n인터페이스 맞춤화 기능이 동작하는지 확인",
+        "inputs": "화면 재배치, 색상변경, 대시보드 구성 변경, 위젯 등",
+        "expectedResult": "인터페이스 맞춤화 기능이 사용자 조정에 따라 동작함",
+        "defectExample": {
+          "summary": "인터페이스\n조정 오류",
+          "severity": "M",
+          "content": "[프로그램>AAA>BBB]\n대시보드 위젯 추가 시, 추가된 위젯의 일부 글자가 잘려서 표시됨"
+        }
+      },
+      {
+        "ruleId": "COMMON-08",
+        "qualityCharacteristic": "사용성",
+        "subCharacteristic": "운영성",
+        "scenario": "***입력장치 제공하는 경우\n입력 장치를 지원하는지 확인",
+        "inputs": "입력 장치 있는 경우\n키보드, 마우스, IP카메라, 센서 등",
+        "expectedResult": "입력 장치를 지원함",
+        "defectExample": {
+          "summary": "입력장치\n미제공",
+          "severity": "M",
+          "content": "[프로그램>AAA]\n사용자취급설명서에는 IP카메라와 연동하여 실시간 영상 조회를 하는 것으로 기술되어 있지만, 시험대상제품에서는 IP카메라와 연동이 불가능함"
+        }
+      },
+      {
+        "ruleId": "COMMON-09",
+        "qualityCharacteristic": "사용성",
+        "subCharacteristic": "접근성",
+        "scenario": "***다국어 제공하는 경우\n다국어 변경 시 변경된 언어로 기능명, 메뉴명, 메시지 등이 제공되는지 확인",
+        "inputs": "다국어 지원",
+        "expectedResult": "변경된 언어로 제공됨",
+        "defectExample": {
+          "summary": "다국어 지원 오류",
+          "severity": "M",
+          "content": "[프로그램]\n지원 언어를 영어로 변경하였지만, 일부 메뉴가 한글로 표시됨"
+        }
+      },
+      {
+        "ruleId": "COMMON-10",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "무결성",
+        "scenario": "***업데이트 서버 제공하는 경우\n업데이트 서버에서 다운로드 받는 파일의 무결성 검사하는지 확인",
+        "inputs": "업데이트 서버 연동하는 경우",
+        "expectedResult": "업데이트 서버에서 다운받는 파일의 무결성을 검사함",
+        "defectExample": {
+          "summary": "업데이트 파일 무결성 검사 기능 미제공",
+          "severity": "H",
+          "content": "업데이트 서버로부터 설정 파일, 보안정책, 악성코드 탐지규칙 파일 등 다운로드 시, 파일의 무결성 검사를 수행하지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-11",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "부인방지성",
+        "scenario": "***전자문서 등제공하는 경우\n부인방지 기능이 제공되는지 확인",
+        "inputs": "부인방지성 기능\n전자문서, 결재, 간편인증, 송금 기능",
+        "expectedResult": "부인방지 기능이 제공됨",
+        "defectExample": {
+          "summary": "전자서명 기능 미제공",
+          "severity": "H",
+          "content": "결재 부인방지를 위한 전자서명 기능이 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-12",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "중요 데이터를 암호화하여 전송하는지 확인\nHTTPS 여부 확인",
+        "inputs": "웹 기반 제품",
+        "expectedResult": "중요 정보가 암호화하여 전송됨",
+        "defectExample": {
+          "summary": "중요정보 평문 전송",
+          "severity": "H",
+          "content": "웹 브라우저에서 입력된 비밀번호가 암호화되지 않는 프로토콜(http)를 통해 평문으로 서버에 전송되어 네트워크 패킷 분석도구(와이어샤크 등)을 통해 비밀번호 조회가 가능함"
+        }
+      },
+      {
+        "ruleId": "COMMON-13",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "응답헤더, 오류 페이지, 탭 제목 등에 \n내부 로직을 파악할 수 있는 정보가 제공되는지 확인",
+        "inputs": "웹 기반 제품",
+        "expectedResult": "내부 로직을 파악할 수 있는 정보가 제공되지 않음",
+        "defectExample": {
+          "summary": "내부로직 정보 표시",
+          "severity": "M",
+          "content": "응답 헤더 및 오류 페이지(403)에 내부 시스템 정보를 파악할 수 있는(예: nginx 1.18.0) 메시지가 출력됨"
+        }
+      },
+      {
+        "ruleId": "COMMON-14",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "보안이 취약하다고 알려진 라이브러리 및 프로그램을 사용하는지 확인",
+        "inputs": "웹 기반 제품\n(&invicti)",
+        "expectedResult": "보안이 취약하다고 알려진 라이브러리 및 프로그램을 사용하지 않음",
+        "defectExample": {
+          "summary": "구버전 소프트웨어 사용",
+          "severity": "M",
+          "content": "최신 버전의 소프트웨어를 사용하지 않음\n- 현재 버전:\n- 최신 버전: "
+        }
+      },
+      {
+        "ruleId": "COMMON-15",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "비밀번호가 쿼리로 전송되는지 확인",
+        "inputs": "웹 기반 제품\n(&invicti)",
+        "expectedResult": "전송되지 않음",
+        "defectExample": {
+          "summary": "비밀번호 쿼리 전송",
+          "severity": "M",
+          "content": "[프로그램]\n비밀번호가 쿼리 문자열을 통해 전송됨"
+        }
+      },
+      {
+        "ruleId": "COMMON-16",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "안전한 최신버전의 TLS를 사용하는지 확인",
+        "inputs": "웹 기반 제품\n(&invicti)",
+        "expectedResult": "안전한 버전을 사용함",
+        "defectExample": {
+          "summary": "안전하지 않은 TLS 1.0 사용",
+          "severity": "H",
+          "content": "최신버전의 TLS를 사용하지 않음\n\n<TTA>\n낮은 버전의 TLS  v1.0을 사용하고 있으며, TLS v1.2이상 사용을 권장함"
+        }
+      },
+      {
+        "ruleId": "COMMON-17",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "HSTS(HTTP Strict Transport Security) 옵션(Strict-Transport_x0002_Security)를 설정되어있는지 확인",
+        "inputs": "웹 기반 제품\n(&invicti)",
+        "expectedResult": "정상 설정됨",
+        "defectExample": {
+          "summary": "HSTS 보안 미설정",
+          "severity": "M",
+          "content": "[프로그램]\nHTTPS 채널을 제공하는 경우, 사용자 단말(브라우저)이 HTTPS 채널로의 접속을 강제화하기 위해 서버는 응답 헤더에 HSTS(HTTP Strict Transport Security) 옵션(Strict-Transport_x0002_Security)를 설정해야하지만 설정하지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-18",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "웹 브라우저가 HTTP를 통해 접근하는 경우, HTTPS로 리디렉션되는지 확인",
+        "inputs": "웹 기반 제품\n(&invicti)",
+        "expectedResult": "정상 리디렉션됨",
+        "defectExample": {
+          "summary": "HTTPS\n 리디렉션\n 오류",
+          "severity": "M",
+          "content": "[프로그램]\n 웹 브라우저가 HTTP를 통해 접근하는 경우, HTTPS로 리디렉션하지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-19",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "기밀성",
+        "scenario": "쿠키에 Secure 속성이 설정되어있는지 확인",
+        "inputs": "웹 기반 제품\n(&invicti)",
+        "expectedResult": "정상 설정됨",
+        "defectExample": {
+          "summary": "안전하지 않은 세션 쿠키",
+          "severity": "M",
+          "content": "쿠키에 Secure 속성이 설정되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-20",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "정보노출",
+        "scenario": "사용중인 소프트웨어 정보가 노출되는지 확인",
+        "inputs": "웹 기반 제품\n(&invicti)",
+        "expectedResult": "노출되지 않음",
+        "defectExample": {
+          "summary": "사용 소프트웨어 노출",
+          "severity": "M",
+          "content": "[프로그램]\n웹브라우저 탭에 톰캣 아이콘이 표시됨"
+        }
+      },
+      {
+        "ruleId": "COMMON-21",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "정보노출",
+        "scenario": "내부 서버 오류가 식별는지 확인\n\n 500 에러 화면 대신 제품에서 제공하는 오류 안내 페이지 제공 필요",
+        "inputs": "웹 기반 제품\n(&invicti)",
+        "expectedResult": "식별되지 않음",
+        "defectExample": {
+          "summary": "내부 서버 오류",
+          "severity": "M",
+          "content": "[프로그램]\n내부 서버 오류가 식별됨\n-HTTP 상태(500)"
+        }
+      },
+      {
+        "ruleId": "COMMON-22",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "무결성",
+        "scenario": "크로스 사이트 스크립팅 및 요청위조 식별되는지 확인",
+        "inputs": "웹 기반 제품\n(&invicti)",
+        "expectedResult": "식별되지 않음",
+        "defectExample": {
+          "summary": "크로스 사이트\n 스크립트 \n 실행 오류",
+          "severity": "H",
+          "content": "[프로그램]\n크로스 사이트 스크립팅 및 요청위조 식별됨\nhttps://test.jigpu.com/?mode=admin&p=sign_in&random=%27%3e%3cnet%20sparker%3dalert(0x009B04)%3e"
+        }
+      },
+      {
+        "ruleId": "COMMON-23",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "무결성",
+        "scenario": "세션 쿠키를 HttpOnly로 설정되어있는지 확인",
+        "inputs": "웹 기반 제품\n(&invicti)",
+        "expectedResult": "정상 설정됨",
+        "defectExample": {
+          "summary": "안전하지 않은 세션 쿠키",
+          "severity": "M",
+          "content": "[프로그램]\n세션 쿠키를 HttpOnly로 설정하지 않아 크로스 사이트 스크립팅 공격으로부터 취약할 수 있음"
+        }
+      },
+      {
+        "ruleId": "COMMON-24",
+        "qualityCharacteristic": "신뢰성",
+        "subCharacteristic": "가용성",
+        "scenario": "시험대상제품이 비정상 중지되지 않는지 확인",
+        "inputs": "공통",
+        "expectedResult": "비정상 중지되지 않음",
+        "defectExample": {
+          "summary": "프로그램\n비정상 중지",
+          "severity": "M",
+          "content": "[프로그램]\nAAA 기능을 실행하는 경우, 프로그램이 비정상 중지되고 기능이 실행되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-25",
+        "qualityCharacteristic": "신뢰성",
+        "subCharacteristic": "가용성",
+        "scenario": "시험대상제품이 비정상 종료되지 않는지 확인",
+        "inputs": "공통",
+        "expectedResult": "비정상 종료되지 않음",
+        "defectExample": {
+          "summary": "프로그램\n비정상 중지",
+          "severity": "H",
+          "content": "[프로그램]\nAAA 기능을 실행하는 경우, 프로그램이 비정상 종료됨"
+        }
+      },
+      {
+        "ruleId": "COMMON-26",
+        "qualityCharacteristic": "신뢰성",
+        "subCharacteristic": "결함허용성",
+        "scenario": "***이중화 제공하는 경우\n고장 회피 기능이 동작하는지 확인",
+        "inputs": "이중화 지원 제품의 경우\n**DBMS, WAS, 웹서버 등",
+        "expectedResult": "고장 회피 기능이 동작함",
+        "defectExample": {
+          "summary": "Fail-over\n기능오류",
+          "severity": "H",
+          "content": "이중화 기능이 활성화된 상태에서 Active 서버 비정상 종료 시, Standby 서버로 Fail-over되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-27",
+        "qualityCharacteristic": "신뢰성",
+        "subCharacteristic": "복구성",
+        "scenario": "***자체 복구 제공하는 경우\n자체 복구 기능이 동작하는지 확인",
+        "inputs": "복구 기능 지원 제품의 경우",
+        "expectedResult": "자체 복구 기능이 동작함",
+        "defectExample": {
+          "summary": "데이터\n복구 오류",
+          "severity": "H",
+          "content": "30억건의 데이터 삽입 후, Dump 프로그램 실행하여 데이터 복구 시도 시, 데이터가 30억건이 복구되어야 하지만 10건으로 잘못 복구됨"
+        }
+      },
+      {
+        "ruleId": "COMMON-28",
+        "qualityCharacteristic": "성능효율성",
+        "subCharacteristic": "시간반응성",
+        "scenario": "주요 기능의 응답시간이 지연되지 않는지 확인",
+        "inputs": "등록/조회 등 일반적 기능 경우",
+        "expectedResult": "응답시간이 지연되지 않고 동작함(약 3초)",
+        "defectExample": {
+          "summary": "응답시간 지연",
+          "severity": "H",
+          "content": "[프로그램>AAA>BBB]\nAAA 조회 기능 실행 시, ~~~를 클릭한 시점부터 조회될 때까지의 소요시간이 약 XX초로 길게 소요됨"
+        }
+      },
+      {
+        "ruleId": "COMMON-29",
+        "qualityCharacteristic": "성능효율성",
+        "subCharacteristic": "자원효율성",
+        "scenario": "주어진 시간(약 2시간) 동안 주요 기능 실행 시, CPU 사용률이 효율적으로 사용되는지 확인",
+        "inputs": "주요 기능 경우\n성능모니터, vmstat 활용",
+        "expectedResult": "CPU 메모리가 효율적으로 사용됨",
+        "defectExample": {
+          "summary": "과도한\nCPU 사용",
+          "severity": "H",
+          "content": "[프로그램]\n프로그램 구동후, 일정 시간(2시간)이 지나면 CPU 사용량이 99%까지 올라가고 정상 상태로 복귀되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-30",
+        "qualityCharacteristic": "성능효율성",
+        "subCharacteristic": "용량성",
+        "scenario": "다수 사용자가 접속하는 경우 응답시간이 지연되지 않는지 확인",
+        "inputs": "다수 사용자 접속하는 경우",
+        "expectedResult": "응답시간이 지연되지 않고 동작함",
+        "defectExample": {
+          "summary": "응답시간\n지연",
+          "severity": "H",
+          "content": "[프로그램]\n10명의 사용자가 동시에 1초 간격으로 10분동안 이메일 전송 시, 메일을 모두 수신 받을 때까지의 시간이 약 1시간 이상 길게 소요됨"
+        }
+      },
+      {
+        "ruleId": "COMMON-31",
+        "qualityCharacteristic": "이식성",
+        "subCharacteristic": "적응성",
+        "scenario": "시험합의서에 작성된 시험환경에서 시험대상제품이 정상 동작하는지 확인",
+        "inputs": "공통",
+        "expectedResult": "주어진 환경에서 정상 동작함",
+        "defectExample": {
+          "summary": "AAA\n기능 오류",
+          "severity": "M",
+          "content": "Windows OS 환경에서는 'AAA' 기능이 정상 동작하지만, Linux OS 환경에서는 'AAA' 기능이 동작하지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-32",
+        "qualityCharacteristic": "이식성",
+        "subCharacteristic": "대체성",
+        "scenario": "***재인증 제품 대상 경우\n이전 버전에서의 기능을 현재 버전에서 사용할 수 있는지 확인",
+        "inputs": "재인증 제품 대상",
+        "expectedResult": "기능이 정상 동작함",
+        "defectExample": {
+          "summary": "기능 포괄성 부족",
+          "severity": "M",
+          "content": "시험대상제품(v2.0)에서는 이전버전(v1.0)에서 제공하였던 'AAA' 기능이 제공되지 않지만, 이에 대한 설명이 사용자취급설명서에 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-33",
+        "qualityCharacteristic": "이식성",
+        "subCharacteristic": "설치성",
+        "scenario": "***설치 프로그램 제공하는 경우\n설치 경로를 변경할 수 있는지 확인",
+        "inputs": "설치 프로그램 제공",
+        "expectedResult": "설치 경로를 변경하여 설치됨",
+        "defectExample": {
+          "summary": "설치 경로 설정 기능 미제공",
+          "severity": "M",
+          "content": "프로그램 설치 시, 설치 경로 설정 기능이 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-34",
+        "qualityCharacteristic": "호환성",
+        "subCharacteristic": "공존성",
+        "scenario": "***타프로그램 제공하는 경우\n타 소프트웨어(오피스, 한글, 백신, 웹브라우저)를 설치하여 충돌하지 않는지 확인",
+        "inputs": "설치 프로그램을 제공하는 경우",
+        "expectedResult": "타 소프트웨어와 충돌하지 않고 정상 동작함",
+        "defectExample": {
+          "summary": "공존성 오류",
+          "severity": "H",
+          "content": "[프로그램]\n시험대상제품이 오피스 프로그램과 충돌하여 실행되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-35",
+        "qualityCharacteristic": "호환성",
+        "subCharacteristic": "상호운용성",
+        "scenario": "***외부연동 제공하는 경우\n타 소프트웨어와 연동하여 기능이 정상적으로 동작하는지 확인",
+        "inputs": "외부 API 연동하는 경우\n예: 기상청API 등",
+        "expectedResult": "타 소프트웨어가 정상적으로 연동함",
+        "defectExample": {
+          "summary": "AAA 기능 오류",
+          "severity": "M",
+          "content": "[프로그램>AAA>BBB]\n기상청 API를 연동하여 날씨 정보가 대시보드에 표시되어야 하지만 표시되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-36",
+        "qualityCharacteristic": "유지보수성",
+        "subCharacteristic": "분석성",
+        "scenario": "고장 원인을 분석할 수 있는 별도의 시스템 로그를 제공하는지 확인",
+        "inputs": "로그",
+        "expectedResult": "시스템 로그를 제공함",
+        "defectExample": {
+          "summary": "문제 진단정보 미제공",
+          "severity": "M",
+          "content": "[프로그램]\n제품 구동 중 문제 발생 시 문제 원인을 진단할 수 있는 정보(예: 로그)가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-37",
+        "qualityCharacteristic": "유지보수성",
+        "subCharacteristic": "변경성",
+        "scenario": "환경설정을 변경한 경우, 주요기능이 설정값에 영향없이 동작하는지 확인",
+        "inputs": "환경설정",
+        "expectedResult": "주요기능이 설정변경에 영향없이 동작함",
+        "defectExample": {
+          "summary": "환경 설정 변경 오류",
+          "severity": "M",
+          "content": "프로그램의 DBMS 포트 변호를 변경한 후, DBMS 연결을 시도하면 오류메시지가 출력되고 DBMS에 정상적으로 연결되지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-38",
+        "qualityCharacteristic": "유지보수성",
+        "subCharacteristic": "시험성",
+        "scenario": "***자체 시험 기능 제공하는 경우\n자체 시험 기능이 동작하는지 확인",
+        "inputs": "자체 시험 기능 제공",
+        "expectedResult": "자체 시험 기능이 동작함",
+        "defectExample": {
+          "summary": "연결 테스트 기능 오류",
+          "severity": "M",
+          "content": "DBMS의 연결 여부를 확인하는 '연결 테스트' 기능이 동작하지 않음"
+        }
+      },
+      {
+        "ruleId": "COMMON-39",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "프로그램",
+        "scenario": "식별정보(예: 제품명, 버전)가 제공되는지 확인",
+        "inputs": "공통",
+        "expectedResult": "식별정보가 제공됨",
+        "defectExample": {
+          "summary": "제품 식별 정보 미제공",
+          "severity": "M",
+          "content": "제품을 식별할수 있는 정보(제품명, 버전 등)가 제공되지 않음"
+        }
+      }
+    ],
+    "PRODUCT_DOCUMENT": [
+      {
+        "ruleId": "PRODUCT_DOCUMENT-01",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "제품설명서가 제공되는지 확인",
+        "inputs": "제품설명서",
+        "expectedResult": "제품설명서가 제공됨",
+        "defectExample": {
+          "summary": "제품설명서 미제공",
+          "severity": "H",
+          "content": "제품설명서가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "PRODUCT_DOCUMENT-02",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "사용자취급설명서에 제품의 주요 사용 목적이 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "주요 사용 목적이 제공됨",
+        "defectExample": {
+          "summary": "제품 용도 정보 미제공",
+          "severity": "M",
+          "content": "[제품설명서] \n[사용자취급설명서]\n제품을 이용하여 수행할 수 있는 업무에 대한 정보가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "PRODUCT_DOCUMENT-03",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "제품설명서/사용자취급설명서 요구사항",
+        "scenario": "식별정보(예: 제품명, 버전)가 제공되는지 확인",
+        "inputs": "제품설명서",
+        "expectedResult": "식별정보가 제공됨",
+        "defectExample": {
+          "summary": "제품 식별 정보 미제공",
+          "severity": "M",
+          "content": "제품을 식별할수 있는 정보(제품명, 버전 등)가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "PRODUCT_DOCUMENT-04",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "제품설명서/사용자취급설명서 요구사항",
+        "scenario": "제품 용도 정보가 제공되는지 확인",
+        "inputs": "제품설명서",
+        "expectedResult": "용도 정보가 제공됨",
+        "defectExample": {
+          "summary": "제품 용도 정보 미제공",
+          "severity": "M",
+          "content": "[제품설명서] \n[사용자취급설명서]\n제품을 이용하여 수행할 수 있는 업무에 대한 정보가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "PRODUCT_DOCUMENT-05",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "제품설명서/사용자취급설명서 요구사항",
+        "scenario": "\n제품의 공급자 정보(예: 회사이름, 주소, 전화번호, 웹사이트)가 제공되는지 확인",
+        "inputs": "제품설명서",
+        "expectedResult": "공급자 정보가 제공됨",
+        "defectExample": {
+          "summary": "제품 공급자 정보 미제공",
+          "severity": "M",
+          "content": "[제품설명서]\n[사용자취급설명서]\n제품의 공급자 정보(예: 회사이름, 주소, 전화번호, 웹사이트)가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "PRODUCT_DOCUMENT-06",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "제품설명서/사용자취급설명서 요구사항",
+        "scenario": "제품 운영을 위한 지원정보(예: 고객지원센터 연락처)가 제공되는지 확인",
+        "inputs": "제품설명서",
+        "expectedResult": "지원정보가 제공됨",
+        "defectExample": {
+          "summary": "제품 지원 정보 미제공",
+          "severity": "M",
+          "content": "[제품설명서]\n[사용자취급설명서]\n제품 운영을 위한 지원정보(예: 고객지원센터 연락처)가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "PRODUCT_DOCUMENT-07",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "제품설명서/사용자취급설명서 요구사항",
+        "scenario": "제품 유지보수 제공 여부에 대한 정보(예: 지원 범위, 지원 방법 등)가 제공되는지 확인",
+        "inputs": "제품설명서",
+        "expectedResult": "정보가 제공됨",
+        "defectExample": {
+          "summary": "제품 유지보수\n 정보 미제공",
+          "severity": "M",
+          "content": "[제품설명서]\n[사용자취급설명서]\n제품 유지보수 제공 여부에 대한 정보(예: 지원 범위, 지원 방법 등)가 제공되지 않음"
+        }
+      }
+    ],
+    "USER_MANUAL": [
+      {
+        "ruleId": "USER_MANUAL-01",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "사용자취급설명서가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "사용자취급설명서가 제공됨",
+        "defectExample": {
+          "summary": "사용자취급설명서 미제공",
+          "severity": "H",
+          "content": "사용자취급설명서가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-02",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "제품설명서/사용자취급설명서 요구사항",
+        "scenario": "식별정보(예: 제품명, 버전)가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "식별정보가 제공됨",
+        "defectExample": {
+          "summary": "제품 식별 정보 미제공",
+          "severity": "M",
+          "content": "제품을 식별할수 있는 정보(제품명, 버전 등)가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-03",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "사용자취급설명서에 제품의 주요 사용 목적이 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "주요 사용 목적이 제공됨",
+        "defectExample": {
+          "summary": "제품 용도 정보 미제공",
+          "severity": "M",
+          "content": "[제품설명서] \n[사용자취급설명서]\n제품을 이용하여 수행할 수 있는 업무에 대한 정보가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-04",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "제품 구동을 위해 필요한 최소 혹은 권장 장비 사양 정보가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "권장 장비 사양 정보가 제공됨",
+        "defectExample": {
+          "summary": "성능효율성 정보 미제공",
+          "severity": "M",
+          "content": "[사용자취급설명서]\n제품 구동을 위해 필요한 최소 혹은 권장 장비 사양 정보가 사용자취급설명서에 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-05",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "시험대상제품은 타 제품과 연동되지만 연동제품 정보가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "연동제품 정보가 제공됨",
+        "defectExample": {
+          "summary": "호환성 정보 미제공",
+          "severity": "M",
+          "content": "시험대상제품은 타 제품과 연동되지만 연동제품 정보가 사용자취급설명서에 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-06",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "보편적으로 사용하지 않는 용어 및 약어에 대한 정보가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "용어/약어 정보가 제공됨",
+        "defectExample": {
+          "summary": "사용성 정보 미제공",
+          "severity": "M",
+          "content": "[사용자취급설명서]\n보편적으로 사용되지 않는 용어 및 약어에 대한 설명이 사용자취급설명서에 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-07",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "데이터 백업 및 복구 절차가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "데이터 백업 및 복구 절차가 제공됨",
+        "defectExample": {
+          "summary": "신뢰성 정보 미제공",
+          "severity": "M",
+          "content": "데이터 백업 및 복구 절차에 대한 정보가 사용자취급설명서에 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-08",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "프로그램 사용 권한에 따른 접근 제어 정보가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "접근 제어 정보가 제공됨",
+        "defectExample": {
+          "summary": "보안성 정보 미제공",
+          "severity": "M",
+          "content": "사용 권한에 따른 접근 제어 정보가 사용자취급설명서에 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-09",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "운영 로그 저장 위치 정보가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "로그 저장 위치 정보가 제공됨",
+        "defectExample": {
+          "summary": "유지보수성 정보 미제공",
+          "severity": "M",
+          "content": "프로그램 운영 로그가 저장되는 위치 정보가 사용자취급설명서에 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-10",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "설치 방법 및 절차에 대한 정보가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "설치 방법 및 절차에 대한 정보가 제공됨",
+        "defectExample": {
+          "summary": "이식성 정보 미제공",
+          "severity": "M",
+          "content": "설치 방법 및 절차에 대한 정보가 사용자취급설명서에 제공되지 않음\n시험제품은 사용자에 의해 설치가 불가능하고 설치 담당자가 설치를 해야 하지만 이에 대한 정보가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-11",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "제품설명서/사용자취급설명서 요구사항",
+        "scenario": "제품 용도 정보가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "용도 정보가 제공됨",
+        "defectExample": {
+          "summary": "제품 용도 정보 미제공",
+          "severity": "M",
+          "content": "[제품설명서] \n[사용자취급설명서]\n제품을 이용하여 수행할 수 있는 업무에 대한 정보가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-12",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "제품설명서/사용자취급설명서 요구사항",
+        "scenario": "\n제품의 공급자 정보(예: 회사이름, 주소, 전화번호, 웹사이트)가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "공급자 정보가 제공됨",
+        "defectExample": {
+          "summary": "제품 공급자 정보 미제공",
+          "severity": "M",
+          "content": "[제품설명서]\n[사용자취급설명서]\n제품의 공급자 정보(예: 회사이름, 주소, 전화번호, 웹사이트)가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-13",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "제품설명서/사용자취급설명서 요구사항",
+        "scenario": "제품 운영을 위한 지원정보(예: 고객지원센터 연락처)가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "지원정보가 제공됨",
+        "defectExample": {
+          "summary": "제품 지원 정보 미제공",
+          "severity": "M",
+          "content": "[제품설명서]\n[사용자취급설명서]\n제품 운영을 위한 지원정보(예: 고객지원센터 연락처)가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-14",
+        "qualityCharacteristic": "일반적 요구사항",
+        "subCharacteristic": "제품설명서/사용자취급설명서 요구사항",
+        "scenario": "제품 유지보수 제공 여부에 대한 정보(예: 지원 범위, 지원 방법 등)가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "정보가 제공됨",
+        "defectExample": {
+          "summary": "제품 유지보수\n 정보 미제공",
+          "severity": "M",
+          "content": "[제품설명서]\n[사용자취급설명서]\n제품 유지보수 제공 여부에 대한 정보(예: 지원 범위, 지원 방법 등)가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-15",
+        "qualityCharacteristic": "일반적\n 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "필수입력값에 대한 정보가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "정보가 제공됨",
+        "defectExample": {
+          "summary": "필수입력사항 미제공",
+          "severity": "M",
+          "content": "[프로그램]\n[사용자취급설명서]\n필수입력값에 대한 정보가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-16",
+        "qualityCharacteristic": "일반적\n 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "\n입력필드 제약사항에 대한 정보가 제공되는지 확인\n(예: 숫자, 영문 **자 이상 등)",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "정보가 제공됨",
+        "defectExample": {
+          "summary": "입력 제약사항 미제공",
+          "severity": "M",
+          "content": "[프로그램]\n[사용자취급설명서]\n입력필드 제약사항에 대한 정보가 제공되지 않음\n(예: 숫자, 영문 **자 이상 등)"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-17",
+        "qualityCharacteristic": "일반적\n 요구사항",
+        "subCharacteristic": "품질 특성별 정보 제공",
+        "scenario": "업로드 가능한 파일의 확장자와 크기, 최대 개수에 대한 정보가 제공되는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "정보가 제공됨",
+        "defectExample": {
+          "summary": "업로드 제약사항 미제공",
+          "severity": "M",
+          "content": "[프로그램]\n[사용자취급설명서]\n업로드 가능한 파일의 확장자와 크기, 최대 개수에 대한 정보가 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-18",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "무결성",
+        "scenario": "데이터 백업/복구 방법이 사용자취급설명서에 제공되는지 확인",
+        "inputs": "데이터 무결성을 보장해야하는 제품의 경우",
+        "expectedResult": "데이터 백업/복구 방법이 사용자취급설명서에 제공됨",
+        "defectExample": {
+          "summary": "데이터 백업/복구 방법 미제공",
+          "severity": "M",
+          "content": "비인가자의 데이터 파손 및 변경 방지를 위한 데이터 백업 및 복구 방법이 사용자취급설명서에 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-19",
+        "qualityCharacteristic": "보안성",
+        "subCharacteristic": "책임성",
+        "scenario": "사용자 감사로그 백업 방법이 사용자취급설명서에 제공하는지 확인",
+        "inputs": "사용자취급설명서",
+        "expectedResult": "감사로그 백업 방법이 사용자취급설명서에 제공됨",
+        "defectExample": {
+          "summary": "사용자 감사로그 백업 방법 미제공",
+          "severity": "M",
+          "content": "사용자 감사로그 백업 방법이 사용자취급설명서에 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-20",
+        "qualityCharacteristic": "이식성",
+        "subCharacteristic": "설치성",
+        "scenario": "***설치 프로그램 제공하는 경우\n프로그램 설치 메뉴얼이 제공되는지 확인",
+        "inputs": "설치 프로그램 제공",
+        "expectedResult": "설치 메뉴얼이 제공되고, 설치가 용이함",
+        "defectExample": {
+          "summary": "설치 매뉴얼 미제공",
+          "severity": "M",
+          "content": "프로그램 설치 메뉴얼이 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-21",
+        "qualityCharacteristic": "신뢰성",
+        "subCharacteristic": "복구성",
+        "scenario": "리포지토리 DB 백업 및 복구 방법에 대한 안내가 제공되는지 확인",
+        "inputs": "사용자/운영 데이터 관리를 위한 리포지토리 DB 사용하는 경우\n**DBMS 사용하지않는 경우 포함",
+        "expectedResult": "DB 백업 및 복구 방법이 제공됨",
+        "defectExample": {
+          "summary": "리포지토리 DB\n백업 및 복구 \n방법 미제공",
+          "severity": "M",
+          "content": "[사용자취급설명서]\n리포지토리 DB 백업 및 복구 방법이 사용자취급설명서에 제공되지 않음"
+        }
+      },
+      {
+        "ruleId": "USER_MANUAL-22",
+        "qualityCharacteristic": "유지보수성",
+        "subCharacteristic": "분석성",
+        "scenario": "프로그램 사용 도중 발생할 수 있는 예외사항 혹은 오류 증상과 해결방법(예:FAQ)에 대한 정보가 제공되는지 확인",
+        "inputs": "제품의 공식 사용자취급설명서 및 도움말",
+        "expectedResult": "프로그램 사용 중 발생 가능한 예외·오류 증상과 해결방법(FAQ 등)에 대한 정보가 제공됨",
+        "defectExample": {
+          "summary": "문제해결 정보 미제공",
+          "severity": "M",
+          "content": "[사용자취급설명서]\n프로그램 사용 도중 발생할 수 있는 예외사항 혹은 오류 증상과 해결방법(예:FAQ)에 대한 정보를 제공하지 않음"
+        }
+      }
+    ]
+  }
+}

@@ -26,3 +26,12 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+
+tasks.register<JavaExec>("generateMenuTcSamples") {
+    group = "verification"
+    description = "Generate independent TC workbooks and execution JSON from user menu samples"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.autotest.test_management_service.application.testcase.MenuTcCli")
+    args(rootProject.file("sample/menu sample/menu sample.xlsx").absolutePath,
+        rootProject.file("output/menu-tc-samples").absolutePath)
+}

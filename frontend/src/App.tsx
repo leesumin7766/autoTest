@@ -4,6 +4,7 @@ import './workspace.css'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { PlaywrightSetupPanel } from './PlaywrightSetupPanel'
 import { FunctionalMenuPanel } from './FunctionalMenuPanel'
+import { MenuTcPanel } from './MenuTcPanel'
 import { PreflightWarningDetails, type PreflightDiagnostics, type PreflightWarning } from './PreflightWarningDetails'
 
 type Role = 'AGREEMENT' | 'FUNCTION_LIST' | 'MANUAL'
@@ -424,7 +425,11 @@ function App() {
           {(!validationReady || aiDelivery.preflight?.generationGate?.allowed === false) && <div className="workspace-empty"><h2>{submissionId ? '문서 검증을 먼저 완료해주세요' : '등록된 문서 세트가 없습니다'}</h2><p>기능리스트·매뉴얼의 Jev 검증을 완료한 뒤 화면 수집 결과로 메뉴트리를 작성할 수 있습니다.</p><button className="primary-button" onClick={() => navigate('documents')}>자료 등록·검증으로 이동</button></div>}
           {submissionId && visited.has('menu') && <FunctionalMenuPanel key={`functional:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} ready={validationReady && aiDelivery.preflight?.generationGate?.allowed !== false} />}
         </div>
-        {upcomingPages.map(item => <section key={item.id} className="workflow-page workspace-empty" hidden={page !== item.id} aria-label={item.title}>
+        <div className="workflow-page" hidden={page !== 'tc-generate'}>
+          {!submissionId && <div className="workspace-empty"><h2>등록된 문서 세트가 없습니다</h2><p>자료 등록과 메뉴트리 승인을 완료한 뒤 TC를 생성하세요.</p><button className="primary-button" onClick={() => navigate('documents')}>자료 등록으로 이동</button></div>}
+          {submissionId && visited.has('tc-generate') && <MenuTcPanel key={`menu-tc:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} />}
+        </div>
+        {upcomingPages.filter(item => item.id !== 'tc-generate').map(item => <section key={item.id} className="workflow-page workspace-empty" hidden={page !== item.id} aria-label={item.title}>
           <span className="workspace-badge">준비 중</span>
           <h2>{item.title}</h2>
           <p>{item.description}</p>
