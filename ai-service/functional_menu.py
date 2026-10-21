@@ -18,6 +18,8 @@ ROOT = Path(__file__).parent / 'menu_templates' / 'functional-v1'
 RULES = json.loads((ROOT / 'rules.json').read_text(encoding='utf-8'))
 SCHEMA = json.loads((ROOT / 'output.schema.json').read_text(encoding='utf-8'))
 EXAMPLES = json.loads((ROOT / 'examples.json').read_text(encoding='utf-8'))
+OUTPUT_TOKENS = 2048
+AUTO_INSTRUCTIONS = '\n'.join(RULES['instructions'])+'\n자동 생성 응답에서는 evidence 대신 evidenceSpanIds를 사용한다. sourceSpans에서 현재 source의 원문 구간 ID를 반드시 선택하고 인용문을 다시 작성하지 않는다.'
 router = APIRouter(prefix='/api/v1/functional-menus', dependencies=[Depends(require_internal_token)])
 PROGRESS = OrderedDict()
 LOCK = asyncio.Lock()
@@ -110,7 +112,7 @@ def call_spec(request, source, candidates):
         for start in range(0,len(text),200):
             quote=text[start:start+240]
             if quote.strip():
-                spans.append({'spanId':f"{item['id']}@{start}",'sourceId':item['id'],'quote':quote})
+                spans.append({'spanId':f"{item['id']}@{item.get('segmentStart',0)+start}",'sourceId':item['id'],'quote':quote})
     schema=json.loads(json.dumps(SCHEMA))
     row=schema['properties']['rows']['items']
     row['required'].remove('evidence');row['required'].append('evidenceSpanIds');del row['properties']['evidence']
@@ -124,6 +126,26 @@ def call_spec(request, source, candidates):
     payload={'productName':request.productName,'source':compact(source),'menuCandidates':[compact(item) for item in candidates],
         'sourceSpans':spans,'styleExamples':[{'functionName':'스케줄 삭제','menuDescription':'스케줄을 삭제하는 기능'}]}
     return allowed,spans,schema,payload
+
+def request_size(instructions, payload, schema):
+    messages=[{'role':'system','content':instructions},{'role':'user','content':json.dumps(payload,ensure_ascii=False)}]
+    return len(json.dumps(messages,ensure_ascii=False).encode())+len(json.dumps(schema).encode())
+
+def budget_segments(request, source, budget):
+    """Preserve full text and original source IDs; overlap protects split sentences."""
+    _,_,schema,payload=call_spec(request,source,[])
+    if request_size(AUTO_INSTRUCTIONS,payload,schema)+600 <= budget:
+        return [source]
+    text=source['text']
+    if len(text)<120:
+        raise ValueError('LLM_INPUT_BUDGET_EXCEEDED')
+    middle=len(text)//2
+    boundary=text.rfind('\n',len(text)//3,middle+1)
+    if boundary>0:middle=boundary+1
+    overlap=min(40,len(text)//8)
+    left={**source,'text':text[:middle+overlap]}
+    right={**source,'text':text[middle:],'segmentStart':source.get('segmentStart',0)+middle}
+    return budget_segments(request,left,budget)+budget_segments(request,right,budget)
 
 @router.post('/prompt')
 async def external_prompt(request: Request):
@@ -147,7 +169,8 @@ async def generate(request: Request):
         raise HTTPException(503, 'MENU_PROVIDER_UNAVAILABLE')
     menus = [source for source in request.evidence if source['kind'] in ('MENU','CONTROL')]
     screens = [source for source in request.evidence if source['kind']=='SCREEN']
-    analysis = [source for source in request.evidence if source['kind']=='DOCUMENT']
+    analysis = [part for source in request.evidence if source['kind']=='DOCUMENT'
+                for part in budget_segments(request,source,provider.input_budget_for(OUTPUT_TOKENS))]
     PROGRESS[request.jobId] = {'completed':0,'total':len(analysis)}
     while len(PROGRESS) > 1024:
         PROGRESS.popitem(last=False)
@@ -159,17 +182,16 @@ async def generate(request: Request):
                 relevant=sorted(screens,key=lambda screen:len(tokens.intersection(re.findall(r'\w+',screen['text'].lower()))),reverse=True)
                 if relevant and tokens.intersection(re.findall(r'\w+',relevant[0]['text'].lower())):
                     candidates.append(relevant[0])
-                instructions = '\n'.join(RULES['instructions'])+'\n자동 생성 응답에서는 evidence 대신 evidenceSpanIds를 사용한다. sourceSpans에서 현재 source의 원문 구간 ID를 반드시 선택하고 인용문을 다시 작성하지 않는다.'
+                instructions = AUTO_INSTRUCTIONS
                 # Candidate retrieval may shrink; the current source is never truncated.
                 while True:
                     allowed,spans,schema,payload=call_spec(request,source,candidates)
-                    messages=[{'role':'system','content':instructions},{'role':'user','content':json.dumps(payload,ensure_ascii=False)}]
-                    estimated=len(json.dumps(messages,ensure_ascii=False).encode())+len(json.dumps(schema).encode())
-                    if estimated <= provider.input_budget_for(3072) or not candidates:
+                    estimated=request_size(instructions,payload,schema)
+                    if estimated+600 <= provider.input_budget_for(OUTPUT_TOKENS) or not candidates:
                         break
                     candidates.pop()
                 for attempt in range(2):
-                    response = await provider._call(instructions,payload,schema,num_predict=3072)
+                    response = await provider._call(instructions,payload,schema,num_predict=OUTPUT_TOKENS)
                     try:
                         by_id={span['spanId']:span for span in spans}
                         for row in response['rows']:
@@ -192,7 +214,7 @@ async def generate(request: Request):
                                     focused=json.loads(json.dumps(schema))
                                     focused['properties']['rows']['minItems']=1
                                     focused['properties']['rows']['items']['properties']['functionName']['pattern']=f'.*{focus}.*'
-                                    targeted=await provider._call(instructions+f'\n이번 요청은 현재 원문의 {focus} 기능만 작성한다. functionName에 {focus}를 포함한다.',payload,focused,num_predict=3072)
+                                    targeted=await provider._call(instructions+f'\n이번 요청은 현재 원문의 {focus} 기능만 작성한다. functionName에 {focus}를 포함한다.',payload,focused,num_predict=OUTPUT_TOKENS)
                                     for row in targeted['rows']:
                                         row['evidence']=[{'sourceId':by_id[span]['sourceId'],'quote':by_id[span]['quote']} for span in row.pop('evidenceSpanIds')]
                                     additions=validate_rows(targeted['rows'],allowed,source['id'])

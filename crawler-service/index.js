@@ -19,7 +19,11 @@ app.post('/api/v1/browser-jobs', (req, res) => {
       method: 'POST', signal: AbortSignal.timeout(10000), redirect: 'error',
       headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.PRODUCT_DESCRIPTION_INTERNAL_TOKEN }, body: JSON.stringify(body),
     });
-    if (!response.ok) { const error = new Error(response.status === 409 ? 'CRAWL_LEASE_LOST' : 'LOCAL_CALLBACK_FAILED'); error.status = response.status; throw error; }
+    if (!response.ok) {
+      const failure = await response.json().catch(() => ({}));
+      console.warn('Crawl callback rejected', response.status, /^[A-Z_]{5,80}$/.test(failure.code || '') ? failure.code : 'HTTP_ERROR');
+      const error = new Error(response.status === 409 ? 'CRAWL_LEASE_LOST' : 'LOCAL_CALLBACK_FAILED'); error.status = response.status; throw error;
+    }
     return response.json();
   };
   void runJob({}, job, { request: send }).finally(() => { localBusy = false; });

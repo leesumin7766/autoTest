@@ -13,7 +13,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 @Service
 public class LocalCrawlDispatcher {
     private final String baseUrl,token;
-    private final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+    private final HttpClient http=HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(3)).build();
     public LocalCrawlDispatcher(@Value("${crawler-service.base-url:http://crawler-service:8006}") String baseUrl,
             @Value("${product-description.internal-token:}") String token) {this.baseUrl=baseUrl;this.token=token;}
     public void dispatch(JsonNode job,Consumer<String> failure) {

@@ -24,6 +24,7 @@ async function navigation(page, policy) {
         };
         const entries = [], seen = new Set();
         for (const root of document.querySelectorAll(selectors)) {
+          if (root.closest('.pagination,[data-slot="pagination"]') || /pagination|paging|페이지\s*(이동|네이션|번호)/i.test(root.getAttribute('aria-label') || '')) continue;
           for (const node of root.querySelectorAll('a,button,[role="menuitem"],[role="tab"]')) {
             if (seen.has(node) || !visible(node) || !label(node) || node.getAttribute('aria-haspopup') === 'listbox') continue;
             if (node.closest(selectors) !== root) continue;
@@ -47,7 +48,7 @@ async function navigation(page, policy) {
               url: href && href !== '#' ? node.href : '',
               kind: group && !['HEADER','FOOTER'].includes(location) ? 'GROUP' : tab ? 'TAB' : href && href !== '#' ? 'LINK' : 'BUTTON',
               selected: node.getAttribute('aria-selected') === 'true' || node.getAttribute('aria-current') === 'page',
-              location, canExplore: location !== 'HEADER' && !node.form && !root.matches('[role="toolbar"]') && !/administrat|elevat|superuser|권한|관리.*접근/i.test(label(node)),
+              location, canExplore: location !== 'HEADER' && !node.form && !root.matches('[role="toolbar"]') && !/administrat|elevat|superuser|권한|관리.*접근|collapse sidebar|expand sidebar|dark mode|light mode|theme|language|한국어|english|다크 모드|라이트 모드|테마|언어|사이드바/i.test(label(node)),
               selector: selector(node), order: entries.length });
             if (entries.length >= 500) return entries;
           }
@@ -61,7 +62,7 @@ async function navigation(page, policy) {
         if (item.url) { try { if (!policy.page(item.url)) { item.canExplore = false; item.url = ''; } } catch { item.canExplore = false; item.url = ''; } }
         const key = hash({ path: item.path, kind: item.kind, control: item.selector,
           frame: frame === page.mainFrame() ? 'main' : frameUrl.split('#')[0] });
-        const action = { menuKey: key, selector: item.selector, frameUrl, main: frame === page.mainFrame(), label: item.path.at(-1), kind: item.kind };
+        const action = { menuKey: key, selector: item.selector, frameUrl, main: frame === page.mainFrame(), label: item.path.at(-1), kind: item.kind, path: item.path, url: item.url };
         delete item.selector;
         result.push({ ...item, url: item.url ? normalizedUrl(item.url) : '', frameUrl, menuKey: key, _action: action });
         if (result.length >= 500) return result;
@@ -76,7 +77,12 @@ async function clickNavigation(page, action, policy, end) {
   const frames = await visibleFrames(page, policy);
   const frame = action.main ? page.mainFrame() : frames.find(frame => normalizedUrl(frame.url()).split('#')[0] === action.frameUrl.split('#')[0]);
   if (!frame) throw new Error('NAVIGATION_NOT_AVAILABLE');
-  const node = frame.locator(action.selector);
+  // Re-observe semantic paths after replay: DOM positions may shift as menus expand.
+  const matches = (await navigation(page, policy)).filter(item => item.canExplore !== false && item.kind === action.kind
+    && item._action.main === action.main && (action.main || item.frameUrl === action.frameUrl)
+    && JSON.stringify(item.path) === JSON.stringify(action.path) && item.url === (action.url ? normalizedUrl(action.url) : ''));
+  if (matches.length !== 1) throw new Error('NAVIGATION_NOT_AVAILABLE');
+  const node = frame.locator(matches[0]._action.selector);
   const valid = await node.evaluate((node, label) => {
     const text = (node.getAttribute('aria-label') || node.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 160);
     return text === label && !node.form && Boolean(node.closest('nav,[role="navigation"],[role="menu"],[role="menubar"],[role="tablist"],aside,.sidebar,#sidebar'));

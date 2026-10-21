@@ -242,6 +242,8 @@ public class RemoteCrawlService {
                 ObjectNode summary=mapper.createObjectNode();
                 for(String field:List.of("incompleteCount","navigationFailureCount","noChangeCount","uniqueScreenCount"))
                     summary.put(field,Math.max(0,Math.min(500,body.path("result").path(field).asInt())));
+                summary.put("coverageStatus", "DONE".equals(reason) && summary.path("incompleteCount").asInt()==0
+                        && summary.path("navigationFailureCount").asInt()==0 && summary.path("noChangeCount").asInt()==0 ? "COMPLETE" : "INCOMPLETE");
                 var skipped=body.path("result").path("skipped");
                 if(skipped.isArray() && skipped.size()<=500 && json(skipped).length()<200_000) summary.set("skipped",skipped);
                 jdbc.update("UPDATE playwright_crawl_jobs SET status=?,error_code=?,stop_reason=?,crawl_result=?::jsonb,password_ciphertext=NULL,updated_at=now() WHERE job_id=?",

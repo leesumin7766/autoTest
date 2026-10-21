@@ -159,6 +159,8 @@ export const RemoteCrawlPanel = forwardRef<BrowserExecutionHandle, Props>(functi
     {view.job?.errorCode && <p className="error-copy" role="alert">{browserCheckMessage(view.job.errorCode)}</p>}
     {view.job?.crawlResult && <p>확인된 화면 상태 {view.job.crawlResult.uniqueScreenCount}개 · 로딩 미완료 {view.job.crawlResult.incompleteCount}개
       {' · '}이동 실패 {view.job.crawlResult.navigationFailureCount}개 · 변화 미확인 {view.job.crawlResult.noChangeCount}개</p>}
+    {view.job?.status === 'COMPLETED' && view.job.crawlResult && (view.job.crawlResult.navigationFailureCount > 0 || view.job.crawlResult.incompleteCount > 0 || view.job.crawlResult.noChangeCount > 0 || view.job.stopReason !== 'DONE') &&
+      <p className="error-copy" role="status">수집이 종료됐지만 전체 메뉴 확인은 완료되지 않았습니다. 실패·미방문 항목을 검토한 후 메뉴트리를 작성하세요.</p>}
     {view.job && view.pages.length > 0 && <CapturedMenuTreePanel key={view.job.jobId} base={base} jobId={view.job.jobId}
       memberId={memberId} busy={busy} showPage={showPage} />}
     {view.pages.length > 0 && <ul className="crawl-page-list">{view.pages.map(page => <li key={page.pageIndex}>

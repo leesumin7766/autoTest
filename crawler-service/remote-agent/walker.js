@@ -22,7 +22,8 @@ async function crawl(job, { signal, onPage, browserType = chromium } = {}) {
     : Array.isArray(value) ? value.map(redact) : value && typeof value === 'object'
       ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redact(item)])) : value;
   const summary = stopReason => ({ pageCount: count, stopReason, incompleteCount: incomplete, navigationFailureCount: failed,
-    noChangeCount: noChange, uniqueScreenCount: uniqueScreens.size, skipped });
+    noChangeCount: noChange, uniqueScreenCount: uniqueScreens.size, skipped,
+    coverageStatus: failed || incomplete || noChange || stopReason !== 'DONE' ? 'INCOMPLETE' : 'COMPLETE' });
   try {
     const context = await browser.newContext({ viewport: { width: options.viewportWidth, height: options.viewportHeight },
       ignoreHTTPSErrors: true, serviceWorkers: 'block', acceptDownloads: false,
@@ -45,6 +46,14 @@ async function crawl(job, { signal, onPage, browserType = chromium } = {}) {
     });
     context.on('page', popup => { if (popup !== page) void popup.close().catch(() => {}); });
     if (authenticating) { await login(page, job, authPosts); authenticating = false; }
+    if (page.url() === 'about:blank') await page.goto(job.targetUrl, { waitUntil: 'domcontentloaded', timeout: seconds * 1000 });
+    // Replay starts with the same browser preferences as the authenticated entry.
+    const entryStorage = await page.evaluate(() => ({ origin: location.origin, local: Object.entries(localStorage), session: Object.entries(sessionStorage) }));
+    await context.addInitScript(state => {
+      if (location.origin !== state.origin) return;
+      localStorage.clear();for (const [key,value] of state.local) localStorage.setItem(key,value);
+      sessionStorage.clear();for (const [key,value] of state.session) sessionStorage.setItem(key,value);
+    }, entryStorage);
     const queue = [{ steps: [], via: null, depth: 0 }];
     const visited = new Set(), captured = new Set();
     while (queue.length && count < options.maxPages && Date.now() < deadline) {

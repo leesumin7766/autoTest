@@ -3,11 +3,25 @@ import os
 import unittest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from functional_menu import Request, baseline, validate_rows, prompt, generate
+from functional_menu import Request, baseline, validate_rows, prompt, generate, budget_segments, call_spec, request_size, AUTO_INSTRUCTIONS
 from product_description.ollama_provider import OllamaLlmProvider
 from main import app
 
 class FunctionalMenuTest(unittest.TestCase):
+    def test_long_korean_sources_fit_model_budget_without_losing_text(self):
+        text='작업의 스케줄을 조회하는 기능입니다.\n'*120
+        source={'id':'doc:long-korean','kind':'DOCUMENT','role':'MANUAL','text':text}
+        request=Request(jobId='budget',productName='NeoFlow Server',evidence=[source])
+        parts=budget_segments(request,source,5632)
+        self.assertGreater(len(parts),1)
+        covered=set()
+        for part in parts:
+            start=part.get('segmentStart',0)
+            self.assertEqual(part['text'],text[start:start+len(part['text'])])
+            covered.update(range(start,start+len(part['text'])))
+            _,_,schema,payload=call_spec(request,part,[])
+            self.assertLessEqual(request_size(AUTO_INSTRUCTIONS,payload,schema)+600,5632)
+        self.assertEqual(len(covered),len(text))
     def setUp(self):
         self.sources=[{'id':'menu-a','kind':'MENU','menuKey':'a','path':['Global','System','Services'],'location':'SIDEBAR','text':'Global → System → Services'},
                       {'id':'doc-a','kind':'DOCUMENT','role':'FUNCTION_LIST','text':'서비스 목록을 조회하고 서비스를 검색할 수 있다.'}]
