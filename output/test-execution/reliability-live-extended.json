@@ -1,0 +1,176 @@
+{
+  "passed": false,
+  "planner": "qwen3:4b (local)",
+  "judge": "Jev (real API)",
+  "results": [
+    {
+      "fixture": "goodread",
+      "expected": "P",
+      "actual": null,
+      "executionStatus": "COMPLETED",
+      "reason": "판정 근거 또는 신뢰도가 부족하여 검토가 필요합니다.",
+      "confidence": 0.59,
+      "elapsedSeconds": 13.25,
+      "judgeAnswers": {
+        "case_0": {
+          "choice": "P",
+          "confidence": 0.59
+        },
+        "scope_0": {
+          "choice": "YES",
+          "confidence": 0.98
+        },
+        "coverage_0": {
+          "choice": "COMPLETE",
+          "confidence": 0.72
+        }
+      },
+      "conditions": [
+        {
+          "conditionId": "C1",
+          "requirementQuote": "상세 보기 클릭 후 상태: 승인이 표시된다.",
+          "method": "TEXT_PRESENT",
+          "expected": "승인이 표시된다.",
+          "grounded": true,
+          "outcome": "FAIL",
+          "evidenceIds": [
+            "case-1:final"
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "actions": [
+            {
+              "action": "click",
+              "elementId": "0",
+              "value": "",
+              "url": "",
+              "milliseconds": 500
+            }
+          ],
+          "decision": "EXECUTE",
+          "phase": "TEST",
+          "missingInputs": [],
+          "explanation": "상세 보기 버튼을 클릭하여 신청 상태를 확인합니다. 이는 현재 페이지에서만 가능합니다.",
+          "conditions": [
+            {
+              "requirementQuote": "상세 보기 클릭 후 상태: 승인이 표시된다.",
+              "method": "TEXT_PRESENT",
+              "expected": "승인이 표시된다."
+            }
+          ],
+          "caseId": "detail-case"
+        }
+      ],
+      "observedTexts": [
+        "신청 상세 조회\n\n선택 전\n\n상세 보기",
+        "신청 상세 조회\n\n상태: 승인\n\n상세 보기"
+      ]
+    },
+    {
+      "fixture": "badread",
+      "expected": "F",
+      "actual": null,
+      "executionStatus": "COMPLETED",
+      "reason": "판정 근거 또는 신뢰도가 부족하여 검토가 필요합니다.",
+      "confidence": 0.88,
+      "elapsedSeconds": 12.94,
+      "judgeAnswers": {
+        "case_0": {
+          "choice": "F",
+          "confidence": 0.88
+        },
+        "scope_0": {
+          "choice": "YES",
+          "confidence": 0.97
+        },
+        "coverage_0": {
+          "choice": "COMPLETE",
+          "confidence": 0.67
+        }
+      },
+      "conditions": [
+        {
+          "conditionId": "C1",
+          "requirementQuote": "상세 보기 클릭 후 상태: 승인이 표시된다.",
+          "method": "TEXT_PRESENT",
+          "expected": "승인이 표시된다.",
+          "grounded": true,
+          "outcome": "FAIL",
+          "evidenceIds": [
+            "case-1:final"
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "actions": [
+            {
+              "action": "click",
+              "elementId": "0",
+              "value": "",
+              "url": "",
+              "milliseconds": 500
+            }
+          ],
+          "decision": "EXECUTE",
+          "phase": "TEST",
+          "missingInputs": [],
+          "explanation": "상세 보기 버튼을 클릭하여 신청 상태를 확인합니다. 현재 페이지에서 '상세 보기' 버튼이 존재합니다.",
+          "conditions": [
+            {
+              "requirementQuote": "상세 보기 클릭 후 상태: 승인이 표시된다.",
+              "method": "TEXT_PRESENT",
+              "expected": "승인이 표시된다."
+            }
+          ],
+          "caseId": "detail-case"
+        }
+      ],
+      "observedTexts": [
+        "신청 상세 조회\n\n선택 전\n\n상세 보기",
+        "신청 상세 조회\n\n상태: 거절\n\n상세 보기"
+      ]
+    },
+    {
+      "fixture": "missing",
+      "expected": null,
+      "actual": null,
+      "executionStatus": "NEEDS_CONTEXT",
+      "reason": "EXECUTION_INPUT_CONTEXT_REQUIRED",
+      "confidence": null,
+      "elapsedSeconds": 11.56,
+      "judgeAnswers": {},
+      "conditions": null,
+      "plans": [
+        {
+          "actions": [
+            {
+              "action": "click",
+              "elementId": "0",
+              "value": "",
+              "url": "",
+              "milliseconds": 500
+            }
+          ],
+          "decision": "EXECUTE",
+          "phase": "TEST",
+          "missingInputs": [],
+          "explanation": "시험 파일을 선택하기 위해 파일 입력 필드 클릭",
+          "conditions": [
+            {
+              "requirementQuote": "선택한 시험 파일이 전송된다.",
+              "method": "TEXT_PRESENT",
+              "expected": "시험 파일이 전송된다."
+            }
+          ],
+          "caseId": "file-case"
+        }
+      ],
+      "observedTexts": [
+        "파일 전송\n시험 파일전송"
+      ]
+    }
+  ]
+}

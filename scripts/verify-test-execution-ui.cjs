@@ -41,6 +41,13 @@ const assert = require('node:assert/strict')
         run.status = path.endsWith('/start') ? 'WAITING_EXECUTOR' : 'CANCELED'; history[0].status = run.status
         return json(view())
       }
+      if(path.endsWith('/review')){
+        const body=req.postDataJSON();assert.equal(body.revision,0);assert(body.reason.length>0);
+        const item=run.snapshot.items.find(item=>item.caseId===body.caseId);item.result=body.result;item.reason=body.reason;item.defectDisposition=body.disposition;item.judgmentStatus='USER_REVIEWED';
+        run.snapshot.reviewRevision=1;run.snapshot.reviews=[{caseId:body.caseId,before:null,after:body.result,reason:body.reason}];run.failCount=1;return json(view());
+      }
+      if(path.endsWith('/retry')){const body=req.postDataJSON();assert.equal(body.caseIds.length,1);return json({...view(),run:{...run,runId:'retry-qa',status:'PREPARED',snapshot:{...run.snapshot,retryOf:run.runId}}});}
+      if(path.endsWith('/report'))return route.fulfill({contentType:'text/markdown',body:'# 시험 보고서\nF: 검토한 결함'});
       throw new Error('Unexpected request ' + path)
     })
     await page.goto(process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173/')
@@ -100,6 +107,23 @@ const assert = require('node:assert/strict')
     await page.getByRole('button', { name: '실행 정보 새로고침', exact: true }).click()
     await page.getByText('원본이 변경된 TC입니다. TC를 다시 생성하세요.', { exact: true }).waitFor()
     assert(await page.getByRole('button', { name: '시험 실행 준비', exact: true }).isDisabled())
+    await page.getByRole('button',{name:'06 결함 검토',exact:true}).click()
+    const review=page.getByRole('region',{name:'결함·판정 검토',exact:true})
+    await review.getByRole('button',{name:'판정 검토',exact:true}).first().click()
+    await review.getByLabel('최종 판정').selectOption('F')
+    await review.getByLabel('결함 검토',{exact:true}).selectOption('CONFIRMED')
+    await review.getByLabel('검토 사유').fill('실제 결과 불일치 확인')
+    await review.getByRole('button',{name:'검토 판정 저장',exact:true}).click()
+    await review.getByText('사용자 검토를 저장했습니다. 자동 판정과 변경 이력을 보존했습니다.',{exact:true}).waitFor()
+    await review.getByRole('checkbox').first().check()
+    await review.getByRole('button',{name:'선택 항목 재시험 준비',exact:true}).click()
+    await review.getByText(/재시험 준비 완료 · retry-qa/).waitFor()
+    const reportDownload=page.waitForEvent('download')
+    await review.getByRole('button',{name:'시험 보고서 초안 다운로드',exact:true}).click()
+    assert.match((await reportDownload).suggestedFilename(),/시험보고서-초안\.md$/)
+    await page.getByRole('button',{name:'07 리포트·재시험',exact:true}).click()
+    await page.getByRole('region',{name:'리포트·재시험 관리',exact:true}).getByRole('button',{name:'판정 검토',exact:true}).first().waitFor()
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No review page overflow')
     assert.deepEqual(errors, [])
     console.log('PASS: TC linking, feature selection, preparation, pending judgments, detail/pagination, request/cancel, retained history, stale guard and responsive layout.')
   } finally { await browser.close() }

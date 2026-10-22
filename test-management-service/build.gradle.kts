@@ -27,6 +27,10 @@ tasks.test {
     useJUnitPlatform()
 }
 
+tasks.processResources {
+    from(rootProject.file("frontend/public/downloads/menu-tree-common-rules.md")) { into("menu-templates") }
+}
+
 tasks.register<JavaExec>("generateMenuTcSamples") {
     group = "verification"
     description = "Generate independent TC workbooks and execution JSON from user menu samples"

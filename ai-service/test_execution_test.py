@@ -21,7 +21,7 @@ class ExecutionTest(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn('screenshot',evidence[0]);self.assertNotIn('plans',evidence[0])
             return {'case_0':{'choice':'P','confidence':.99}}
         result=await execute_feature(self.request(),planner,judge,httpx.MockTransport(transport),False)
-        self.assertEqual('P',result['items'][0]['result']);self.assertTrue(calls[-1].endswith('/close'))
+        self.assertIsNone(result['items'][0]['result']);self.assertTrue(calls[-1].endswith('/close'))
 
     async def test_action_error_never_becomes_product_failure(self):
         def transport(req):
@@ -50,5 +50,22 @@ class ExecutionTest(unittest.IsolatedAsyncioTestCase):
         for answer in ({'choice':'F','confidence':.4},{'choice':'INSUFFICIENT','confidence':1}):
             self.assertIsNone(judgments(self.request().cases,{'case_0':answer},['observed'])[0]['result'])
         self.assertEqual('N/A',judgments(self.request().cases,{'case_0':{'choice':'N_A','confidence':.99}},['observed'])[0]['result'])
+
+    async def test_one_success_cannot_pass_another_tc(self):
+        opens=0
+        def transport(req):
+            nonlocal opens
+            if req.url.path.endswith('/open'):
+                opens+=1;return httpx.Response(200,json={'sessionId':str(opens),'observation':{'text':'시험 화면','elements':[{'id':'0','name':'버튼'}]}})
+            if req.url.path.endswith('/step'):return httpx.Response(200,json={'records':[{'status':'COMPLETED','action':'click'}],'observation':{'text':'성공','elements':[]}})
+            return httpx.Response(200,json={})
+        async def planner(payload):
+            self.assertEqual(1,len(payload['cases']));expected=payload['cases'][0]['expectedResult']
+            return Plan(actions=[{'action':'click','elementId':'0'}],decision='EXECUTE',phase='TEST',missingInputs=[],explanation='한 TC만 수행',conditions=[{'requirementQuote':expected,'method':'TEXT_PRESENT','expected':expected}])
+        def judge(*_):return {'case_0':{'choice':'P','confidence':.99},'scope_0':{'choice':'YES','confidence':.99},'coverage_0':{'choice':'COMPLETE','confidence':.99}}
+        request=self.request().model_copy(update={'cases':[{'id':'success','expectedResult':'성공'},{'id':'cancel','expectedResult':'취소'}]})
+        result=await execute_feature(request,planner,judge,httpx.MockTransport(transport),False)
+        self.assertEqual(2,opens);self.assertEqual('P',result['items'][0]['result']);self.assertIsNone(result['items'][1]['result'])
+        first=set(result['items'][0]['evidenceIds']);second=set(result['items'][1]['evidenceIds']);self.assertFalse(first&second)
 
 if __name__=='__main__':unittest.main()

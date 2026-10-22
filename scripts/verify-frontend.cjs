@@ -14,7 +14,7 @@ const origin = process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173'
     let delivery = { status: 'PENDING', attempts: 1, lastError: null, deliveredAt: null, updatedAt: null, retryable: false, preflight: null }
     let setup = null, checks = {}, crawl = null
     const row = { rowId: 'row-1', included: true, menuPath: ['사용자 관리'], functionName: '사용자 조회', menuDescription: '등록된 사용자를 조회한다.', location: 'SIDEBAR', verificationStatus: 'MATCH_PROPOSED', evidenceStatus: 'VALID', connectionStatus: 'PROPOSED', evidence: [{ sourceId: 'source-1', quote: '사용자를 조회할 수 있습니다.' }], matchedMenuKeys: [], reviewNotes: [] }
-    let job = { jobId: 'menu-1', crawlJobId: 'crawl-1', productName: '검증용 제품', status: 'DRAFT', revision: 1, stale: false, generationMode: 'REAL', warnings: [], sources: [], output: { rows: [row] } }
+    let job = { jobId: 'menu-1', crawlJobId: 'crawl-1', productName: '검증용 제품', status: 'DRAFT', revision: 1, stale: false, generationMode: 'REAL', warnings: [], sources: [{ id: 'source-1', kind: 'DOCUMENT' }], output: { rows: [row] } }
     const view = () => ({ job, history: [{ jobId: job.jobId, productName: job.productName, status: job.status }], crawls: [{ jobId: 'crawl-1', pageCount: 1, createdAt: '2026-10-21T00:00:00Z', targetUrl: 'https://example.com' }] })
     const submission = () => ({ submissionId: 'qa-set', status: 'PARSED', failureReason: null, documents, aiDelivery: delivery })
     await page.route('**/api/**', async route => {
@@ -49,7 +49,7 @@ const origin = process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173'
       }
       if (path.endsWith('/evidence')) return json({ id: 'source-1', kind: 'DOCUMENT', filename: '매뉴얼.pdf', text: '사용자를 조회할 수 있습니다.' })
       if (path.endsWith('/download')) return route.fulfill({ contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', body: 'fixture' })
-      if (path.endsWith('/prompt')) return json({ prompt: '검증용 외부 LLM 프롬프트' })
+      if (path.endsWith('/prompt')) return json({ instructionVersion: 'self-llm-v2', requestId: 'qa-request', prompt: '검증용 외부 LLM 프롬프트' })
       if (/\/functional-menu\/menu-1\/(draft|approval|import)$/.test(path)) {
         job = { ...job, status: path.endsWith('/approval') ? 'APPROVED' : 'DRAFT', revision: job.revision + 1, output: { rows: request.postDataJSON().rows } }
         return json(view())
@@ -114,10 +114,10 @@ const origin = process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173'
     const draftDownload = page.waitForEvent('download')
     await page.getByRole('button', { name: '초안 Excel', exact: true }).click()
     assert.match((await draftDownload).suggestedFilename(), /초안\.xlsx$/)
-    await page.locator('summary').filter({ hasText: /^외부 LLM 프롬프트·JSON 가져오기$/ }).click()
-    await page.getByRole('button', { name: '통합 프롬프트 만들기' }).click()
-    assert.equal(await page.getByLabel('통합 메뉴트리 프롬프트').inputValue(), '검증용 외부 LLM 프롬프트')
-    await page.getByLabel('LLM JSON 응답').fill(JSON.stringify({ rows: [{ ...row, functionName: '외부 응답 기능' }] }))
+    await page.locator('summary').filter({ hasText: /^제품별 프롬프트·JSON 가져오기$/ }).click()
+    await page.getByRole('button', { name: '이 실행의 제품 프롬프트 다시 만들기', exact: true }).click()
+    assert.equal(await page.getByLabel('제품별 메뉴트리 프롬프트').inputValue(), '검증용 외부 LLM 프롬프트')
+    await page.getByLabel('LLM JSON 응답').fill(JSON.stringify({ requestId: 'qa-request', rows: [{ ...row, functionName: '외부 응답 기능' }] }))
     await page.getByRole('button', { name: '근거 검증 후 가져오기' }).click()
     await page.waitForFunction(() => document.querySelector('input[aria-label="1행 기능명"]')?.value === '외부 응답 기능')
     assert.equal(await page.getByLabel('1행 기능명').inputValue(), '외부 응답 기능')

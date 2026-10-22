@@ -32,6 +32,10 @@ public class TestExecutionService {
     }
     @Transactional
     public ObjectNode prepare(UUID submission,long member,UUID set,String targetUrl,String notes,List<String> selected,boolean allowMutation) {
+        return prepare(submission,member,set,targetUrl,notes,selected,allowMutation,"");
+    }
+    @Transactional
+    public ObjectNode prepare(UUID submission,long member,UUID set,String targetUrl,String notes,List<String> selected,boolean allowMutation,String productVersion) {
         owner(submission,member,true);
         if(set==null)throw error(HttpStatus.BAD_REQUEST,"TC_SET_REQUIRED","실행할 TC 세트를 선택하세요.");
         var source=cases.status(submission,member,set).path("set");current(submission,member,set);
@@ -53,6 +57,17 @@ public class TestExecutionService {
             item.set("tc",tc.deepCopy());item.putNull("result");item.putNull("actualResult");item.putNull("reason");item.putArray("evidence");
         }
         snapshot.put("caseCount",items.size()).put("groupCount",groups.size());
+        if(productVersion!=null&&productVersion.length()>120)throw error(HttpStatus.BAD_REQUEST,"EXECUTION_VERSION_INVALID","제품·패치 버전은 120자 이내입니다.");
+        snapshot.put("productVersion",productVersion==null?"":productVersion.trim());snapshot.put("reviewRevision",0);
+        var previous=snapshot.putArray("previousAttempts");
+        jdbc.query("""
+            SELECT DISTINCT ON (item->>'caseId') r.run_id,item->>'caseId' AS case_id,item->>'result' AS result,item->>'proposedResult' AS proposed,item->>'reason' AS reason,r.created_at
+            FROM test_execution_runs r CROSS JOIN LATERAL jsonb_array_elements(r.snapshot->'items') item
+            WHERE r.submission_id=? AND r.member_id=? AND r.tc_set_id=?
+              AND (item->>'result'='F' OR item->>'proposedResult'='F')
+              AND COALESCE(item->>'defectDisposition','PENDING')<>'REJECTED'
+            ORDER BY item->>'caseId',r.created_at DESC
+            """,rs->{if(wanted.contains(rs.getString("case_id")))previous.addObject().put("sourceRunId",rs.getString(1)).put("caseId",rs.getString(2)).put("result",rs.getString(3)).put("proposedResult",rs.getString(4)).put("reason",rs.getString(5)).put("createdAt",rs.getTimestamp(6).toInstant().toString());},submission,member,set);
         snapshot.put("allowMutation",allowMutation);
         UUID run=UUID.randomUUID();jdbc.update("INSERT INTO test_execution_runs(run_id,submission_id,member_id,tc_set_id,status,snapshot) VALUES(?,?,?,?,'PREPARED',?::jsonb)",run,submission,member,set,snapshot.toString());
         return status(submission,member,run);

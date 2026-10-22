@@ -85,9 +85,14 @@ public class TestExecutionWorker {
                 payload.set("featurePath",group.path("featurePath"));payload.set("documents",documents(submission,group.path("featurePath")));
                 if(setup!=null)payload.set("setup",mapper.valueToTree(setup));
                 if(password!=null)payload.put("password",password);
-                var cases=payload.putArray("cases");for(var item:snapshot.path("items"))if(ids.contains(item.path("caseId").asText())){
-                    var tc=mapper.createObjectNode();for(String key:List.of("id","tcId","scenario","inputs","expectedResult","scopeDescription"))tc.set(key,item.path("tc").path(key));cases.add(tc);
+                var cases=mapper.createArrayNode();for(var item:snapshot.path("items"))if(ids.contains(item.path("caseId").asText())){
+                    var tc=mapper.createObjectNode();for(String key:List.of("id","tcId","ruleId","scenario","inputs","expectedResult","scopeDescription"))tc.set(key,item.path("tc").path(key));cases.add(tc);
                 }
+                for(var selectedCase:cases){
+                if(!active(run,attempt))return;
+                payload.set("cases",mapper.createArrayNode().add(selectedCase));
+                Set<String> expectedIds=Set.of(selectedCase.path("id").asText());
+                snapshot.put("currentCaseId",selectedCase.path("id").asText());
                 snapshot.put("currentFeatureId",group.path("featureId").asText());save(run,attempt,snapshot,"RUNNING");
                 var request=HttpRequest.newBuilder(URI.create(aiUrl+"/api/v1/test-executions/feature")).timeout(Duration.ofMinutes(18)).header("Content-Type","application/json").header("X-Internal-Token",token).POST(HttpRequest.BodyPublishers.ofString(payload.toString())).build();
                 var response=http.send(request,HttpResponse.BodyHandlers.ofString());
@@ -97,20 +102,27 @@ public class TestExecutionWorker {
                 Set<String> received=new HashSet<>();
                 for(var value:answer.path("items")) {
                     String id=value.path("caseId").asText();
-                    if(!ids.contains(id)||!received.add(id))throw new IllegalStateException("EXECUTION_RESULT_INVALID");
+                    if(!expectedIds.contains(id)||!received.add(id))throw new IllegalStateException("EXECUTION_RESULT_INVALID");
                     String verdict=value.path("result").asText("");if(!Set.of("","null","P","F","N/A").contains(verdict))throw new IllegalStateException("EXECUTION_VERDICT_INVALID");
                     for(var item:snapshot.path("items"))if(id.equals(item.path("caseId").asText())){
                         ((ObjectNode)item).setAll((ObjectNode)value);
+                        if("P".equals(value.path("result").asText())){
+                            boolean guarded=value.path("requirementCoverageComplete").asBoolean()&&value.path("conditionAssessments").isArray()&&!value.path("conditionAssessments").isEmpty();
+                            for(var condition:value.path("conditionAssessments"))guarded &= condition.path("grounded").asBoolean()&&"PASS".equals(condition.path("outcome").asText());
+                            boolean previousFailure=false;for(var previous:snapshot.path("previousAttempts"))if(id.equals(previous.path("caseId").asText()))previousFailure=true;
+                            if(!guarded||previousFailure)((ObjectNode)item).putNull("result").put("proposedResult","P").put("judgmentStatus","NEEDS_REVIEW").put("reason",previousFailure?"이전 실패 후 성공입니다. 이전 실행과 함께 검토하세요.":"P 확정에 필요한 TC별 확인 조건·증거가 없습니다.");
+                        }
                         String actual="";for(var evidence:answer.path("evidence"))if(evidence.hasNonNull("text"))actual=evidence.path("text").asText();
                         ((ObjectNode)item).put("actualResult",actual.isBlank()?"기능별 관찰 증거와 동작 기록을 확인하세요.":actual.substring(0,Math.min(2000,actual.length())));
                     }
                 }
-                if(!received.equals(ids))throw new IllegalStateException("EXECUTION_RESULT_INCOMPLETE");
-                var result=results.addObject().put("featureId",group.path("featureId").asText());result.set("evidence",answer.path("evidence"));result.set("plans",answer.path("plans"));
+                if(!received.equals(expectedIds))throw new IllegalStateException("EXECUTION_RESULT_INCOMPLETE");
+                var result=results.addObject().put("featureId",group.path("featureId").asText()).put("caseId",selectedCase.path("id").asText());result.set("evidence",answer.path("evidence"));result.set("plans",answer.path("plans"));
                 save(run,attempt,snapshot,"RUNNING");
+                }
             }
             boolean partial=false;for(var item:snapshot.path("items"))if(item.path("result").isNull())partial=true;
-            snapshot.remove("currentFeatureId");save(run,attempt,snapshot,partial?"PARTIAL":"COMPLETED");
+            snapshot.remove(List.of("currentFeatureId","currentCaseId"));save(run,attempt,snapshot,partial?"PARTIAL":"COMPLETED");
         }catch(Exception failure){
             if(snapshot!=null){String code=failure.getMessage();snapshot.put("errorCode",code!=null&&code.matches("EXECUTION_[A-Z_]+")?code:"EXECUTION_WORKER_ERROR");save(run,attempt,snapshot,"FAILED");}
             else jdbc.update("UPDATE test_execution_runs SET status='FAILED',updated_at=now() WHERE run_id=? AND attempt=? AND status='RUNNING'",run,attempt);
