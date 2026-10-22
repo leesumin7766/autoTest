@@ -194,7 +194,12 @@ public class FunctionalMenuService {
         if(job.path("snapshot").has("webStructure"))job.set("webStructure",job.path("snapshot").path("webStructure"));
         job.remove(List.of("snapshot","documentDigest"));response.set("job",job);return response;
     }
-    public JsonNode prompt(UUID id,long member,UUID job){var stored=stored(id,member,job);return post("prompt",request(job,stored.path("snapshot")),Duration.ofSeconds(30));}
+    public JsonNode prompt(UUID id,long member,UUID job){var stored=stored(id,member,job);return new SelfLlmMenuContract(mapper).describe(job,stored.path("snapshot"));}
+    public ObjectNode imported(UUID id,long member,UUID job,int revision,JsonNode rows,String requestId){
+        boolean numbered=false;if(rows.isArray())for(var row:rows)if(row.has("evidenceRefIds"))numbered=true;
+        if(requestId!=null||numbered){var old=stored(id,member,job);rows=new SelfLlmMenuContract(mapper).restore(job,old.path("snapshot"),requestId,rows);}
+        return imported(id,member,job,revision,rows);
+    }
     public JsonNode evidence(UUID id,long member,UUID job,String sourceId){for(JsonNode source:stored(id,member,job).path("snapshot").path("evidence"))if(sourceId.equals(source.path("id").asText()))return source;throw error(HttpStatus.NOT_FOUND,"MENU_EVIDENCE_NOT_FOUND","근거를 찾을 수 없습니다.");}
     public ObjectNode imported(UUID id,long member,UUID job,int revision,JsonNode rows){var old=stored(id,member,job);
         if("GENERATING".equals(old.path("status").asText()))throw error(HttpStatus.CONFLICT,"MENU_RUNNING","생성이 끝난 뒤 가져오세요.");

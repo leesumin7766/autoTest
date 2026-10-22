@@ -1,0 +1,137 @@
+{
+  "passed": true,
+  "planner": "qwen3:4b (local)",
+  "judge": "Jev (real API)",
+  "results": [
+    {
+      "fixture": "good",
+      "expected": "P",
+      "actual": "P",
+      "executionStatus": "COMPLETED",
+      "reason": "Jev 증거 평가: P (신뢰도 0.950).",
+      "confidence": 0.95,
+      "elapsedSeconds": 12.22,
+      "judgeAnswers": {
+        "case_0": {
+          "choice": "P",
+          "confidence": 0.95
+        },
+        "scope_0": {
+          "choice": "YES",
+          "confidence": 0.98
+        },
+        "coverage_0": {
+          "choice": "COMPLETE",
+          "confidence": 0.94
+        }
+      },
+      "conditions": [
+        {
+          "conditionId": "C1",
+          "requirementQuote": "저장 버튼 클릭 후 화면에 저장 완료 문구가 표시된다.",
+          "method": "TEXT_PRESENT",
+          "expected": "저장 완료",
+          "grounded": true,
+          "outcome": "PASS",
+          "evidenceIds": [
+            "case-1:final"
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "actions": [
+            {
+              "action": "click",
+              "elementId": "0",
+              "value": "",
+              "url": "",
+              "milliseconds": 500
+            }
+          ],
+          "decision": "EXECUTE",
+          "phase": "TEST",
+          "missingInputs": [],
+          "explanation": "저장 버튼을 클릭하여 저장 기능을 테스트합니다. 저장 버튼의 elementId는 0입니다.",
+          "conditions": [
+            {
+              "requirementQuote": "저장 버튼 클릭 후 화면에 저장 완료 문구가 표시된다.",
+              "method": "TEXT_PRESENT",
+              "expected": "저장 완료"
+            }
+          ],
+          "caseId": "save-case"
+        }
+      ],
+      "observedTexts": [
+        "저장 기능 시험\n\n저장 버튼을 누르면 결과 문구를 확인할 수 있습니다.\n\n저장 전\n\n저장",
+        "저장 기능 시험\n\n저장 버튼을 누르면 결과 문구를 확인할 수 있습니다.\n\n저장 완료\n\n저장"
+      ]
+    },
+    {
+      "fixture": "broken",
+      "expected": "F",
+      "actual": "F",
+      "executionStatus": "COMPLETED",
+      "reason": "Jev 증거 평가: F (신뢰도 0.990).",
+      "confidence": 0.99,
+      "elapsedSeconds": 14.48,
+      "judgeAnswers": {
+        "case_0": {
+          "choice": "F",
+          "confidence": 0.99
+        },
+        "scope_0": {
+          "choice": "YES",
+          "confidence": 0.95
+        },
+        "coverage_0": {
+          "choice": "COMPLETE",
+          "confidence": 0.8
+        }
+      },
+      "conditions": [
+        {
+          "conditionId": "C1",
+          "requirementQuote": "저장 버튼 클릭 후 화면에 저장 완료 문구가 표시된다.",
+          "method": "TEXT_PRESENT",
+          "expected": "저장 완료",
+          "grounded": true,
+          "outcome": "FAIL",
+          "evidenceIds": [
+            "case-1:final"
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "actions": [
+            {
+              "action": "click",
+              "elementId": "0",
+              "value": "",
+              "url": "",
+              "milliseconds": 500
+            }
+          ],
+          "decision": "EXECUTE",
+          "phase": "TEST",
+          "missingInputs": [],
+          "explanation": "저장 버튼을 클릭하여 저장 기능을 테스트합니다. 저장 버튼의 elementId는 0입니다. 추가 데이터 입력 없이 저장 버튼 클릭 후 저장 완료 문구가 표시되는지 확인합니다.",
+          "conditions": [
+            {
+              "requirementQuote": "저장 버튼 클릭 후 화면에 저장 완료 문구가 표시된다.",
+              "method": "TEXT_PRESENT",
+              "expected": "저장 완료"
+            }
+          ],
+          "caseId": "save-case"
+        }
+      ],
+      "observedTexts": [
+        "저장 기능 시험\n\n저장 버튼을 누르면 결과 문구를 확인할 수 있습니다.\n\n저장 전\n\n저장",
+        "저장 기능 시험\n\n저장 버튼을 누르면 결과 문구를 확인할 수 있습니다.\n\n저장 실패: 서버 오류\n\n저장"
+      ]
+    }
+  ]
+}

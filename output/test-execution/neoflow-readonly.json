@@ -1,0 +1,71 @@
+{
+  "scope": "real NeoFlow read-only; original TC and supplied Server documents",
+  "planner": "local qwen3:4b",
+  "judge": "Jev",
+  "allowMutation": false,
+  "results": [
+    {
+      "result": null,
+      "proposedResult": "INSUFFICIENT",
+      "executionStatus": "COMPLETED",
+      "judgmentStatus": "NEEDS_REVIEW",
+      "reason": "판정 근거 또는 신뢰도가 부족하여 검토가 필요합니다.",
+      "confidence": 0.51,
+      "conditionAssessments": [
+        {
+          "conditionId": "C1",
+          "requirementQuote": "기능이 목적에 맞게 동작함",
+          "method": "TEXT_PRESENT",
+          "expected": "작업 목록을 상태별/카테고리별/정렬순으로 조회하는 기능",
+          "grounded": true,
+          "outcome": "FAIL",
+          "evidenceIds": [
+            "case-1:final"
+          ]
+        }
+      ],
+      "tcId": "TC-002-001",
+      "featurePath": [
+        "NeoFlow Server",
+        "작업 관리",
+        "작업 관리",
+        "Job 목록 조회"
+      ],
+      "elapsedSeconds": 128.27,
+      "plannerCalls": 1,
+      "evidenceCount": 3
+    },
+    {
+      "result": null,
+      "proposedResult": "INSUFFICIENT",
+      "executionStatus": "COMPLETED",
+      "judgmentStatus": "NEEDS_REVIEW",
+      "reason": "판정 근거 또는 신뢰도가 부족하여 검토가 필요합니다.",
+      "confidence": 0.51,
+      "conditionAssessments": [
+        {
+          "conditionId": "C1",
+          "requirementQuote": "기능이 목적에 맞게 동작함",
+          "method": "TEXT_PRESENT",
+          "expected": "DAG를 상태별/카테고리별/정렬순으로 조회하는 기능",
+          "grounded": true,
+          "outcome": "FAIL",
+          "evidenceIds": [
+            "case-1:final"
+          ]
+        }
+      ],
+      "tcId": "TC-013-001",
+      "featurePath": [
+        "NeoFlow Server",
+        "워크플로우(DAG)",
+        "DAG 관리",
+        "DAG 조회"
+      ],
+      "elapsedSeconds": 127.15,
+      "plannerCalls": 1,
+      "evidenceCount": 3
+    }
+  ],
+  "tlsException": "explicitly authorized for this development target only"
+}

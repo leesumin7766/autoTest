@@ -6,6 +6,7 @@ import { PlaywrightSetupPanel } from './PlaywrightSetupPanel'
 import { FunctionalMenuPanel } from './FunctionalMenuPanel'
 import { MenuTcPanel } from './MenuTcPanel'
 import { TestExecutionPanel } from './TestExecutionPanel'
+import { ExecutionReviewPanel } from './ExecutionReviewPanel'
 import { PreflightWarningDetails, type PreflightDiagnostics, type PreflightWarning } from './PreflightWarningDetails'
 
 type Role = 'AGREEMENT' | 'FUNCTION_LIST' | 'MANUAL'
@@ -434,7 +435,11 @@ function App() {
           {!submissionId && <div className="workspace-empty"><h2>등록된 문서 세트가 없습니다</h2><p>자료 등록과 TC 생성을 완료한 뒤 시험을 준비하세요.</p><button className="primary-button" onClick={() => navigate('documents')}>자료 등록으로 이동</button></div>}
           {submissionId && visited.has('execution') && <TestExecutionPanel key={`execution:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} />}
         </div>
-        {upcomingPages.filter(item => item.id !== 'tc-generate' && item.id !== 'execution').map(item => <section key={item.id} className="workflow-page workspace-empty" hidden={page !== item.id} aria-label={item.title}>
+        {upcomingPages.filter(item => item.id === 'defects' || item.id === 'reports').map(item => <div key={item.id} className="workflow-page" hidden={page !== item.id}>
+          {!submissionId && <div className="workspace-empty"><h2>등록된 문서 세트가 없습니다</h2><p>자료 등록과 TC 시험을 먼저 진행하세요.</p></div>}
+          {submissionId && visited.has(item.id) && <ExecutionReviewPanel key={`${item.id}:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} reports={item.id === 'reports'} />}
+        </div>)}
+        {upcomingPages.filter(item => !['tc-generate', 'execution', 'defects', 'reports'].includes(item.id)).map(item => <section key={item.id} className="workflow-page workspace-empty" hidden={page !== item.id} aria-label={item.title}>
           <span className="workspace-badge">준비 중</span>
           <h2>{item.title}</h2>
           <p>{item.description}</p>

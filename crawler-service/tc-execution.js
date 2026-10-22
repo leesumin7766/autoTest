@@ -33,9 +33,10 @@ async function open(input) {
     const setup = input.setup || { loginMethod: 'NONE', automation: {} };
     if (!['NONE', 'FORM_AUTO', 'BASIC_AUTH'].includes(setup.loginMethod)) throw failure('EXECUTION_LOGIN_UNSUPPORTED');
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true,
+      ignoreHTTPSErrors: setup.automation?.ignoreHTTPSErrors === true,
       ...(setup.loginMethod === 'BASIC_AUTH' ? { httpCredentials: { username: setup.automation.username, password: input.password } } : {}) });
     const page = await context.newPage(); page.setDefaultTimeout(8000);
-    const s = { browser, context, page, origins, allowMutation: input.allowMutation === true, observation: null, busy: false, downloads: [], dialogs: [], touched: Date.now(), authenticating: setup.loginMethod === 'FORM_AUTO', blockedRequests: 0 };
+    const s = { browser, context, page, origins, effects: new Set(), allowMutation: input.allowMutation === true, observation: null, busy: false, downloads: [], dialogs: [], touched: Date.now(), authenticating: setup.loginMethod === 'FORM_AUTO', blockedRequests: 0 };
     await context.route('**/*', route => {
       try {
         safeUrl(route.request().url(), origins);
@@ -44,7 +45,17 @@ async function open(input) {
       } catch { return route.abort(); }
     });
     page.on('dialog', dialog => { s.dialogs.push({ type: dialog.type(), text: dialog.message(), dismissed: true }); void dialog.dismiss(); });
-    page.on('download', download => { const entry={ filename: download.suggestedFilename(), status: 'STARTED' }; s.downloads.push(entry); void download.failure().then(error => { entry.status = error ? 'FAILED' : 'COMPLETED'; }).catch(()=>{entry.status='FAILED';}); });
+    page.on('download', download => {
+      const entry={ filename: download.suggestedFilename(), status: 'STARTED' };s.downloads.push(entry);
+      entry.promise=(async()=>{try{
+        if(await download.failure())throw new Error('DOWNLOAD_FAILED');
+        const stream=await download.createReadStream();let size=0;const chunks=[];
+        for await(const chunk of stream){size+=chunk.length;if(size>1048576){entry.truncated=true;stream.destroy();break;}chunks.push(chunk);}
+        const bytes=Buffer.concat(chunks);entry.bytes=size;entry.sha256=require('node:crypto').createHash('sha256').update(bytes).digest('hex');
+        if(/\.(csv|txt|json|tsv)$/i.test(entry.filename)&&!bytes.includes(0))entry.text=bytes.toString('utf8');
+        entry.status='COMPLETED';
+      }catch{entry.status='FAILED';}})();
+    });
     if (setup.loginMethod === 'FORM_AUTO') {
       if (!input.password) throw failure('EXECUTION_PASSWORD_REQUIRED');
       await login(page, { targetUrl: input.targetUrl, automation: setup.automation, password: input.password }, new Set());
@@ -54,7 +65,11 @@ async function open(input) {
     const observation = await observe(s);
     const sessionId = randomUUID(); sessions.set(sessionId, s);
     return { sessionId, observation };
-  } catch (error) { await browser.close(); throw error; }
+  } catch (error) {
+    await browser.close();
+    if (/net::ERR_CERT_/.test(error.message || '')) throw failure('EXECUTION_TLS_UNTRUSTED');
+    throw error;
+  }
 }
 async function step(s, actions) {
   if (!Array.isArray(actions) || actions.length > 8) throw failure('EXECUTION_PLAN_INVALID');
@@ -62,7 +77,9 @@ async function step(s, actions) {
   for (const action of actions) {
     const record = { action: action.action, elementId: action.elementId || null, status: 'COMPLETED' };
     try {
-      if (action.action === 'wait') await s.page.waitForTimeout(Math.min(2000, Math.max(0, Number(action.milliseconds) || 500)));
+      record.beforeText=(await s.page.locator('body').innerText()).slice(0,5000);
+      if (action.action === 'reload') await s.page.reload({waitUntil:'domcontentloaded',timeout:20000});
+      else if (action.action === 'wait') await s.page.waitForTimeout(Math.min(2000, Math.max(0, Number(action.milliseconds) || 500)));
       else if (action.action === 'goto') {
         const href = safeUrl(action.url, s.origins);
         if (!(s.observation.elements || []).some(el => el.href === href)) throw failure('EXECUTION_UNOBSERVED_URL');
@@ -71,21 +88,29 @@ async function step(s, actions) {
       } else {
         const el = s.observation.elements.find(x => x.id === action.elementId);
         if (!el || !/^\d+$/.test(el.id)) throw failure('EXECUTION_ELEMENT_UNKNOWN');
+        record.targetName=el.name;record.value=action.action==='fill'||action.action==='select'?String(action.value||''):undefined;
         if (el.type === 'password' || el.type === 'file') throw failure('EXECUTION_INPUT_CONTEXT_REQUIRED');
         if (!s.allowMutation && mutation.test(el.name + ' ' + el.href)) throw failure('EXECUTION_MUTATION_NOT_ALLOWED');
         const locator = s.page.locator(`[data-autotest-execution-id="${el.id}"]`);
+        if(action.action==='click'&&mutation.test(el.name+' '+el.href)){
+          const fingerprint=JSON.stringify([s.page.url(),el.name,el.href]);
+          if(s.effects.has(fingerprint))throw failure('EXECUTION_REPEAT_REQUIRES_REVIEW');
+          s.effects.add(fingerprint);
+        }
         if (action.action === 'click') await locator.click();
         else if (action.action === 'fill') await locator.fill(String(action.value || '').slice(0, 2000));
         else if (action.action === 'select') await locator.selectOption(String(action.value || ''));
         else throw failure('EXECUTION_ACTION_UNSUPPORTED');
       }
       await s.page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
+      await s.page.waitForTimeout(500);
       record.url = s.page.url(); record.text = (await s.page.locator('body').innerText()).slice(0, 5000);
       records.push(record);
     } catch (error) { records.push({ ...record, status: 'ERROR', errorCode: error.code || 'EXECUTION_ACTION_FAILED' }); break; }
   }
   s.touched = Date.now();
-  return { records, downloads: s.downloads, dialogs: s.dialogs, blockedRequests: s.blockedRequests, needsDialogInput: s.dialogs.some(d=>d.type==='confirm'||d.type==='prompt'), observation: await observe(s) };
+  await Promise.all(s.downloads.map(d=>d.promise));
+  return { records, downloads: s.downloads.map(({promise,...value})=>value), dialogs: s.dialogs, blockedRequests: s.blockedRequests, needsDialogInput: s.dialogs.some(d=>d.type==='confirm'||d.type==='prompt'), observation: await observe(s) };
 }
 function register(app, auth, reserve, release) {
   app.post('/api/v1/tc-browser/open', auth, async (req, res) => {

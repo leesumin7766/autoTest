@@ -5,7 +5,7 @@ import os
 import time
 import sys
 from pathlib import Path
-from test_execution import Execute, execute_feature
+from test_execution import Execute, execute_feature, judge_with_jev
 
 async def main():
     os.environ['CRAWLER_SERVICE_URL']='http://crawler-service:8017'
@@ -22,10 +22,13 @@ async def main():
         if mode=='missing':
             request.featurePath=['파일 전송'];request.allowMutation=True
             request.cases=[{'id':'file-case','tcId':'TC-SMOKE-003','scenario':'제공된 시험 파일을 전송한다.','inputs':'시험 파일이 필요하지만 현재 파일을 제공하지 않았다.','expectedResult':'선택한 시험 파일이 전송된다.'}]
-        result=await execute_feature(request,check_active=False)
+        judge_answers={}
+        def judge(cases,evidence,path):
+            answer=judge_with_jev(cases,evidence,path);judge_answers.update(answer);return answer
+        result=await execute_feature(request,judge=judge,check_active=False)
         item=result['items'][0]
         entry={'fixture':mode,'expected':expected,'actual':item.get('result'),'executionStatus':item.get('executionStatus'),'reason':item.get('reason'),'confidence':item.get('confidence'),
-            'elapsedSeconds':round(time.monotonic()-started,2),'plans':result['plans'],'observedTexts':[e.get('text') for e in result['evidence'] if e.get('text')]}
+            'elapsedSeconds':round(time.monotonic()-started,2),'judgeAnswers':judge_answers,'conditions':item.get('conditionAssessments'),'plans':result['plans'],'observedTexts':[e.get('text') for e in result['evidence'] if e.get('text')]}
         report.append(entry)
         print(json.dumps(entry,ensure_ascii=False),flush=True)
     summary={'passed':all(r['actual']==r['expected'] and (r['expected'] is not None or r['executionStatus']=='NEEDS_CONTEXT') for r in report),'planner':'qwen3:4b (local)','judge':'Jev (real API)','results':report}

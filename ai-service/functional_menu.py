@@ -259,7 +259,7 @@ def budget_segments(request, source, budget):
 @router.post('/prompt')
 async def external_prompt(request: Request):
     schema=json.loads(json.dumps(SCHEMA));schema['properties']['rows']['maxItems']=2000
-    return {'rulesVersion': RULES['version'], 'schemaVersion': 'functional-menu-v1', 'prompt': prompt(request), 'schema': schema}
+    return {'instructionVersion': 'legacy-functional-menu-v1', 'rulesVersion': RULES['version'], 'schemaVersion': 'functional-menu-v1', 'prompt': prompt(request), 'schema': schema}
 
 @router.get('/progress/{job_id}')
 async def progress(job_id: str):
