@@ -37,7 +37,8 @@ public class MenuTcGenerator {
             return explicit;
         }
         String name = feature.path("functionName").asText().toLowerCase(Locale.ROOT);
-        return (name.contains("로그인") || name.contains("로그아웃") || name.equals("login") || name.equals("logout")) ? "로그인" : "주요기능";
+        boolean history = name.matches(".*(기록|이력|조회|history|audit).*");
+        return !history && (name.contains("로그인") || name.contains("로그아웃") || name.equals("login") || name.equals("logout")) ? "로그인" : "주요기능";
     }
     public ObjectNode generate(String product, JsonNode features, JsonNode source) {
         if (product == null || product.isBlank() || product.length() > 160) throw invalid("TC_PRODUCT_REQUIRED", "제품명이 필요합니다.");

@@ -5,6 +5,13 @@ app.use(express.json({ limit: '8mb' }));
 const { timingSafeEqual } = require('node:crypto');
 const { runJob } = require('./remote-agent/agent');
 let localBusy = false;
+function internalAuth(req, res, next) {
+  const expected = Buffer.from(process.env.PRODUCT_DESCRIPTION_INTERNAL_TOKEN || '');
+  const supplied = Buffer.from(req.get('X-Internal-Token') || '');
+  if (!expected.length || expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) return res.sendStatus(401);
+  next();
+}
+require('./tc-execution').register(app, internalAuth, () => { if (localBusy) return false; localBusy = true; return true; }, () => { localBusy = false; });
 app.post('/api/v1/browser-jobs', (req, res) => {
   const expected = Buffer.from(process.env.PRODUCT_DESCRIPTION_INTERNAL_TOKEN || '');
   const provided = Buffer.from(req.get('X-Internal-Token') || '');

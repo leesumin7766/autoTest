@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties={"s3.enabled=false","s3.access-key=test","s3.secret-key=test","playwright.credentials-key-file=./build/test-playwright/credentials.key"})
+@SpringBootTest(properties={"execution.worker.enabled=false","s3.enabled=false","s3.access-key=test","s3.secret-key=test","playwright.credentials-key-file=./build/test-playwright/credentials.key"})
 @AutoConfigureMockMvc
 @Transactional
 class MenuTcIntegrationTest {
@@ -34,6 +34,9 @@ class MenuTcIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;
     @Autowired SubmissionPersistenceService persistence;
+    @Autowired TestExecutionService executions;
+    @Autowired com.autotest.test_management_service.application.crawler.PlaywrightSetupService setups;
+    @Autowired com.autotest.test_management_service.application.crawler.PlaywrightCredentialCipher cipher;
     @Test void sourceApprovalToDurableIdempotentSetToExcelAndStaleFencing() throws Exception {
         UUID submission=UUID.randomUUID(),crawl=UUID.randomUUID(),menu=UUID.randomUUID();long member=92351;
         jdbc.update("INSERT INTO submissions(submission_id,member_id,product_id,status,uploaded_at) VALUES(?,?,1,'PARSED',now())",submission,member);
@@ -82,13 +85,38 @@ class MenuTcIntegrationTest {
         for(var item:snapshot.path("items")){assertTrue(item.path("result").isNull());assertEquals("PENDING",item.path("executionStatus").asText());assertTrue(item.path("evidence").isEmpty());}
         mvc.perform(get(executionBase).param("run",run).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.snapshot.caseCount").value(77));
         mvc.perform(get(executionBase).param("run",run).header("X-Member-Id",member+1)).andExpect(status().isForbidden());
-        mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.status").value("WAITING_EXECUTOR")).andExpect(jsonPath("$.executorConnected").value(false));
+        mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.status").value("WAITING_EXECUTOR"));
         mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isOk());
         var other=mapper.readTree(mvc.perform(post(executionBase).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(prepare)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
         String otherRun=other.path("run").path("runId").asText();
         mvc.perform(post(executionBase+"/"+otherRun+"/start").header("X-Member-Id",member)).andExpect(status().isConflict());
         mvc.perform(post(executionBase+"/"+run+"/cancel").header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.status").value("CANCELED"));
         mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isConflict());
+        // Exercise the actual persistence worker with a deterministic AI transport, separately from live model QA.
+        var fakeAi=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+        fakeAi.createContext("/api/v1/test-executions/feature",exchange->{
+            var body=mapper.readTree(exchange.getRequestBody());var answer=mapper.createObjectNode();var values=answer.putArray("items");
+            body.path("cases").forEach(tc->values.addObject().put("caseId",tc.path("id").asText()).put("executionStatus","COMPLETED").put("judgmentStatus","COMPLETED").put("result","P").put("reason","격리된 워커 저장 검증"));
+            answer.putArray("evidence").addObject().put("id","fixture-observation").put("text","테스트 증거");answer.putArray("plans");
+            byte[] bytes=mapper.writeValueAsBytes(answer);exchange.getResponseHeaders().set("Content-Type","application/json");exchange.sendResponseHeaders(200,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();
+        });fakeAi.start();
+        var worker=new TestExecutionWorker(jdbc,mapper,executions,setups,cipher,"http://127.0.0.1:"+fakeAi.getAddress().getPort(),"test-token");
+        try {
+            // Only one function TC: common/manual groups stay outside this worker transport test.
+            String caseId=snapshot.path("items").get(0).path("caseId").asText();
+            var workerRun=executions.prepare(submission,member,UUID.fromString(set),"https://example.com","",List.of(caseId),false).path("run");
+            UUID workerRunId=UUID.fromString(workerRun.path("runId").asText());executions.transition(submission,member,workerRunId,false);
+            // Keep the competing prepared history, but no other queued work.
+            worker.processNext();
+            var finished=executions.status(submission,member,workerRunId).path("run");
+            assertEquals("COMPLETED",finished.path("status").asText());assertEquals(1,finished.path("passCount").asInt());
+            assertEquals("P",finished.path("snapshot").path("items").get(0).path("result").asText());
+            assertTrue(finished.path("snapshot").path("groupResults").size()>0);
+            // A stale worker attempt cannot be considered active after completion.
+            UUID attempt=jdbc.queryForObject("SELECT attempt FROM test_execution_runs WHERE run_id=?",UUID.class,workerRunId);
+            assertFalse(worker.active(workerRunId,attempt));
+            assertTrue(first.path("set").path("output").path("testCases").get(0).path("result").isNull());
+        } finally {worker.close();fakeAi.stop(0);}
         jdbc.update("UPDATE functional_menu_jobs SET revision=2 WHERE job_id=?",menu);
         mvc.perform(post(executionBase+"/"+otherRun+"/start").header("X-Member-Id",member)).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EXECUTION_SOURCE_CHANGED"));
         mvc.perform(get(executionBase).param("run",run).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.stale").value(true)).andExpect(jsonPath("$.run.snapshot.caseCount").value(77));

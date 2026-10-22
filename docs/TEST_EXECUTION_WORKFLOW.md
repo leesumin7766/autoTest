@@ -1,5 +1,7 @@
 # 시험 실행 골격 (execution-v1)
 
+dev5의 실제 Qwen·Playwright·Jev 연결과 검증 결과는 `TEST_EXECUTION_DEV5.md`를 따른다. 아래는 generate-tc 시점의 준비·이력 골격 계약이다.
+
 ## 현재 범위
 
 생성된 TC 세트 → 5depth 기능별 실행 그룹 → Playwright 수행·증거 수집 → LLM P/F/N/A 판정 → 사용자 검토의 구조다.

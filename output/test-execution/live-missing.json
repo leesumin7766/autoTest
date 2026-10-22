@@ -1,0 +1,36 @@
+{
+  "passed": true,
+  "planner": "qwen3:4b (local)",
+  "judge": "Jev (real API)",
+  "results": [
+    {
+      "fixture": "missing",
+      "expected": null,
+      "actual": null,
+      "executionStatus": "NEEDS_CONTEXT",
+      "reason": "EXECUTION_INPUT_CONTEXT_REQUIRED",
+      "confidence": null,
+      "elapsedSeconds": 6.07,
+      "plans": [
+        {
+          "actions": [
+            {
+              "action": "click",
+              "elementId": "0",
+              "value": "",
+              "url": "",
+              "milliseconds": 500
+            }
+          ],
+          "decision": "EXECUTE",
+          "phase": "TEST",
+          "missingInputs": [],
+          "explanation": "시험 파일을 선택하기 위해 파일 입력 필드 클릭"
+        }
+      ],
+      "observedTexts": [
+        "파일 전송\n시험 파일전송"
+      ]
+    }
+  ]
+}

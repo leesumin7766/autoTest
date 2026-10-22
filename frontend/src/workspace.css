@@ -174,4 +174,5 @@
 .execution-connection-dialog { width: min(560px, calc(100vw - 48px)); max-height: 85vh; overflow: auto; box-sizing: border-box; }
 .execution-connection-dialog::backdrop { background: rgba(17, 24, 39, .4); }
 .connection-success { color: #15803d; font-weight: 600; border: 1px solid #86efac; border-radius: 4px; padding: 8px 12px; background: #f0fdf4; }
+.execution-evidence-image { width: 100%; max-width: 960px; border: 1px solid var(--line); }
 .tc-table td .quiet-button { white-space: nowrap; }

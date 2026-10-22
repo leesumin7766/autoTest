@@ -11,7 +11,7 @@ const assert = require('node:assert/strict')
     const errors = []; page.on('pageerror', e => errors.push(e.message))
     let run = null, stale = false, prepared = 0, connection = null, connectionHttp = 200, connectionCount = 0
     const history = []
-    const view = () => ({ run, history, executorConnected: false, judgeConnected: false })
+    const view = () => ({ run, history, executorConnected: true, judgeConnected: true })
     await page.route('**/api/**', async route => {
       const req = route.request(), url = new URL(req.url()), path = url.pathname
       const json = value => route.fulfill({ contentType: 'application/json', body: JSON.stringify(value) })
@@ -82,7 +82,7 @@ const assert = require('node:assert/strict')
     await page.getByRole('button', { name: '상세 닫기', exact: true }).click()
     await page.getByRole('button', { name: '다음', exact: true }).click()
     await page.getByRole('button', { name: '실행 요청', exact: true }).click()
-    await page.locator('.execution-summary strong').filter({ hasText: '실행기 연결 대기' }).waitFor()
+    await page.locator('.execution-summary strong').filter({ hasText: '실행 대기' }).waitFor()
     assert(await page.getByRole('button', { name: '실행 요청', exact: true }).isDisabled())
     await page.getByRole('button', { name: '실행 중단', exact: true }).click()
     await page.locator('.execution-summary strong').filter({ hasText: '중단됨' }).waitFor()

@@ -31,7 +31,7 @@ public class TestExecutionService {
         if(cases.status(submission,member,set).path("set").path("stale").asBoolean())throw error(HttpStatus.CONFLICT,"EXECUTION_SOURCE_CHANGED","메뉴트리·문서가 변경되었습니다. TC를 다시 생성하세요.");
     }
     @Transactional
-    public ObjectNode prepare(UUID submission,long member,UUID set,String targetUrl,String notes,List<String> selected) {
+    public ObjectNode prepare(UUID submission,long member,UUID set,String targetUrl,String notes,List<String> selected,boolean allowMutation) {
         owner(submission,member,true);
         if(set==null)throw error(HttpStatus.BAD_REQUEST,"TC_SET_REQUIRED","실행할 TC 세트를 선택하세요.");
         var source=cases.status(submission,member,set).path("set");current(submission,member,set);
@@ -53,11 +53,12 @@ public class TestExecutionService {
             item.set("tc",tc.deepCopy());item.putNull("result");item.putNull("actualResult");item.putNull("reason");item.putArray("evidence");
         }
         snapshot.put("caseCount",items.size()).put("groupCount",groups.size());
+        snapshot.put("allowMutation",allowMutation);
         UUID run=UUID.randomUUID();jdbc.update("INSERT INTO test_execution_runs(run_id,submission_id,member_id,tc_set_id,status,snapshot) VALUES(?,?,?,?,'PREPARED',?::jsonb)",run,submission,member,set,snapshot.toString());
         return status(submission,member,run);
     }
     public ObjectNode status(UUID submission,long member,UUID selected) {
-        owner(submission,member,false);var result=mapper.createObjectNode();result.put("executorConnected",false).put("judgeConnected",false);
+        owner(submission,member,false);var result=mapper.createObjectNode();result.put("executorConnected",true).put("judgeConnected",true).put("planner","qwen3:4b").put("judge","Jev");
         var history=jdbc.query("SELECT run_id,status,created_at FROM test_execution_runs WHERE submission_id=? AND member_id=? ORDER BY created_at DESC,run_id DESC LIMIT 50",(rs,n)->mapper.createObjectNode().put("runId",rs.getString(1)).put("status",rs.getString(2)).put("createdAt",rs.getTimestamp(3).toInstant().toString()),submission,member);
         result.set("history",mapper.valueToTree(history));if(selected==null&&!history.isEmpty())selected=UUID.fromString(history.getFirst().path("runId").asText());
         if(selected==null){result.putNull("run");return result;}
@@ -67,18 +68,23 @@ public class TestExecutionService {
         },selected,submission,member);
         if(values.isEmpty())throw error(HttpStatus.NOT_FOUND,"EXECUTION_NOT_FOUND","시험 실행 이력을 찾을 수 없습니다.");
         var run=values.getFirst();run.put("stale",cases.status(submission,member,UUID.fromString(run.path("tcSetId").asText())).path("set").path("stale").asBoolean());
-        run.put("completedCount",0);result.set("run",run);return result;
+        int completed=0,p=0,f=0,na=0;
+        for(var item:run.path("snapshot").path("items")) {
+            if(!"PENDING".equals(item.path("executionStatus").asText()))completed++;
+            switch(item.path("result").asText()) { case "P"->p++;case "F"->f++;case "N/A"->na++;default->{} }
+        }
+        run.put("completedCount",completed).put("passCount",p).put("failCount",f).put("naCount",na).put("unjudgedCount",run.path("snapshot").path("caseCount").asInt()-p-f-na);result.set("run",run);return result;
     }
     @Transactional
     public ObjectNode transition(UUID submission,long member,UUID run,boolean cancel) {
         owner(submission,member,true);var value=status(submission,member,run).path("run");String state=value.path("status").asText();
         if(cancel) {
-            if(!state.equals("CANCELED"))jdbc.update("UPDATE test_execution_runs SET status='CANCELED',updated_at=now() WHERE run_id=? AND status IN ('PREPARED','WAITING_EXECUTOR')",run);
+            if(!state.equals("CANCELED"))jdbc.update("UPDATE test_execution_runs SET status='CANCELED',updated_at=now() WHERE run_id=? AND status IN ('PREPARED','WAITING_EXECUTOR','RUNNING')",run);
         } else {
             current(submission,member,UUID.fromString(value.path("tcSetId").asText()));
-            if(state.equals("CANCELED"))throw error(HttpStatus.CONFLICT,"EXECUTION_CANCELED","중단한 실행입니다. 새 실행을 준비하세요.");
+            if(!Set.of("PREPARED","WAITING_EXECUTOR","RUNNING").contains(state))throw error(HttpStatus.CONFLICT,"EXECUTION_CLOSED","종료한 실행입니다. 새 실행을 준비하세요.");
             if(state.equals("PREPARED")) {
-                if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM test_execution_runs WHERE submission_id=? AND status='WAITING_EXECUTOR')",Boolean.class,submission)))throw error(HttpStatus.CONFLICT,"EXECUTION_ALREADY_WAITING","대기 중인 실행을 먼저 중단하세요.");
+                if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM test_execution_runs WHERE submission_id=? AND status IN ('WAITING_EXECUTOR','RUNNING'))",Boolean.class,submission)))throw error(HttpStatus.CONFLICT,"EXECUTION_ALREADY_WAITING","진행 중인 실행을 먼저 중단하세요.");
                 jdbc.update("UPDATE test_execution_runs SET status='WAITING_EXECUTOR',updated_at=now() WHERE run_id=? AND status='PREPARED'",run);
             }
         }

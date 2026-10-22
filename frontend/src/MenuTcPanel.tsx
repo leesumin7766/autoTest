@@ -47,7 +47,7 @@ export function MenuTcPanel({ submissionId, memberId }: { submissionId: string; 
   const action = async (work: () => Promise<void>) => { setBusy(true); setError(''); try { await work() } catch (failure) { setError(failure instanceof Error ? failure.message : '요청 실패') } finally { setBusy(false) } }
   const menu = menuView.job
   const features = useMemo(() => menu?.output?.rows.filter(row => row.included && row.rowType !== 'MENU_OBSERVATION') || [], [menu])
-  const typeFor = (row: MenuRow): FeatureType => types[row.rowId] || row.featureType || (/로그인|로그아웃|^login$|^logout$/i.test(row.functionName) ? '로그인' : '주요기능')
+  const typeFor = (row: MenuRow): FeatureType => types[row.rowId] || row.featureType || (/로그인|로그아웃|^login$|^logout$/i.test(row.functionName) && !/기록|이력|조회|history|audit/i.test(row.functionName) ? '로그인' : '주요기능')
   const loginCount = features.filter(row => typeFor(row) === '로그인').length
   const expectedCount = loginCount * 27 + (features.length - loginCount) * 9 + 68
   const ready = menu?.status === 'APPROVED' && !menu.stale && menu.generationMode !== 'MOCK' && menu.output?.completionStatus !== 'PARTIAL' && features.length > 0
