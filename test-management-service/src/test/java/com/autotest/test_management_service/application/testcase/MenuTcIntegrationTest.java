@@ -49,6 +49,17 @@ class MenuTcIntegrationTest {
             """;
         jdbc.update("INSERT INTO functional_menu_jobs(job_id,submission_id,member_id,crawl_job_id,document_digest,product_name,rules_version,status,generation_mode,revision,snapshot,output) VALUES(?,?,?,?,?,'검증용 제품','functional-v1','APPROVED','REAL',1,'{\"warnings\":[],\"evidence\":[]}'::jsonb,?::jsonb)",menu,submission,member,crawl,digest,rows);
         String base="/api/submissions/"+submission+"/menu-test-cases";
+        var upload = new org.springframework.mock.web.MockMultipartFile("file", "menu.json", "application/json", rows.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String uploadUrl="/api/submissions/"+submission+"/functional-menu/upload";
+        mvc.perform(multipart(uploadUrl).file(upload).header("X-Member-Id",member+1)).andExpect(status().isForbidden());
+        var uploaded=mapper.readTree(mvc.perform(multipart(uploadUrl).file(upload).header("X-Member-Id",member))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.job.status").value("APPROVED"))
+                .andReturn().getResponse().getContentAsByteArray());
+        String uploadedJob=uploaded.path("job").path("jobId").asText();
+        mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("menuJobId",uploadedJob))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.set.output.caseCount").value(77));
+        jdbc.update("DELETE FROM menu_tc_sets WHERE submission_id=?",submission);
         String payload=mapper.writeValueAsString(Map.of("menuJobId",menu,"featureTypes",Map.of("feature","부가기능")));
         var first=mapper.readTree(mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(payload)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
         String set=first.path("set").path("setId").asText();assertFalse(set.isBlank());
@@ -58,7 +69,29 @@ class MenuTcIntegrationTest {
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM menu_tc_sets WHERE submission_id=?",Integer.class,submission));
         mvc.perform(get(base).header("X-Member-Id",member+1)).andExpect(status().isForbidden());
         mvc.perform(get(base+"/"+set+"/download").header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"));
+        String executionBase="/api/submissions/"+submission+"/executions";
+        String prepare=mapper.writeValueAsString(Map.of("tcSetId",set,"targetUrl","https://example.com","notes","실행 골격 검증"));
+        mvc.perform(post(executionBase).header("X-Member-Id",member+1).contentType(MediaType.APPLICATION_JSON).content(prepare)).andExpect(status().isForbidden());
+        mvc.perform(post(executionBase).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("tcSetId",set,"targetUrl","javascript:alert(1)")))).andExpect(status().isBadRequest());
+        mvc.perform(post(executionBase).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("tcSetId",set,"targetUrl","https://example.com","caseIds",List.of("unknown"))))).andExpect(status().isBadRequest());
+        var execution=mapper.readTree(mvc.perform(post(executionBase).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(prepare))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.run.status").value("PREPARED")).andReturn().getResponse().getContentAsByteArray());
+        String run=execution.path("run").path("runId").asText();
+        var snapshot=execution.path("run").path("snapshot");assertEquals(77,snapshot.path("items").size());
+        assertEquals(4,snapshot.path("groups").size());
+        for(var item:snapshot.path("items")){assertTrue(item.path("result").isNull());assertEquals("PENDING",item.path("executionStatus").asText());assertTrue(item.path("evidence").isEmpty());}
+        mvc.perform(get(executionBase).param("run",run).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.snapshot.caseCount").value(77));
+        mvc.perform(get(executionBase).param("run",run).header("X-Member-Id",member+1)).andExpect(status().isForbidden());
+        mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.status").value("WAITING_EXECUTOR")).andExpect(jsonPath("$.executorConnected").value(false));
+        mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isOk());
+        var other=mapper.readTree(mvc.perform(post(executionBase).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(prepare)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
+        String otherRun=other.path("run").path("runId").asText();
+        mvc.perform(post(executionBase+"/"+otherRun+"/start").header("X-Member-Id",member)).andExpect(status().isConflict());
+        mvc.perform(post(executionBase+"/"+run+"/cancel").header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.status").value("CANCELED"));
+        mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isConflict());
         jdbc.update("UPDATE functional_menu_jobs SET revision=2 WHERE job_id=?",menu);
+        mvc.perform(post(executionBase+"/"+otherRun+"/start").header("X-Member-Id",member)).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EXECUTION_SOURCE_CHANGED"));
+        mvc.perform(get(executionBase).param("run",run).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.stale").value(true)).andExpect(jsonPath("$.run.snapshot.caseCount").value(77));
         mvc.perform(get(base).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.set.stale").value(true));
         mvc.perform(get(base+"/"+set+"/download").header("X-Member-Id",member)).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("TC_SOURCE_CHANGED"));
         jdbc.update("UPDATE functional_menu_jobs SET status='DRAFT' WHERE job_id=?",menu);

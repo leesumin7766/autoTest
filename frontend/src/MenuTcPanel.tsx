@@ -18,6 +18,7 @@ export function MenuTcPanel({ submissionId, memberId }: { submissionId: string; 
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState('')
   const [search, setSearch] = useState(''), [page, setPage] = useState(0), [detail, setDetail] = useState<Tc | null>(null)
   const menuVersion = useRef('')
+  const [uploadedFile, setUploadedFile] = useState('')
   const base = `/api/submissions/${submissionId}/menu-test-cases`
   const request = useCallback(async (url: string, options: RequestInit = {}) => {
     const response = await fetch(url, { ...options, headers: { 'X-Member-Id': memberId, ...(options.body ? { 'Content-Type': 'application/json' } : {}) } })
@@ -64,13 +65,18 @@ export function MenuTcPanel({ submissionId, memberId }: { submissionId: string; 
       <input type="file" accept=".xlsx,.json" aria-label="메뉴트리 파일 업로드" disabled={busy || loading} onChange={event => {
         const input = event.currentTarget, file = input.files?.[0]; if (!file) return
         void action(async () => {
+          setUploadedFile('')
           const form = new FormData(); form.append('file', file)
           const response = await fetch(`/api/submissions/${submissionId}/functional-menu/upload`, { method: 'POST', headers: { 'X-Member-Id': memberId }, body: form })
           let body; try { body = await response.json() } catch { throw new Error('메뉴트리 업로드 응답을 읽지 못했습니다.') }
-          if (!response.ok) throw new Error(body.message || '메뉴트리를 업로드하지 못했습니다.')
-          setSelectedMenu(body.job.jobId); await load()
+          if (!response.ok) throw new Error(body.message || (response.status === 404 ? '현재 서버에 메뉴트리 업로드 API가 반영되지 않았습니다. 서버 업데이트 후 다시 시도해주세요.' : '메뉴트리를 업로드하지 못했습니다.'))
+          if (!body.job?.jobId) throw new Error('업로드 결과에 메뉴트리 정보가 없습니다.')
+          setSelectedMenu(body.job.jobId)
+          setUploadedFile(file.name)
         }).finally(() => { input.value = '' })
       }} /><span>파일 선택</span></label></div>
+      {busy && <span role="status"><span className="spinner" /> 요청 처리 중…</span>}
+      {uploadedFile && <span role="status">{uploadedFile} 업로드 완료</span>}
       <small>메뉴트리 탭에서 내려받은 .xlsx 또는 rows가 담긴 .json을 올리면 화면 수집 없이 TC 생성에 사용합니다. 자료 등록은 필요합니다.</small></div>
     <label className="tc-field">메뉴트리 선택<select value={selectedMenu || menu?.jobId || ''} disabled={busy || loading} onChange={event => setSelectedMenu(event.target.value)}>
       {!menuView.history.length && <option value="">작성한 메뉴트리가 없습니다</option>}
