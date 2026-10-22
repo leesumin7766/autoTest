@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-22",
+  "source": "Actual isolated Qwen + Playwright + Jev run; measured console results",
+  "planner": "qwen3:4b",
+  "judge": "Jev real API",
+  "externalGenerativeLlm": false,
+  "results": [
+    {"fixture":"good","expected":"P","actual":"P","confidence":0.95,"elapsedSeconds":11.5},
+    {"fixture":"broken","expected":"F","actual":"F","confidence":0.96,"elapsedSeconds":6.46}
+  ],
+  "limitations": "Synthetic save-button fixtures only. Not a benchmark or proof of NeoFlow product coverage. Initial attempts failed on missing-input confusion and repeated clicks; execution-phase control was added."
+}

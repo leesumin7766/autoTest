@@ -1,0 +1,96 @@
+{
+  "passed": false,
+  "planner": "qwen3:4b (local)",
+  "judge": "Jev (real API)",
+  "results": [
+    {
+      "fixture": "goodread",
+      "expected": "P",
+      "actual": null,
+      "executionStatus": "COMPLETED",
+      "reason": "판정 근거 또는 신뢰도가 부족하여 검토가 필요합니다.",
+      "confidence": 0.87,
+      "elapsedSeconds": 7.12,
+      "plans": [
+        {
+          "actions": [
+            {
+              "action": "click",
+              "elementId": "0",
+              "value": "",
+              "url": "",
+              "milliseconds": 500
+            }
+          ],
+          "decision": "EXECUTE",
+          "phase": "TEST",
+          "missingInputs": [],
+          "explanation": "상세 보기 버튼을 클릭하여 신청 상태를 확인합니다."
+        }
+      ],
+      "observedTexts": [
+        "신청 상세 조회\n\n선택 전\n\n상세 보기",
+        "신청 상세 조회\n\n상태: 승인\n\n상세 보기"
+      ]
+    },
+    {
+      "fixture": "badread",
+      "expected": "F",
+      "actual": null,
+      "executionStatus": "COMPLETED",
+      "reason": "판정 근거 또는 신뢰도가 부족하여 검토가 필요합니다.",
+      "confidence": 0.8,
+      "elapsedSeconds": 5.84,
+      "plans": [
+        {
+          "actions": [
+            {
+              "action": "click",
+              "elementId": "0",
+              "value": "",
+              "url": "",
+              "milliseconds": 500
+            }
+          ],
+          "decision": "EXECUTE",
+          "phase": "TEST",
+          "missingInputs": [],
+          "explanation": "상세 보기 버튼을 클릭하여 신청 상태를 확인합니다."
+        }
+      ],
+      "observedTexts": [
+        "신청 상세 조회\n\n선택 전\n\n상세 보기",
+        "신청 상세 조회\n\n상태: 거절\n\n상세 보기"
+      ]
+    },
+    {
+      "fixture": "missing",
+      "expected": null,
+      "actual": null,
+      "executionStatus": "ERROR",
+      "reason": "EXECUTION_ACTION_FAILED_OR_BLOCKED",
+      "confidence": null,
+      "elapsedSeconds": 6.58,
+      "plans": [
+        {
+          "actions": [
+            {
+              "action": "click",
+              "elementId": "0",
+              "value": "",
+              "url": "",
+              "milliseconds": 500
+            }
+          ],
+          "decision": "EXECUTE",
+          "phase": "TEST",
+          "missingInputs": [],
+          "explanation": "시험 파일을 선택하기 위해 파일 입력 필드 클릭"
+        }
+      ],
+      "observedTexts": [
+        "파일 전송\n시험 파일전송"
+      ]
+    }
+  ]
+}

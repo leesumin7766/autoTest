@@ -18,12 +18,14 @@ from product_description.api import router as product_description_router
 from tc_generation import router as tc_router
 from menu_tree import router as menu_tree_router
 from functional_menu import router as functional_menu_router
+from test_execution import router as test_execution_router
 
 app = FastAPI()
 app.include_router(product_description_router)
 app.include_router(tc_router)
 app.include_router(menu_tree_router)
 app.include_router(functional_menu_router)
+app.include_router(test_execution_router)
 logger = logging.getLogger(__name__)
 
 

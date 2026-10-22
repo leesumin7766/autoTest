@@ -1,0 +1,12 @@
+package com.autotest.test_management_service.application.testcase;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+class ExecutionFeatureClassificationTest {
+    @Test void loginHistoryIsNotAuthenticationButUserOverrideIsRespected(){
+        var mapper=new ObjectMapper();var generator=new MenuTcGenerator(mapper);
+        assertEquals("주요기능",generator.classify(mapper.createObjectNode().put("functionName","로그인 기록 조회")));
+        assertEquals("로그인",generator.classify(mapper.createObjectNode().put("functionName","로그인/로그아웃")));
+        assertEquals("로그인",generator.classify(mapper.createObjectNode().put("functionName","로그인 기록 조회").put("featureType","로그인")));
+    }
+}
