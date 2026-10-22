@@ -7,14 +7,23 @@ const assert = require('node:assert/strict')
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
     const errors = []; page.on('pageerror', error => errors.push(error.message))
-    let set = null, generated = 0, failure = false
+    let set = null, generated = 0, failure = false, uploadStatus = 200, uploaded = false
     const job = { jobId: 'menu-qa', productName: output.productName, revision: 1, status: 'APPROVED', stale: false, generationMode: 'REAL', sources: [], warnings: [], output: { rows: output.features.map(f => ({ rowId: f.featureId, included: true, functionName: f.functionName, menuPath: f.featurePath.slice(0, -1), menuDescription: f.description, featureType: f.featureType })) } }
     const menus = { job, history: [{ jobId: job.jobId, productName: job.productName, status: job.status }], crawls: [] }
     await page.route('**/api/**', async route => {
       const request = route.request(), path = new URL(request.url()).pathname
       const json = value => route.fulfill({ contentType: 'application/json', body: JSON.stringify(value) })
       if (path === '/api/submissions/ui-tc') return json({ submissionId: 'ui-tc', documents: [], aiDelivery: { status: 'DELIVERED', retryable: false, preflight: { decision: 'READY', warnings: [], generationGate: { allowed: true } } } })
-      if (path.endsWith('/functional-menu')) return json(menus)
+      if (path.endsWith('/functional-menu/upload')) {
+        if (uploadStatus !== 200) return route.fulfill({ status: uploadStatus, contentType: 'application/json', body: '{}' })
+        uploaded = true
+        return json({ job: { ...job, jobId: 'uploaded-menu', productName: '업로드한 제품' } })
+      }
+      if (path.endsWith('/functional-menu')) {
+        const selected = new URL(request.url()).searchParams.get('job')
+        if (uploaded && selected !== 'uploaded-menu') throw new Error('Upload must not reload the previous menu')
+        return json(uploaded ? { ...menus, job: { ...job, jobId: 'uploaded-menu', productName: '업로드한 제품' }, history: [...menus.history, { jobId: 'uploaded-menu', productName: '업로드한 제품', status: 'APPROVED' }] } : menus)
+      }
       if (path.endsWith('/menu-test-cases')) {
         if (failure) return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ message: '검증용 오류: 원본이 변경되었습니다.' }) })
         if (request.method() === 'POST') {
@@ -64,6 +73,15 @@ const assert = require('node:assert/strict')
     await page.getByRole('button', { name: '메뉴트리·TC 새로고침', exact: true }).click()
     await page.getByText(/원본 메뉴트리나 문서가 변경되었습니다/).waitFor()
     assert(await page.getByRole('button', { name: '엑셀 다운로드', exact: true }).isDisabled())
+    const file = { name: '검증-메뉴.json', mimeType: 'application/json', buffer: Buffer.from('{"rows":[]}') }
+    uploadStatus = 404
+    await page.getByLabel('메뉴트리 파일 업로드').setInputFiles(file)
+    await page.getByRole('alert').filter({ hasText: '현재 서버에 메뉴트리 업로드 API가 반영되지 않았습니다' }).waitFor()
+    uploadStatus = 200
+    await page.getByLabel('메뉴트리 파일 업로드').setInputFiles(file)
+    await page.getByText('검증-메뉴.json 업로드 완료', { exact: true }).waitFor()
+    await page.getByText(/업로드한 제품 · 승인 완료 · 버전 1/).waitFor()
+    assert.equal(await page.getByLabel('메뉴트리 선택').inputValue(), 'uploaded-menu')
     assert.deepEqual(errors, [])
     console.log('PASS: real generated sample preview, 133 feature assignments, 1283 case view, search/pagination/detail, state retention, Excel/JSON download, API error, stale-source guard and mobile layout.')
   } finally { await browser.close() }
