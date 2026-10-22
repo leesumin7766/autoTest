@@ -1,5 +1,7 @@
 # dev5 — 로컬 Qwen + Jev 실행 프로토타입
 
+최신 우선순위·완료 기준은 [개발 계획](DEVELOPMENT_PLAN.md)을 따른다. 속도보다 충분한 수행과 F→P 오판 방지를 우선하며, 사전 필요 파일·폴더 업로드는 후속 보관 항목이다. 아래 구현 설명과 개선 계획을 구분한다.
+
 ## 흐름
 
 TC 선택 → 실행 snapshot → 대기 작업 claim → 기능별 문서 구간·화면 관찰 → 로컬 Qwen 계획 → Playwright 수행 → Jev 판정 → 실행 이력 저장.
@@ -36,6 +38,8 @@ Qwen에 화면 변경마다 호출하지 않는다. NAVIGATE 배치가 필요한
 
 실제 사용자 제품을 변경하지 않고 별도 포트 8017의 합성 사이트에서 시험했다. AI 서비스가 다른 worktree를 마운트하고 있어 dev5 코드는 `/tmp/execution-dev5`의 격리된 Python 프로세스로 실행했다. 운영 AI 소스나 모델 설정은 변경하지 않았다.
 
+위 경로 설명은 합성 검증 당시 상태다. 이후 2026-10-22 사용자의 서버 반영 승인으로 DB 백업 후 V24를 적용하고 TMS·AI·crawler를 갱신했다. AI mount를 현재 작업 폴더로 맞추고 Qwen 모델·Jev 설정·내부 인증·API 연결을 확인했다. 실제 제품 전체 시험 완료를 확인한 것은 아니다.
+
 | 시험 | 결과 | 소요 시간 |
 | --- | --- | --- |
 | 정상 저장 후 ‘저장 완료’ | P, confidence 0.95 | 11.50초 |
@@ -55,5 +59,7 @@ Qwen에 화면 변경마다 호출하지 않는다. NAVIGATE 배치가 필요한
 ## 반영 조건
 
 운영 V24 적용 전 DB 백업. TMS bootJar와 crawler 재빌드·재시작, AI source mount를 현재 dev5 작업 폴더로 맞춘 뒤 재시작 필요. 현재 실행 중 서비스에 자동 반영했다고 가정하면 안 된다. 운영 컨테이너 반영은 별도 승인 후 수행한다.
+
+위 절차에 따른 2026-10-22 서버 반영은 완료됐다. 다음 변경을 반영할 때도 소스·실행 경로·이미지·마이그레이션을 별도로 확인한다. 개발 계획에 적힌 미구현 항목까지 배포됐다는 의미는 아니다.
 
 환경 선택: `EXECUTION_QWEN_MODEL` 기본 qwen3:4b, `OLLAMA_BASE_URL`, `CRAWLER_SERVICE_URL`, `MANAGEMENT_SERVICE_URL`, `TYPESAFE_API_KEY`, `PRODUCT_DESCRIPTION_INTERNAL_TOKEN`. `EXECUTION_JEV_MIN_CONFIDENCE` 기본 .9. 테스트에서는 `execution.worker.enabled=false`로 scheduler를 막고 동기 워커 저장 검증을 별도로 수행한다.

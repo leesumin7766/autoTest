@@ -31,7 +31,7 @@ V21 `menu_tc_sets`에 메뉴 작업 ID·revision·입력 digest·템플릿 버�
 | POST `{menuJobId,featureTypes:{기능행ID:기능구분}}` | 승인 메뉴에서 TC 생성·저장·동일 입력 재사용 |
 | GET `/{setId}/download` | 저장 결과 Excel 출력 |
 
-UI는 검색·25건 페이지 나누기·상세·이력·Excel·실행 입력 JSON 다운로드를 제공한다. TC 수정·최종 승인 및 Playwright 실행·판정은 다음 단계다.
+UI는 검색·25건 페이지 나누기·상세·이력·Excel·실행 입력 JSON 다운로드를 제공한다. TC 직접 수정·최종 승인은 후속이다. Playwright 수행과 Qwen/Jev 계획·판정은 dev5에서 프로토타입으로 연결했으며 실제 제품 전체 품질 검증은 남아 있다. [시험 실행](TEST_EXECUTION_DEV5.md)과 [개발 계획](DEVELOPMENT_PLAN.md)을 따른다.
 
 Excel의 `TestCase` 시트는 사용자 예시의 16열 형식이며, `실행 정보`에는 전체 경로·기능 ID·규칙 ID·설명·절차·필요 정보·적용 조건·대상 URL·근거를 기록한다. `생성 정보`에는 출처·템플릿 버전·주의사항을 기록한다. 모든 값은 수식이 아닌 문자열이며 결과는 빈 셀과 P/F/N/A 선택 목록이다. Excel 편집은 서버에 자동 반영하지 않는다.
 
@@ -64,4 +64,4 @@ CLI와 서버는 같은 `MenuTcGenerator`·`MenuTcWorkbook`을 사용한다. 결
 
 Vite 실행 후 `node scripts/verify-menu-tc-ui.cjs` 및 `node scripts/verify-frontend.cjs`로 새 화면과 기존 기능의 브라우저 검사를 수행한다. 실제 생성 JSON·Excel을 모의 API 응답으로 사용한다. 별도의 `MenuTcIntegrationTest`는 실제 PostgreSQL `autotest_test`에서 HTTP→V21→저장·멱등 재사용·권한·다운로드·원본 변경 차단을 검증하고 트랜잭션을 rollback한다. 운영 DB를 사용하지 않는다.
 
-기존 운영 서버에는 이 브랜치의 백엔드 빌드·재시작과 V21 반영이 필요하다. 운영 DB 마이그레이션 전에는 기존 지침대로 백업한다. 이번 작업의 샘플 생성·검증은 운영 DB를 변경하거나 제품 시험을 실행하지 않는다.
+새 환경에서는 백엔드 빌드·재시작과 V21 이상의 마이그레이션 반영이 필요하다. 2026-10-22 확인 환경은 사용자 승인 후 V24까지 반영했다. 운영 DB 마이그레이션 전에는 기존 지침대로 백업한다. 샘플 생성·검증 자체는 운영 DB를 변경하거나 제품 시험을 실행하지 않는다.
