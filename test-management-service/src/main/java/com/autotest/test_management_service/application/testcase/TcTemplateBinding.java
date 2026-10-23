@@ -48,6 +48,7 @@ final class TcTemplateBinding {
         }
         var defect=(ObjectNode)tc.path("defectExample");
         for(String key:List.of("summary","content"))defect.put(key,substitute(defect.path(key).asText(),name,path));
+        TcProcedureWriter.write(tc,name,path,group);
         var context=mapper.createArrayNode().add("저장된 접속 설정과 시험 계정의 역할·권한");
         String rule=tc.path("ruleId").asText();
         if(required.equals("READ"))context.add("조회 조건별 시험 데이터와 기대 목록");
@@ -64,13 +65,12 @@ final class TcTemplateBinding {
         var spec=plan.putObject("specification").put("status","NEEDS_CONTEXT").put("timeoutSeconds",60)
             .put("retryPolicy","조건 대기만 재시도. 실패한 변경 동작을 성공할 때까지 반복하지 않음.")
             .put("cleanup",Set.of("CREATE","UPDATE","DELETE","WRITE").contains(required)?"시험 전용 데이터의 정리·복구 방법 확인 필요":"변경한 시험 조건·세션을 초기화");
-        spec.putArray("steps").addObject().put("action","BIND_TARGET").put("target",path).put("status","UNRESOLVED");
-        spec.putArray("checks").addObject().put("requirementQuote",tc.path("expectedResult").asText()).put("method","REQUIRES_BINDING")
+        var specSteps=spec.putArray("steps");
+        for(var step:plan.path("steps"))specSteps.addObject().put("action","REQUIRES_BINDING").put("instruction",step.asText()).put("target",path).put("status","UNRESOLVED");
+        var checks=spec.putArray("checks");
+        for(String check:tc.path("expectedResult").asText().split("\n"))checks.addObject().put("requirementQuote",check).put("method","REQUIRES_BINDING")
             .put("status","UNRESOLVED").put("oracleSource","문서·제품 설정·시험 데이터 근거와 연결 필요");
         spec.putArray("evidence").add("대상 화면 본문").add("실제 조작 기록").add("조건별 실제값과 기대값");
-        var steps=mapper.createArrayNode().add("대상 화면·권한·시험 데이터와 적용 조건을 확인한다: "+path)
-            .add(tc.path("scenario").asText()).add("조건별 실제값을 기대 출력 및 근거와 비교하고 증거를 보존한다.");
-        if(!rule.equals("LOGIN-17")&&!rule.equals("LOGIN-18"))plan.set("steps",steps);
     }
     static String operation(String name) {
         int kinds=0;

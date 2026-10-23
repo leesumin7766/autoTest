@@ -46,7 +46,7 @@ public class MenuTcGenerator {
         if (product == null || product.isBlank() || product.length() > 160) throw invalid("TC_PRODUCT_REQUIRED", "제품명이 필요합니다.");
         if (!features.isArray() || features.isEmpty() || features.size() > 2000) throw invalid("TC_FEATURES_INVALID", "기능은 1~2,000개여야 합니다.");
         var output = mapper.createObjectNode().put("schemaVersion", VERSION).put("templateVersion", VERSION)
-            .put("templateDigest", hash(bank.toString())).put("generationMode", "TEMPLATE").put("productName", product)
+            .put("templateDigest", hash(bank.toString()+TcProcedureWriter.VERSION)).put("procedureVersion",TcProcedureWriter.VERSION).put("generationMode", "TEMPLATE").put("productName", product)
             .put("status", "DRAFT").put("reviewRequired", true);
         output.set("source", source.deepCopy());
         var cases = output.putArray("testCases"); var normalized = output.putArray("features");

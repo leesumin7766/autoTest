@@ -65,7 +65,7 @@ class MenuTcIntegrationTest {
         String uploadedJob=uploaded.path("job").path("jobId").asText();
         mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(Map.of("menuJobId",uploadedJob))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.set.output.caseCount").value(77));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.set.output.caseCount").value(84));
         // Real XLSX upload -> persisted selectable menu -> generated TC -> downloadable workbook.
         byte[] menuExcel;
         try(var book=new org.apache.poi.xssf.usermodel.XSSFWorkbook();var bytes=new java.io.ByteArrayOutputStream()){
@@ -77,12 +77,12 @@ class MenuTcIntegrationTest {
         var excelUpload=mapper.readTree(mvc.perform(multipart(uploadUrl).file(xlsx).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.job.status").value("APPROVED")).andReturn().getResponse().getContentAsByteArray());
         String excelMenu=excelUpload.path("job").path("jobId").asText();
         mvc.perform(get("/api/submissions/"+submission+"/functional-menu").param("job",excelMenu).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.job.output.rows[0].functionName").value("사용자 조회"));
-        var excelSet=mapper.readTree(mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("menuJobId",excelMenu)))).andExpect(status().isOk()).andExpect(jsonPath("$.set.output.caseCount").value(77)).andReturn().getResponse().getContentAsByteArray());
+        var excelSet=mapper.readTree(mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("menuJobId",excelMenu)))).andExpect(status().isOk()).andExpect(jsonPath("$.set.output.caseCount").value(84)).andReturn().getResponse().getContentAsByteArray());
         mvc.perform(get(base+"/"+excelSet.path("set").path("setId").asText()+"/download").header("X-Member-Id",member)).andExpect(status().isOk());
         // Authentication is generated even when absent from the approved sidebar features.
         jdbc.update("UPDATE functional_menu_jobs SET snapshot=?::jsonb WHERE job_id=?", "{\"warnings\":[],\"evidence\":[{\"id\":\"doc:auth\",\"kind\":\"DOCUMENT\",\"text\":\"아이디와 비밀번호로 로그인합니다. 비밀번호 5회 실패 시 계정 잠금\"}]}",menu);
         var authenticationSet=mapper.readTree(mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("menuJobId",menu))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.set.output.caseCount").value(104))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.set.output.caseCount").value(111))
                 .andExpect(jsonPath("$.set.output.testCases[0].ruleId").value("LOGIN-04"))
                 .andExpect(jsonPath("$.set.output.source.authentication.failedAttemptLimit").value(5)).andReturn().getResponse().getContentAsByteArray());
         mvc.perform(get(base+"/"+authenticationSet.path("set").path("setId").asText()+"/download").header("X-Member-Id",member)).andExpect(status().isOk());
