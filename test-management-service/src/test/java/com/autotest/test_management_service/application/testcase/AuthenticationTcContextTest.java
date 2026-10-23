@@ -22,7 +22,7 @@ class AuthenticationTcContextTest {
             var prepared=AuthenticationTcContext.prepare(mapper,"제품",features(),context);
             var output=new MenuTcGenerator(mapper).generate("제품",prepared,source);
             assertEquals("LOGIN-04",output.path("testCases").get(0).path("ruleId").asText());
-            assertEquals(104,output.path("caseCount").asInt());
+            assertEquals(27+16+68,output.path("caseCount").asInt()); // Login + READ CRUD + product scopes.
             JsonNode lock=null;for(var tc:output.path("testCases"))if("LOGIN-17".equals(tc.path("ruleId").asText()))lock=tc;
             assertNotNull(lock);assertTrue(lock.path("scenario").asText().contains(count+"회"));
             assertTrue(lock.path("executionPlan").path("requiredContext").toString().contains("전용 계정"));
