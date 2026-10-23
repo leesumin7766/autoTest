@@ -80,6 +80,7 @@ function App() {
   const [productId, setProductId] = useState('1')
   const [memberId, setMemberId] = useState('1')
   const [submissionId, setSubmissionId] = useState('')
+  const [generatedTc, setGeneratedTc] = useState<{ context: string; setId: string } | null>(null)
   const [fileSelectionGeneration, setFileSelectionGeneration] = useState(0)
   const [files, setFiles] = useState<Partial<Record<Role, File>>>({})
   const [states, setStates] = useState<Partial<Record<Role, UploadState>>>({})
@@ -421,23 +422,23 @@ function App() {
         </div>
         <div className="workflow-page" hidden={page !== 'crawl'}>
           {!submissionId && <div className="workspace-empty"><h2>등록된 문서 세트가 없습니다</h2><p>자료를 등록하거나 왼쪽에서 기존 문서 세트를 조회하세요.</p><button className="primary-button" onClick={() => navigate('documents')}>자료 등록으로 이동</button></div>}
-          {submissionId && visited.has('crawl') && <PlaywrightSetupPanel key={`${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} deliveryStatus={aiDelivery.status} preflight={aiDelivery.preflight} />}
+          {submissionId && visited.has('crawl') && <PlaywrightSetupPanel active={page === 'crawl'} key={`${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} deliveryStatus={aiDelivery.status} preflight={aiDelivery.preflight} />}
         </div>
         <div className="workflow-page" hidden={page !== 'menu'}>
           {(!validationReady || aiDelivery.preflight?.generationGate?.allowed === false) && <div className="workspace-empty"><h2>{submissionId ? '문서 검증을 먼저 완료해주세요' : '등록된 문서 세트가 없습니다'}</h2><p>기능리스트·매뉴얼의 Jev 검증을 완료한 뒤 화면 수집 결과로 메뉴트리를 작성할 수 있습니다.</p><button className="primary-button" onClick={() => navigate('documents')}>자료 등록·검증으로 이동</button></div>}
-          {submissionId && visited.has('menu') && <FunctionalMenuPanel key={`functional:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} ready={validationReady && aiDelivery.preflight?.generationGate?.allowed !== false} />}
+          {submissionId && visited.has('menu') && <FunctionalMenuPanel active={page === 'menu'} key={`functional:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} ready={validationReady && aiDelivery.preflight?.generationGate?.allowed !== false} />}
         </div>
         <div className="workflow-page" hidden={page !== 'tc-generate'}>
           {!submissionId && <div className="workspace-empty"><h2>등록된 문서 세트가 없습니다</h2><p>자료 등록과 메뉴트리 승인을 완료한 뒤 TC를 생성하세요.</p><button className="primary-button" onClick={() => navigate('documents')}>자료 등록으로 이동</button></div>}
-          {submissionId && visited.has('tc-generate') && <MenuTcPanel key={`menu-tc:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} />}
+          {submissionId && visited.has('tc-generate') && <MenuTcPanel active={page === 'tc-generate'} key={`menu-tc:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} onGenerated={setId => setGeneratedTc({ context: `${submissionId}:${memberId}`, setId })} />}
         </div>
         <div className="workflow-page" hidden={page !== 'execution'}>
           {!submissionId && <div className="workspace-empty"><h2>등록된 문서 세트가 없습니다</h2><p>자료 등록과 TC 생성을 완료한 뒤 시험을 준비하세요.</p><button className="primary-button" onClick={() => navigate('documents')}>자료 등록으로 이동</button></div>}
-          {submissionId && visited.has('execution') && <TestExecutionPanel key={`execution:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} />}
+          {submissionId && visited.has('execution') && <TestExecutionPanel active={page === 'execution'} key={`execution:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} preferredSetId={generatedTc?.context === `${submissionId}:${memberId}` ? generatedTc.setId : undefined} />}
         </div>
         {upcomingPages.filter(item => item.id === 'defects' || item.id === 'reports').map(item => <div key={item.id} className="workflow-page" hidden={page !== item.id}>
           {!submissionId && <div className="workspace-empty"><h2>등록된 문서 세트가 없습니다</h2><p>자료 등록과 TC 시험을 먼저 진행하세요.</p></div>}
-          {submissionId && visited.has(item.id) && <ExecutionReviewPanel key={`${item.id}:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} reports={item.id === 'reports'} />}
+          {submissionId && visited.has(item.id) && <ExecutionReviewPanel active={page === item.id} key={`${item.id}:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} reports={item.id === 'reports'} />}
         </div>)}
         {upcomingPages.filter(item => !['tc-generate', 'execution', 'defects', 'reports'].includes(item.id)).map(item => <section key={item.id} className="workflow-page workspace-empty" hidden={page !== item.id} aria-label={item.title}>
           <span className="workspace-badge">준비 중</span>

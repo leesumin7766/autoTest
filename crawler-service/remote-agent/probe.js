@@ -14,7 +14,7 @@ async function probe(job, { signal, browserType = chromium } = {}) {
   try {
     if (signal?.aborted) throw new Error('CRAWL_LEASE_LOST');
     if (!connection && !['NONE', 'FORM_AUTO', 'BASIC_AUTH'].includes(job.loginMethod)) throw new Error('LOGIN_METHOD_UNSUPPORTED');
-    const context = await browser.newContext({ serviceWorkers: 'block', acceptDownloads: false, ignoreHTTPSErrors: true,
+    const context = await browser.newContext({ serviceWorkers: 'block', acceptDownloads: false, ignoreHTTPSErrors: options.ignoreHTTPSErrors === true,
       ...(!connection && job.loginMethod === 'BASIC_AUTH' ? { httpCredentials: {
         origin: new URL(job.targetUrl).origin, username: options.username, password: job.password,
       } } : {}),

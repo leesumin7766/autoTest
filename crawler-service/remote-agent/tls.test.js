@@ -20,16 +20,18 @@ test('untrusted, expired and mismatched target certificate permits connection, l
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `https://127.0.0.1:${server.address().port}`;
-  const job = { targetUrl: `${origin}/home`, loginMethod: 'FORM_AUTO', password: 'test-only', automation: {
+  const job = { targetUrl: `${origin}/home`, loginMethod: 'FORM_AUTO', password: 'test-only', automation: { ignoreHTTPSErrors: true,
     loginUrl: `${origin}/login`, username: 'tester', allowedOrigins: [], includePaths: [], excludePaths: ['/logout*'],
-    maxPages: 1, maxDepth: 0, maxDurationSeconds: 30, viewportWidth: 800, viewportHeight: 600,
+    maxPages: 2, maxDepth: 0, maxDurationSeconds: 30, viewportWidth: 800, viewportHeight: 600,
   } };
   try {
+    await assert.rejects(probe({ ...job, purpose: 'CONNECTION', automation: { ...job.automation, ignoreHTTPSErrors: false } }), /CERTIFICATE_ERROR/);
     assert.equal((await probe({ ...job, purpose: 'CONNECTION' })).httpStatus, 200);
     assert.equal((await probe({ ...job, purpose: 'LOGIN' })).loginVerified, true);
     const pages = [];
     await crawl(job, { onPage: async page => pages.push(page) });
-    assert.equal(pages.length, 1);
-    assert.equal(pages[0].title, 'Home');
+    assert.equal(pages.length, 2);
+    assert.equal(pages[0].transition.scope, 'PRE_AUTH');
+    assert.equal(pages[1].title, 'Home');
   } finally { await new Promise(resolve => server.close(resolve)); }
 });

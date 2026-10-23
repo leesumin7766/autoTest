@@ -37,7 +37,7 @@ async function visible(locator) {
 }
 function failure(code) { return new Error(code); }
 
-async function login(page, job, authPosts) {
+async function login(page, job, authPosts, beforeCredentials) {
   const options = job.automation;
   await page.goto(options.loginUrl || job.targetUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
   const loginPageUrl = page.url();
@@ -50,6 +50,7 @@ async function login(page, job, authPosts) {
   if (!username) throw failure('LOGIN_FAILED');
   const formAction = await username.evaluate(input => input.form?.action || '');
   if (formAction) authPosts.add(new URL(formAction).pathname);
+  if (beforeCredentials) await beforeCredentials(page);
   await username.fill(options.username);
   let password = await visible(options.passwordSelector ? page.locator(options.passwordSelector) : page.locator('input[type="password"]'));
   if (!password) {

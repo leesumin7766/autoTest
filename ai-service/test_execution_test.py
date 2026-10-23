@@ -5,6 +5,17 @@ import httpx
 from test_execution import Execute, Plan, execute_feature, judgments
 
 class ExecutionTest(unittest.IsolatedAsyncioTestCase):
+    async def test_blocked_request_preserves_the_failure_screen(self):
+        def transport(req):
+            if req.url.path.endswith('/open'):return httpx.Response(200,json={'sessionId':'s','observation':{'text':'Dashboard','elements':[],'screenshot':'before'}})
+            if req.url.path.endswith('/step'):return httpx.Response(200,json={'records':[{'action':'click','status':'COMPLETED','isNavigation':True}],'blockedRequests':1,'observation':{'text':'Logs: 요청 차단','elements':[],'screenshot':'failure'}})
+            return httpx.Response(200,json={})
+        async def planner(_):return Plan(actions=[{'action':'click','elementId':'0'}],decision='EXECUTE',phase='NAVIGATE',missingInputs=[],explanation='Logs 이동')
+        result=await execute_feature(self.request(),planner,transport=httpx.MockTransport(transport),check_active=False)
+        self.assertEqual('ERROR',result['items'][0]['executionStatus'])
+        self.assertEqual('Logs: 요청 차단',result['evidence'][-1]['text'])
+        self.assertEqual('failure',result['evidence'][-1]['screenshot'])
+        self.assertNotIn('screenshot',result['evidence'][0])
     def request(self):
         return Execute(runId='run', attempt='attempt', targetUrl='http://fixture.local', featureId='feature', featurePath=['기능'], cases=[{'id': 'tc', 'scenario': '저장', 'expectedResult': '저장 완료 표시'}])
 
@@ -61,11 +72,48 @@ class ExecutionTest(unittest.IsolatedAsyncioTestCase):
             return httpx.Response(200,json={})
         async def planner(payload):
             self.assertEqual(1,len(payload['cases']));expected=payload['cases'][0]['expectedResult']
-            return Plan(actions=[{'action':'click','elementId':'0'}],decision='EXECUTE',phase='TEST',missingInputs=[],explanation='한 TC만 수행',conditions=[{'requirementQuote':expected,'method':'TEXT_PRESENT','expected':expected}])
+            done=bool(payload['previousActions'])
+            return Plan(actions=[] if done else [{'action':'click','elementId':'0'}],decision='FINISH' if done else 'EXECUTE',phase='TEST',missingInputs=[],explanation='한 TC만 수행',conditions=[{'requirementQuote':expected,'method':'TEXT_PRESENT','expected':expected}])
         def judge(*_):return {'case_0':{'choice':'P','confidence':.99},'scope_0':{'choice':'YES','confidence':.99},'coverage_0':{'choice':'COMPLETE','confidence':.99}}
         request=self.request().model_copy(update={'cases':[{'id':'success','expectedResult':'성공'},{'id':'cancel','expectedResult':'취소'}]})
         result=await execute_feature(request,planner,judge,httpx.MockTransport(transport),False)
         self.assertEqual(2,opens);self.assertEqual('P',result['items'][0]['result']);self.assertIsNone(result['items'][1]['result'])
         first=set(result['items'][0]['evidenceIds']);second=set(result['items'][1]['evidenceIds']);self.assertFalse(first&second)
+
+    async def test_mislabeled_menu_click_cannot_finish_a_test(self):
+        rounds=0; judged=0
+        def transport(req):
+            if req.url.path.endswith('/open'):return httpx.Response(200,json={'sessionId':'s','observation':{'text':'Dashboard','elements':[]}})
+            if req.url.path.endswith('/step'):
+                return httpx.Response(200,json={'records':[{'action':'click','status':'COMPLETED','isNavigation':rounds==1}], 'observation':{'text':'Jobs' if rounds==1 else '업로드할 JSON 파일을 선택하세요.','elements':[]}})
+            return httpx.Response(200,json={})
+        async def planner(payload):
+            nonlocal rounds
+            rounds+=1
+            return Plan(actions=[{'action':'click','elementId':'0'}] if rounds<3 else [],decision='EXECUTE' if rounds<3 else 'FINISH',phase='TEST',missingInputs=[],explanation='단계',conditions=[{'requirementQuote':'안내메시지를 명확하게 제공함','method':'TEXT_PRESENT','expected':'명확하게 제공함'}])
+        def judge(cases,evidence,path):
+            nonlocal judged
+            judged+=1;self.assertEqual(3,rounds)
+            self.assertEqual('SEMANTIC',cases[0]['conditionAssessments'][0]['method'])
+            return {'case_0':{'choice':'P','confidence':.99},'scope_0':{'choice':'YES','confidence':.99},'coverage_0':{'choice':'COMPLETE','confidence':.99},'condition_0_0':{'choice':'PASS','confidence':.99}}
+        request=self.request().model_copy(update={'cases':[{'id':'message','expectedResult':'안내메시지를 명확하게 제공함'}]})
+        result=await execute_feature(request,planner,judge,httpx.MockTransport(transport),False)
+        self.assertEqual(1,judged);self.assertEqual('P',result['items'][0]['result'])
+
+    async def test_navigation_only_never_calls_judge(self):
+        def transport(req):
+            if req.url.path.endswith('/open'):return httpx.Response(200,json={'sessionId':'s','observation':{'text':'Jobs','elements':[]}})
+            if req.url.path.endswith('/step'):return httpx.Response(200,json={'records':[{'action':'click','status':'COMPLETED','isNavigation':True}],'observation':{'text':'Jobs','elements':[]}})
+            return httpx.Response(200,json={})
+        async def planner(_):return Plan(actions=[{'action':'click','elementId':'0'}],decision='EXECUTE',phase='TEST',missingInputs=[],explanation='이동')
+        def judge(*_):self.fail('Navigation is not test execution')
+        result=await execute_feature(self.request(),planner,judge,httpx.MockTransport(transport),False)
+        self.assertEqual('NEEDS_CONTEXT',result['items'][0]['executionStatus']);self.assertIsNone(result['items'][0]['result'])
+
+    async def test_file_prerequisite_skips_browser_and_model(self):
+        async def planner(_):self.fail('Missing file must be detected before inference')
+        request=self.request().model_copy(update={'cases':[{'id':'upload','ruleId':'FEATURE-01','scopeDescription':'작업 파일을 업로드하는 기능','expectedResult':'정상 동작함'}]})
+        result=await execute_feature(request,planner,check_active=False)
+        self.assertEqual('NOT_EXECUTED',result['items'][0]['judgmentStatus']);self.assertEqual([],result['evidence'])
 
 if __name__=='__main__':unittest.main()

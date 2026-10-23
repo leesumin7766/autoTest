@@ -1,13 +1,14 @@
 import { browserCheckMessage } from './browserCheckMessages'
 import { CapturedMenuTreePanel } from './CapturedMenuTreePanel'
+import { RunProgress } from './RunProgress'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 
 type Agent = { agentId: string; name: string; online: boolean; busy: boolean }
 export type BrowserCheck = { jobId: string; status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELED'
   agentName: string; pageCount: number; errorCode: string | null; stopReason: string | null
   result?: { httpStatus: number; elapsedMs: number; loginVerified: boolean } }
-type Job = BrowserCheck & { crawlResult?: { incompleteCount: number; navigationFailureCount: number; noChangeCount: number; uniqueScreenCount: number } }
-type Page = { pageIndex: number; url: string; title: string; screenState?: { screenKey?: string; readiness?: string; frames?: unknown[] }; transition?: { menuPath?: string[]; outcome?: string } }
+type Job = BrowserCheck & { createdAt?: string; updatedAt?: string; elapsedMs?: number; resumeAvailable?: boolean; crawlResult?: { skipped?: {path:string[];stage:string;reason:string}[]; resumedFrom?: string; preservedCount?: number; unresolvedCount?: number; progress?: {stage: string; current: string; remaining: number}; incompleteCount: number; navigationFailureCount: number; noChangeCount: number; uniqueScreenCount: number } }
+type Page = { pageIndex: number; url: string; title: string; screenState?: { screenKey?: string; readiness?: string; frames?: unknown[] }; transition?: { menuKey?: string; menuPath?: string[]; outcome?: string } }
 type View = { job: Job | null; pages: Page[]; checks?: Partial<Record<CheckType, BrowserCheck>> }
 export type CheckType = 'CONNECTION' | 'LOGIN'
 export type BrowserExecutionHandle = { runCheck: (type: CheckType, draft: unknown) => Promise<void>; invalidate: (type: 'ALL' | 'LOGIN') => void }
@@ -15,6 +16,11 @@ type Props = { submissionId: string; memberId: string; canStart: boolean; mode: 
   onChecks: (checks: Partial<Record<CheckType, BrowserCheck>>) => void; onBusyChange: (busy: boolean) => void }
 const stopMessages: Record<string, string> = { PAGE_LIMIT: '최대 화면 수 도달', DEPTH_LIMIT: '탐색 깊이 도달',
   TIME_LIMIT: '최대 시간 도달', STORAGE_LIMIT: '저장 한도 도달', DONE: '탐색 완료' }
+type CrawlClock = { start: number; end?: string }
+function storedClock(job: string): CrawlClock | undefined {
+  try { const clock=JSON.parse(sessionStorage.getItem(`autotest:crawl-clock:${job}`) || 'null');return clock && Number.isFinite(clock.start) && (!clock.end || Number.isFinite(Date.parse(clock.end))) ? clock : undefined } catch { return undefined }
+}
+function storeClock(job: string, clock: CrawlClock) { try { sessionStorage.setItem(`autotest:crawl-clock:${job}`,JSON.stringify(clock)) } catch { /* The in-memory clock works when storage is disabled. */ } }
 
 export const RemoteCrawlPanel = forwardRef<BrowserExecutionHandle, Props>(function RemoteCrawlPanel({ submissionId, memberId, canStart, mode, onChecks, onBusyChange }, ref) {
   const [agents, setAgents] = useState<Agent[]>([])
@@ -22,8 +28,12 @@ export const RemoteCrawlPanel = forwardRef<BrowserExecutionHandle, Props>(functi
   const [name, setName] = useState('')
   const [serverUrl, setServerUrl] = useState(['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname) ? '' : window.location.origin)
   const [registration, setRegistration] = useState<{ agentId: string; token: string } | null>(null)
-  const [view, setView] = useState<View>({ job: null, pages: [] })
+  const [view, updateView] = useState<View>({ job: null, pages: [] })
   const [busy, setBusy] = useState(false)
+  const [receivedAt, setReceivedAt] = useState(Date.now())
+  const [startingAt, setStartingAt] = useState<number | null>(null)
+  const starts = useRef(new Map<string, CrawlClock>())
+  const setView = useCallback((next: View) => { setReceivedAt(Date.now()); updateView(next) }, [])
   const [error, setError] = useState('')
   const [image, setImage] = useState('')
   const [evidence, setEvidence] = useState('')
@@ -32,6 +42,19 @@ export const RemoteCrawlPanel = forwardRef<BrowserExecutionHandle, Props>(functi
   const base = `/api/submissions/${submissionId}/playwright-crawls`
   const activeJob = [view.job, ...Object.values(view.checks || {})].find(job => job?.status === 'QUEUED' || job?.status === 'RUNNING')
   const active = Boolean(activeJob)
+  const confirmedPages = view.pages.filter(page => page.screenState?.readiness === 'READY' && page.transition?.outcome === 'CONFIRMED')
+  const diagnosticPages = view.pages.filter(page => page.screenState?.readiness === 'LOAD_TIMEOUT' || ['LOAD_TIMEOUT','NO_STATE_CHANGE'].includes(page.transition?.outcome || ''))
+  const savedCount = Math.max(view.job?.pageCount || 0,view.pages.length)
+  const unknownCount = savedCount-confirmedPages.length-diagnosticPages.length
+  const uniqueCount = new Set(confirmedPages.map(page => page.screenState?.screenKey || page.pageIndex)).size
+  const duplicateCount = confirmedPages.length-uniqueCount
+  const jobActive = !!view.job && ['QUEUED','RUNNING'].includes(view.job.status)
+  const normalEnd = view.job?.status === 'COMPLETED' && view.job.stopReason === 'DONE'
+    && !view.job.crawlResult?.navigationFailureCount && !view.job.crawlResult?.incompleteCount && !view.job.crawlResult?.noChangeCount && !view.job.crawlResult?.unresolvedCount
+  const incompleteEnd = view.job?.status === 'COMPLETED' && view.job.stopReason === 'DONE' && !normalEnd
+  if(view.job && !starts.current.has(view.job.jobId)){const saved=storedClock(view.job.jobId);if(saved)starts.current.set(view.job.jobId,saved)}
+  const clock = view.job ? starts.current.get(view.job.jobId) : undefined
+  if(clock && !jobActive && !clock.end){clock.end = new Date().toISOString();storeClock(view.job!.jobId,clock)}
   const issued = useRef<Partial<Record<CheckType, { id: string }>>>({})
   const online = agents.filter(agent => agent.online && !agent.busy)
   const request = useCallback(async (url: string, options?: RequestInit) => {
@@ -147,7 +170,7 @@ export const RemoteCrawlPanel = forwardRef<BrowserExecutionHandle, Props>(functi
     {!canStart && <p>연결·로그인 테스트를 확인하고 설정을 저장한 뒤 수집을 시작해 주세요.</p>}
     <div className="dialog-actions"><button type="button" className="primary-button"
       disabled={busy || active || !canStart || (mode === 'REMOTE' && ((!selected && online.length !== 1) || Boolean(selected && !online.some(agent => agent.agentId === selected))))}
-      onClick={() => void action(async () => { setView(await request(base, { method: 'POST', body: JSON.stringify({ agentId: mode === 'REMOTE' ? selected || null : null, executionMode: mode, purpose: 'CRAWL' }) })); await refresh() })}>
+      onClick={() => void action(async () => { const clicked=Date.now();setStartingAt(clicked);try{const next=await request(base, { method: 'POST', body: JSON.stringify({ agentId: mode === 'REMOTE' ? selected || null : null, executionMode: mode, purpose: 'CRAWL' }) });if(next.job){const clock={start:clicked};starts.current.set(next.job.jobId,clock);storeClock(next.job.jobId,clock);}setView(next);}finally{setStartingAt(null)}await refresh() })}>
       {busy ? '요청 중…' : '로그인하고 화면 수집 시작'}</button>
       {active && <button type="button" className="quiet-button" disabled={busy} onClick={() => void action(async () => {
         setView(await request(`${base}/${activeJob!.jobId}/cancel`, { method: 'POST' })); await refresh()
@@ -156,9 +179,17 @@ export const RemoteCrawlPanel = forwardRef<BrowserExecutionHandle, Props>(functi
     <p className="playwright-description">수집은 메뉴와 화면 조회를 중심으로 진행합니다. 로그인 이후 데이터 입력·삭제·결제 폼을 제출하지 않습니다. 메뉴트리 화면에서 기능리스트·매뉴얼과 함께 분석할 수 있습니다.</p>
     {view.job && <p role="status">{view.job.agentName} · {({ QUEUED: '실행기 작업 수신 대기', RUNNING: '화면 수집 중', COMPLETED: '수집 완료', FAILED: '수집 실패', CANCELED: '수집 중단' })[view.job.status]}
       {' · '}{view.job.pageCount}개 화면{view.job.stopReason && ` · ${stopMessages[view.job.stopReason] || view.job.stopReason}`}</p>}
+    {startingAt !== null && <RunProgress taskKey={`request-${startingAt}`} startedAt={startingAt} receivedAt={startingAt} title="화면 수집 요청 중" active completed={0} current="실행기에 수집을 요청하고 있습니다." metrics={[]} />}
+    {view.job && startingAt === null && <RunProgress taskKey={view.job.jobId} startedAt={clock?.start ?? view.job.createdAt} endedAt={clock?.end ?? view.job.updatedAt}
+      tone={jobActive ? 'active' : normalEnd ? 'success' : 'danger'}
+      title={jobActive ? view.job.status === 'QUEUED' ? '수집 실행기 대기' : '화면 수집 진행 중' : normalEnd ? '탐색 정상 종료' : incompleteEnd ? '수집 종료 · 미완료 항목 있음' : view.job.status === 'CANCELED' ? '수집 중단 · 결과 보존됨' : view.job.status === 'FAILED' ? '수집 오류 · 결과 보존됨' : '수집 중지 · 한도 도달'}
+      active={jobActive} elapsedMs={view.job.elapsedMs} receivedAt={receivedAt} completed={savedCount}
+      current={jobActive ? `${({CONNECTING:'브라우저 접속',LOGIN:'로그인 확인',DISCOVERING:'메뉴 탐색',NAVIGATING:'메뉴 이동',LOADING:'화면 로딩 대기',CAPTURING:'화면·근거 저장'} as Record<string,string>)[view.job.crawlResult?.progress?.stage || 'CONNECTING']} · ${view.job.crawlResult?.progress?.current || '실행기 연결 확인 중'}` : view.job.status==='FAILED' ? `중단 사유: ${view.job.errorCode==='CRAWL_FAILED'?'수집 중 예외가 발생했습니다. 현재 기록에는 구체적인 원인이 없습니다.':browserCheckMessage(view.job.errorCode)} (${view.job.errorCode || '원인 코드 없음'})${view.job.crawlResult?.progress?.current?` · 마지막 진행 위치: ${view.job.crawlResult.progress.current}`:''}` : view.job.status==='CANCELED' ? '수집 중단 요청으로 종료했습니다. 저장된 화면은 보존됩니다.' : stopMessages[view.job.stopReason || ''] || '종료 사유가 기록되지 않았습니다.'}
+      metrics={[{label:'저장 캡처',value:savedCount},{label:'정상 확인 캡처',value:confirmedPages.length,tone:'success'},{label:'진단 캡처',value:diagnosticPages.length,tone:'warning'},{label:'상태 정보 없는 캡처',value:unknownCount}]}
+      note={`저장 ${savedCount} = 정상 확인 ${confirmedPages.length} + 진단 ${diagnosticPages.length} + 상태 정보 없음 ${unknownCount}. 정상 확인 중 고유 화면 ${uniqueCount}개 · 동일 상태 재캡처 ${duplicateCount}개. 캡처 전 이동 실패 ${view.job.crawlResult?.navigationFailureCount || 0}건은 저장 수와 별도입니다.${jobActive ? ` 탐색 대기 ${view.job.crawlResult?.progress?.remaining || 0}건.` : ''}${view.job.crawlResult?.resumedFrom ? ` 이전 화면 ${view.job.crawlResult.preservedCount || 0}개 보존 · 중단 대기 시간을 제외한 누적 시간입니다.` : ''}`} />}
+    {view.job?.resumeAvailable && <div className="dialog-actions"><button type="button" className="primary-button" disabled={busy || active || (mode === 'REMOTE' && !online.length)} onClick={() => void action(async () => {const clicked=Date.now();setStartingAt(clicked);try{const next=await request(`${base}/${view.job!.jobId}/resume`, {method:'POST',body:JSON.stringify({agentId:mode==='REMOTE'?selected || null:null,executionMode:mode})});if(next.job){const clock={start:clicked};starts.current.set(next.job.jobId,clock);storeClock(next.job.jobId,clock);}setView(next);}finally{setStartingAt(null)}await refresh()})}>미완료 화면 이어서 수집</button><span>저장한 화면을 보존하고 새 작업으로 이어갑니다.</span></div>}
     {view.job?.errorCode && <p className="error-copy" role="alert">{browserCheckMessage(view.job.errorCode)}</p>}
-    {view.job?.crawlResult && <p>확인된 화면 상태 {view.job.crawlResult.uniqueScreenCount}개 · 로딩 미완료 {view.job.crawlResult.incompleteCount}개
-      {' · '}이동 실패 {view.job.crawlResult.navigationFailureCount}개 · 변화 미확인 {view.job.crawlResult.noChangeCount}개</p>}
+    {!!view.job?.crawlResult?.skipped?.length&&<details open><summary>수집하지 못한 메뉴·사유 ({view.job.crawlResult.skipped.length}건)</summary><ul>{view.job.crawlResult.skipped.map((item,index)=><li key={index}>{item.path.join(' → ') || '시작 화면'} · {({CAPTURE_CONTEXT_CHANGED:'캡처 중 화면이 전환됨 · 재수집 필요',CAPTURE_TIMEOUT:'스크린샷 저장 대기 시간 초과',BROWSER_ERROR_PAGE:'브라우저 오류 페이지로 이동함',CONNECTION_SCOPE_BLOCKED:'허용된 수집 주소 범위를 벗어남',SOURCE_LOAD_TIMEOUT:'이동 전 화면의 로딩이 완료되지 않음',NAVIGATION_NOT_AVAILABLE:'이동할 메뉴 요소를 찾지 못함',CLICK_TIMEOUT:'메뉴 클릭 대기 시간 초과',NAVIGATION_FAILED:'화면 이동 실패',ERR_BLOCKED_BY_CLIENT:'실행기의 네트워크 정책에 의해 요청 차단',ERR_ABORTED:'브라우저가 화면 이동을 중단함',ERR_CONNECTION_RESET:'대상 서버 연결이 끊김',ERR_CONNECTION_REFUSED:'대상 서버가 연결을 거부함',ERR_TIMED_OUT:'대상 서버 응답 시간 초과'} as Record<string,string>)[item.reason] || item.reason} ({item.reason}) · 단계: {item.stage}</li>)}</ul></details>}
     {view.job?.status === 'COMPLETED' && view.job.crawlResult && (view.job.crawlResult.navigationFailureCount > 0 || view.job.crawlResult.incompleteCount > 0 || view.job.crawlResult.noChangeCount > 0 || view.job.stopReason !== 'DONE') &&
       <p className="error-copy" role="status">수집이 종료됐지만 전체 메뉴 확인은 완료되지 않았습니다. 실패·미방문 항목을 검토한 후 메뉴트리를 작성하세요.</p>}
     {view.job && view.pages.length > 0 && <CapturedMenuTreePanel key={view.job.jobId} base={base} jobId={view.job.jobId}

@@ -43,7 +43,7 @@ public class RemoteCrawlController {
         var session=wire.open(agent,action,timestamp,nonce,raw);
         Object result=switch(action) {
             case "heartbeat" -> { service.seen(agent); yield Map.of("accepted",true); }
-            case "claim" -> service.claim(agent);
+            case "claim" -> service.claim(agent,session.body().path("capabilities").isArray()&&java.util.stream.StreamSupport.stream(session.body().path("capabilities").spliterator(),false).anyMatch(value->"crawl-resume-v1".equals(value.asText())));
             case "event" -> service.worker(agent,session.body());
             default -> throw new ProductDescriptionException(HttpStatus.BAD_REQUEST,"AGENT_ACTION_INVALID","지원하지 않는 실행기 요청입니다.");
         };
@@ -58,6 +58,8 @@ public class RemoteCrawlController {
         return response(service.start(submission,member,request.agentId(),request.executionMode()==null?"REMOTE":request.executionMode(),
                 request.purpose()==null?"CRAWL":request.purpose(),request.draft()));
     }
+    @PostMapping("/api/submissions/{submission}/playwright-crawls/{job}/resume")
+    public ResponseEntity<?> resume(@PathVariable UUID submission,@PathVariable UUID job,@RequestHeader("X-Member-Id") long member,@RequestBody StartRequest request){return response(service.resume(submission,member,job,request.agentId(),request.executionMode()==null?"LOCAL":request.executionMode()));}
     @PostMapping("/api/internal/playwright-crawls/events")
     public ResponseEntity<?> localEvent(@RequestHeader("X-Internal-Token") String token,@RequestBody JsonNode body) {
         if(internalToken.isBlank() || !java.security.MessageDigest.isEqual(internalToken.getBytes(java.nio.charset.StandardCharsets.UTF_8),token.getBytes(java.nio.charset.StandardCharsets.UTF_8)))

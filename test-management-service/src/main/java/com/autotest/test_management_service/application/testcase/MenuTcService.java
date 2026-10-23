@@ -66,7 +66,10 @@ public class MenuTcService {
         var source=mapper.createObjectNode().put("kind","APPROVED_MENU").put("submissionId",submission.toString())
             .put("menuJobId",menu.path("jobId").asText()).put("menuRevision",menu.path("revision").asInt())
             .put("crawlJobId",menu.path("crawlJobId").asText()).put("targetUrl",menu.path("targetUrl").asText());
-        ObjectNode output=generator.generate(menu.path("productName").asText(),features(menu,overrides),source);
+        JsonNode authentication=menus.authentication(submission,member,menuJob);
+        source.set("authentication",authentication);
+        var prepared=AuthenticationTcContext.prepare(mapper,menu.path("productName").asText(),features(menu,overrides),authentication);
+        ObjectNode output=generator.generate(menu.path("productName").asText(),prepared,source);
         UUID set=UUID.randomUUID();
         jdbc.update("INSERT INTO menu_tc_sets(set_id,submission_id,member_id,menu_job_id,menu_revision,input_digest,template_version,output) VALUES(?,?,?,?,?,?,?,?::jsonb) ON CONFLICT(submission_id,input_digest) DO NOTHING",
             set,submission,member,UUID.fromString(menu.path("jobId").asText()),menu.path("revision").asInt(),output.path("inputDigest").asText(),MenuTcGenerator.VERSION,output.toString());

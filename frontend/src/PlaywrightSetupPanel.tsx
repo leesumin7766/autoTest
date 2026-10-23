@@ -4,14 +4,14 @@ import { PreflightWarningDetails, type PreflightDiagnostics, type PreflightWarni
 import { RemoteCrawlPanel, type BrowserCheck, type BrowserExecutionHandle, type CheckType } from './RemoteCrawlPanel'
 
 type LoginMethod = 'NONE' | 'FORM_AUTO' | 'BASIC_AUTH' | 'MANUAL' | 'SSO' | 'OTHER'
-type Automation = {
+export type Automation = {
   productVersion: string; loginUrl: string; username: string
   usernameSelector: string; passwordSelector: string; submitSelector: string
   successUrl: string; successSelector: string; allowedOrigins: string[]
   includePaths: string[]; excludePaths: string[]; maxPages: number; maxDepth: number
-  maxDurationSeconds: number; viewportWidth: number; viewportHeight: number; pageLoadTimeoutSeconds: number
+  maxDurationSeconds: number; viewportWidth: number; viewportHeight: number; pageLoadTimeoutSeconds: number; ignoreHTTPSErrors: boolean
 }
-type Setup = {
+export type Setup = {
   targetUrl: string; loginMethod: LoginMethod; loginInstructions: string; testAccountLabel: string
   crawlScopeNotes: string; testDataNotes: string; testEnvironmentConfirmed: boolean
   stale: boolean; status: string; automation: Automation; passwordConfigured: boolean
@@ -20,11 +20,11 @@ type Preflight = {
   decision: 'BLOCKED' | 'READY_WITH_WARNINGS' | 'READY'; warnings: PreflightWarning[]
   diagnostics?: PreflightDiagnostics; generationGate?: { allowed: boolean }
 }
-type Props = { submissionId: string; memberId: string; deliveryStatus: string; preflight: Preflight | null }
-const automationDefaults: Automation = {
+type Props = { active?: boolean; submissionId: string; memberId: string; deliveryStatus: string; preflight: Preflight | null }
+export const automationDefaults: Automation = {
   productVersion: '', loginUrl: '', username: '', usernameSelector: '', passwordSelector: '', submitSelector: '',
   successUrl: '', successSelector: '', allowedOrigins: [], includePaths: [], excludePaths: ['/logout*', '/signout*'],
-  maxPages: 100, maxDepth: 5, maxDurationSeconds: 600, viewportWidth: 1440, viewportHeight: 900, pageLoadTimeoutSeconds: 30,
+  maxPages: 500, maxDepth: 10, maxDurationSeconds: 3000, viewportWidth: 1440, viewportHeight: 900, pageLoadTimeoutSeconds: 60, ignoreHTTPSErrors: false,
 }
 const emptySetup: Setup = {
   targetUrl: '', loginMethod: 'FORM_AUTO', loginInstructions: '', testAccountLabel: '', crawlScopeNotes: '',
@@ -32,7 +32,7 @@ const emptySetup: Setup = {
   automation: automationDefaults, passwordConfigured: false,
 }
 
-export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, preflight }: Props) {
+export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, preflight, active = true }: Props) {
   const [setup, setSetup] = useState<Setup>(emptySetup)
   const [password, setPassword] = useState('')
   const [loaded, setLoaded] = useState(false)
@@ -44,6 +44,8 @@ export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, p
   const [checks, setChecks] = useState<Partial<Record<CheckType, BrowserCheck>>>({})
   const [checkErrors, setCheckErrors] = useState<Partial<Record<CheckType, string>>>({})
   const [checking, setChecking] = useState(false)
+  const [tlsPolicyLoading, setTlsPolicyLoading] = useState(false)
+  const [tlsPolicyError, setTlsPolicyError] = useState('')
   const execution = useRef<BrowserExecutionHandle>(null)
   const invalidate = (type: 'ALL' | 'LOGIN' = 'ALL') => {
     execution.current?.invalidate(type)
@@ -65,22 +67,45 @@ export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, p
   }, [endpoint, memberId])
   useEffect(() => {
     if (!ready) { setLoaded(false); setPassword(''); return }
+    if (!active || dirty) return
     const controller = new AbortController()
     void load(controller.signal).catch((failure: Error) => { if (!controller.signal.aborted) { setError(failure.message); setLoaded(false) } })
     return () => controller.abort()
-  }, [ready, load])
+  }, [ready, load, active])
+
+  useEffect(() => {
+    if (!ready || !loaded) return
+    try { const url=new URL(setup.targetUrl); if(!['http:','https:'].includes(url.protocol))throw Error() }
+    catch { setTlsPolicyLoading(false); setTlsPolicyError(''); return }
+    const controller=new AbortController();setTlsPolicyLoading(true);setTlsPolicyError('')
+    const timer=window.setTimeout(()=>{
+      void fetch(`${endpoint}/tls-policy?targetUrl=${encodeURIComponent(setup.targetUrl.trim())}`,{headers:{'X-Member-Id':memberId},signal:controller.signal})
+        .then(async response=>{if(!response.ok)throw Error('인증서 예외 설정을 조회하지 못했습니다. 아래 인증서 설정을 직접 확인해 주세요.');return response.json()})
+        .then(value=>{if(controller.signal.aborted)return;setSetup(current=>({...current,automation:{...current.automation,ignoreHTTPSErrors:value.ignoreHTTPSErrors===true}}))})
+        .catch(failure=>{if(!controller.signal.aborted)setTlsPolicyError(failure.message)})
+        .finally(()=>{if(!controller.signal.aborted)setTlsPolicyLoading(false)})
+    },250)
+    return ()=>{controller.abort();window.clearTimeout(timer)}
+  },[ready,loaded,endpoint,memberId,setup.targetUrl])
 
   const update = <K extends keyof Setup>(key: K, value: Setup[K]) => {
+    if(key==='targetUrl'&&value!==setup.targetUrl) {
+      setTlsPolicyLoading(true);setTlsPolicyError('')
+      let sameOrigin=false;try{sameOrigin=new URL(String(value)).origin===new URL(setup.targetUrl).origin}catch{ /* Editing URL */ }
+      if(!sameOrigin)setSetup(current=>({...current,automation:{...current.automation,ignoreHTTPSErrors:false}}))
+    }
     setSetup(current => ({ ...current, [key]: value })); setDirty(true); invalidate(key === 'targetUrl' || key === 'testEnvironmentConfirmed' ? 'ALL' : 'LOGIN')
   }
   const updateAutomation = <K extends keyof Automation>(key: K, value: Automation[K]) => {
-    setSetup(current => ({ ...current, automation: { ...current.automation, [key]: value } })); setDirty(true); invalidate(key === 'allowedOrigins' ? 'ALL' : 'LOGIN')
+    if(key==='ignoreHTTPSErrors')setTlsPolicyError('')
+    setSetup(current => ({ ...current, automation: { ...current.automation, [key]: value } })); setDirty(true); invalidate(key === 'allowedOrigins' || key === 'ignoreHTTPSErrors' ? 'ALL' : 'LOGIN')
   }
   const draft = () => ({ targetUrl: setup.targetUrl, loginMethod: setup.loginMethod,
     loginInstructions: setup.loginInstructions, testAccountLabel: setup.testAccountLabel, crawlScopeNotes: setup.crawlScopeNotes,
     testDataNotes: setup.testDataNotes, testEnvironmentConfirmed: setup.testEnvironmentConfirmed,
     automation: setup.automation, password: automatic ? password : undefined })
   const runCheck = async (type: CheckType) => {
+    if(tlsPolicyLoading||tlsPolicyError)return
     setCheckErrors(current => ({ ...current, [type]: '' })); setChecking(true)
     try { if (!execution.current) throw new Error('실행 준비가 완료되지 않았습니다.'); await execution.current.runCheck(type, draft()) }
     catch (failure) { setCheckErrors(current => ({ ...current, [type]: failure instanceof Error ? failure.message : '테스트 요청 실패' })); setChecking(false) }
@@ -97,7 +122,7 @@ export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, p
   }
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!ready || saving) return
+    if (!ready || saving || tlsPolicyLoading || tlsPolicyError) return
     setSaving(true); setError('')
     try {
       const response = await fetch(endpoint, {
@@ -136,7 +161,10 @@ export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, p
           <small>제품의 실제 http/https 주소를 입력하세요. 관리 서버나 PC의 IP를 바꿀 필요는 없습니다.</small>
           <label className="playwright-confirmation"><input type="checkbox" checked={setup.testEnvironmentConfirmed}
             onChange={event => update('testEnvironmentConfirmed', event.target.checked)} />접속·로그인·화면 수집 권한이 있는 테스트 환경과 계정입니다.</label>
-          <div><button type="button" className="quiet-button" disabled={!setup.targetUrl.trim() || !setup.testEnvironmentConfirmed}
+          <label className="playwright-confirmation"><input type="checkbox" checked={config.ignoreHTTPSErrors} disabled={tlsPolicyLoading} onChange={event => updateAutomation('ignoreHTTPSErrors',event.target.checked)} />이 시험 환경의 인증서 오류 허용</label>
+          <small role="status">{tlsPolicyLoading?'이 주소의 인증서 예외 설정 확인 중…':config.ignoreHTTPSErrors?'인증서 예외 적용 · 연결 테스트·로그인·화면 수집에 동일하게 사용합니다.':'인증서를 검증합니다. 예외는 이 시험 환경에만 적용할 수 있습니다.'}</small>
+          {tlsPolicyError&&<p className="error-copy" role="alert">{tlsPolicyError}</p>}
+          <div><button type="button" className="quiet-button" disabled={tlsPolicyLoading || !!tlsPolicyError || !setup.targetUrl.trim() || !setup.testEnvironmentConfirmed}
             onClick={() => void runCheck('CONNECTION')}>연결 테스트</button></div>
           {report('CONNECTION')}
           <details className="playwright-advanced"><summary>제품·계정 정보 (선택)</summary>
@@ -189,7 +217,7 @@ export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, p
             </details>}
           </>}
           {setup.loginMethod !== 'NONE' && <div><button type="button" className="quiet-button"
-            disabled={checks.CONNECTION?.status !== 'COMPLETED' || !automatic || !setup.automation.username.trim() || (!password && !setup.passwordConfigured)}
+            disabled={tlsPolicyLoading || !!tlsPolicyError || checks.CONNECTION?.status !== 'COMPLETED' || !automatic || !setup.automation.username.trim() || (!password && !setup.passwordConfigured)}
             onClick={() => void runCheck('LOGIN')}>로그인 테스트</button></div>}
           {report('LOGIN')}
           {setup.loginMethod === 'NONE' && <p>로그인 없이 접속합니다. 연결 테스트 후 설정을 저장하면 수집할 수 있습니다.</p>}
@@ -201,11 +229,11 @@ export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, p
           <small>비밀번호는 전용 입력란에만 입력하세요. 메모에 비밀번호·쿠키·토큰을 적지 마세요.</small>
         </fieldset>
         </details>
-        <details className="setup-section"><summary>로딩 대기 시간</summary>
+        <details className="setup-section"><summary>접속·로딩 설정</summary>
         <fieldset disabled={saving || checking}>
           <label>페이지 로딩 최대 대기 시간 (초)<input type="number" required min={1} max={60}
             value={config.pageLoadTimeoutSeconds} onChange={event => updateAutomation('pageLoadTimeoutSeconds', Number(event.target.value))} /></label>
-          <small>기본 30초, 최대 60초. 각 화면에서 로딩을 기다리는 한도이며, 로딩이 끝나면 바로 수집합니다. 전체 수집 시간 한도는 별도입니다.</small>
+          <small>기본·최대 60초. 각 화면에서 로딩을 기다리는 한도이며, 로딩이 끝나면 바로 수집합니다. 전체 수집 시간 한도는 별도입니다.</small>
         </fieldset>
         </details>
         <details className="playwright-advanced"><summary>고급 설정 · 수집 범위와 테스트 데이터</summary>
@@ -246,13 +274,13 @@ export function PlaywrightSetupPanel({ submissionId, memberId, deliveryStatus, p
         {saved && !dirty && !setup.stale && <p className="playwright-ready" role="status">설정을 저장했습니다. 아래에서 실행 PC를 연결하고 화면 수집을 시작할 수 있습니다.</p>}
         {dirty && <p role="status">저장하지 않은 변경사항이 있습니다.</p>}
         {error && <p className="error-copy" role="alert">{error}</p>}
-        <div className="dialog-actions"><button className="primary-button" type="submit" disabled={saving || checking || !setup.testEnvironmentConfirmed}>
+        <div className="dialog-actions"><button className="primary-button" type="submit" disabled={saving || checking || tlsPolicyLoading || !!tlsPolicyError || !setup.testEnvironmentConfirmed}>
           {saving ? '저장 중…' : '로그인·화면 수집 설정 저장'}</button>
           <span className="playwright-not-run">저장 후 아래에서 화면 수집을 시작하세요.</span></div>
       </form>}
       {loaded && <RemoteCrawlPanel ref={execution} submissionId={submissionId} memberId={memberId} mode={mode}
         onChecks={setChecks} onBusyChange={setChecking}
-        canStart={saved && !dirty && !setup.stale && checks.CONNECTION?.status === 'COMPLETED' && (setup.loginMethod === 'NONE' || checks.LOGIN?.status === 'COMPLETED')} />}
+        canStart={saved && !dirty && !setup.stale && !tlsPolicyLoading && !tlsPolicyError && checks.CONNECTION?.status === 'COMPLETED' && (setup.loginMethod === 'NONE' || checks.LOGIN?.status === 'COMPLETED')} />}
     </>}
     {error && !loaded && <p className="error-copy" role="alert">{error} <button className="quiet-button"
       onClick={() => void load().catch((failure: Error) => setError(failure.message))}>다시 조회</button></p>}

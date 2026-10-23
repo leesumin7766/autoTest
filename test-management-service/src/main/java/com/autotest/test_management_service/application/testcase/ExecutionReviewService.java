@@ -48,6 +48,21 @@ public class ExecutionReviewService {
         jdbc.update("UPDATE test_execution_runs SET snapshot=?::jsonb WHERE run_id=?",next.toString(),UUID.fromString(prepared.path("run").path("runId").asText()));
         return prepared;
     }
+    @Transactional public ObjectNode resume(UUID submission,long member,UUID run){
+        var value=closed(submission,member,run);var snapshot=value.path("snapshot");var ids=new ArrayList<String>();var uncertain=new ArrayList<String>();
+        for(var item:snapshot.path("items")){
+            String id=item.path("caseId").asText();
+            if(item.path("tc").path("featureId").asText().startsWith("scope:")||!Set.of("PENDING","ERROR","NEEDS_CONTEXT").contains(item.path("executionStatus").asText()))continue;
+            if(snapshot.path("allowMutation").asBoolean()&&(id.equals(snapshot.path("currentCaseId").asText())||!"PENDING".equals(item.path("executionStatus").asText()))){uncertain.add(id);continue;}
+            ids.add(id);
+        }
+        if(ids.isEmpty())throw invalid(HttpStatus.CONFLICT,"EXECUTION_NO_RESUMABLE_CASES","자동으로 이어갈 미완료 TC가 없습니다. 변경 동작이 중단된 TC와 미판정 TC는 증거를 검토한 뒤 선택 재시험하세요.");
+        var prepared=retry(submission,member,run,ids,snapshot.path("productVersion").asText());var next=(ObjectNode)prepared.path("run").path("snapshot");
+        int completed=0;for(var item:snapshot.path("items"))if("COMPLETED".equals(item.path("executionStatus").asText()))completed++;
+        next.put("resumedFrom",run.toString()).put("preservedCount",completed).put("priorElapsedMs",value.path("elapsedMs").asLong()+snapshot.path("priorElapsedMs").asLong());
+        var review=next.putArray("resumeNeedsReview");uncertain.forEach(review::add);
+        jdbc.update("UPDATE test_execution_runs SET snapshot=?::jsonb WHERE run_id=?",next.toString(),UUID.fromString(prepared.path("run").path("runId").asText()));return prepared;
+    }
     public String report(UUID submission,long member,UUID run){
         var value=executions.status(submission,member,run).path("run");var snapshot=value.path("snapshot");
         StringBuilder text=new StringBuilder("# 시험·결함 검토 보고서 초안\n\n");

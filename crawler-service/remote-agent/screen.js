@@ -47,6 +47,7 @@ async function waitForScreen(page, policy, end) {
   let previous = '', stableSince = 0, frames = [];
   const began = Date.now();
   while (Date.now() < end) {
+    if(page.url().startsWith('chrome-error:'))return {frames:[],readiness:'LOAD_TIMEOUT',waitedMs:Date.now()-began};
     frames = await observe(page, policy);
     const signature = hash(frames.map(frame => ({ url: frame.rawUrl, headings: frame.headings, selected: frame.selected,
       // Ignore live counters while still noticing a substantially changing layout.

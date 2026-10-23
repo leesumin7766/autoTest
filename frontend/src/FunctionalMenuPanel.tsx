@@ -8,7 +8,7 @@ type Job = { jobId: string; crawlJobId: string; productName: string; status: str
   newerCrawlAvailable?: boolean
   targetUrl?: string
   webStructure?: { version: string; nodes: { path: string[]; kind: string; depthReviewRequired?: boolean }[] }
-  errorCode?: string; warnings: string[]; sources: Source[]; progress?: { completed: number; total: number }; output?: { rows: Row[]; completionStatus?: string; issueCount?: number; diagnosticsTruncated?: boolean; issues?: { sourceId?: string; segmentStart?: number; code: string; rowIndex?: number; proposedRow?: unknown; expectedSpanIds?: string[]; fields?: unknown }[] } }
+  errorCode?: string; warnings: string[]; sources: Source[]; progress?: { completed: number; total: number }; output?: { rows: Row[]; coverageReport?: { documentSourceCount:number; referencedDocumentSourceCount:number; note:string; unreferencedDocumentSources:{sourceId:string;filename:string;role:string}[] }; completionStatus?: string; issueCount?: number; diagnosticsTruncated?: boolean; issues?: { sourceId?: string; segmentStart?: number; code: string; rowIndex?: number; proposedRow?: unknown; expectedSpanIds?: string[]; fields?: unknown }[] } }
 type View = { job: Job | null; history: { jobId: string; productName: string; status: string }[]; crawls: { jobId: string; pageCount: number; createdAt: string; targetUrl?: string }[] }
 const locations: Record<string,string> = { HEADER: '상단', FOOTER: '하단', SIDEBAR: '측면', CONTENT: '본문·탭', UNKNOWN: '미분류' }
 const verification: Record<string,string> = { UNVERIFIED:'근거 미확인 · 사용자 판단 필요', DOCUMENT_ONLY:'문서 근거 확인 · 화면 연결 미확인', SCREEN_OBSERVED:'화면에서 발견', MATCH_PROPOSED:'문서·화면 연결 제안', INCOMPLETE:'화면 확인 불완전' }
@@ -16,7 +16,7 @@ type MenuBranch={title:string;children:MenuBranch[]}
 function observedBranches(paths:string[][]){const roots:MenuBranch[]=[];for(const path of paths){let level=roots;for(const title of path){let item=level.find(node=>node.title===title);if(!item){item={title,children:[]};level.push(item)}level=item.children}}return roots}
 function renderBranches(nodes:MenuBranch[]){return <ul>{nodes.map(node=><li key={node.title}>{node.title}{node.children.length>0&&renderBranches(node.children)}</li>)}</ul>}
 
-export function FunctionalMenuPanel({ submissionId, memberId, ready }: { submissionId: string; memberId: string; ready: boolean }) {
+export function FunctionalMenuPanel({ submissionId, memberId, ready, active = true }: { submissionId: string; memberId: string; ready: boolean; active?: boolean }) {
   const base = `/api/submissions/${submissionId}/functional-menu`
   const [view, setView] = useState<View>({ job:null, history:[], crawls:[] })
   const [selected, setSelected] = useState(''), [crawl, setCrawl] = useState(''), [product, setProduct] = useState('')
@@ -36,13 +36,13 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready }: { submiss
   const apply = (next: View) => { setView(next); setRows(next.job?.output?.rows || []); setDirty(false) }
   const refresh = useCallback(async (signal?: AbortSignal) => {
     const next = await request(`${base}${selected ? `?job=${selected}` : ''}`, { signal }) as View
-    if (!signal?.aborted) { setView(next); if (!dirty) setRows(next.job?.output?.rows || []) }
+    if (!signal?.aborted) { setView(current => dirty ? {...current, history:next.history, crawls:next.crawls} : next); if (!dirty) setRows(next.job?.output?.rows || []) }
   }, [request, base, selected, dirty])
-  useEffect(() => { if (!ready) return; const controller = new AbortController(); void refresh(controller.signal).catch(failure => { if (!controller.signal.aborted) setError(String(failure.message)) }); return () => controller.abort() }, [ready, refresh])
+  useEffect(() => { if (!ready || !active) return; const controller = new AbortController(); void refresh(controller.signal).catch(failure => { if (!controller.signal.aborted) setError(String(failure.message)) }); return () => controller.abort() }, [ready, refresh, active])
   useEffect(() => { if (!running) return; const timer = window.setInterval(() => { void refresh().catch(failure => setError(failure.message)) }, 3000); return () => window.clearInterval(timer) }, [running, refresh])
   useEffect(() => () => { if (image) URL.revokeObjectURL(image) }, [image])
   const action = async (work: () => Promise<void>) => { setBusy(true); setError(''); try { await work() } catch (failure) { setError(failure instanceof Error ? failure.message : '요청 실패') } finally { setBusy(false) } }
-  const makePrompt = async (jobId: string) => { setPrompt(''); setNotice(''); const result=await request(`${base}/${jobId}/prompt`,{method:'POST'}); if(result.instructionVersion!=='self-llm-v2')throw new Error('공통 지침 버전이 다릅니다. 화면과 서비스를 최신 버전으로 갱신하세요.'); setPrompt(result.prompt) }
+  const makePrompt = async (jobId: string) => { setPrompt(''); setNotice(''); const result=await request(`${base}/${jobId}/prompt`,{method:'POST'}); if(result.instructionVersion!=='self-llm-v3')throw new Error('공통 지침 버전이 다릅니다. 화면과 서비스를 최신 버전으로 갱신하세요.'); setPrompt(result.prompt) }
   const start = async (mode: string) => { const next = await request(base,{method:'POST',body:JSON.stringify({ productName:product, crawlJobId:crawl || view.crawls[0]?.jobId, mode })}); setSelected(next.job.jobId); apply(next); setPrompt(''); setExternal(''); setNotice(''); if(mode==='EXTERNAL')await makePrompt(next.job.jobId) }
   const copyPrompt = async () => { try { await navigator.clipboard.writeText(prompt); setNotice('제품별 프롬프트 전체를 복사했습니다. 공통 지침을 등록한 LLM에 붙여넣으세요.') } catch { promptArea.current?.focus(); promptArea.current?.select(); setNotice('자동 복사를 사용할 수 없어 전체 내용을 선택했습니다. Ctrl+C로 복사하세요.') } }
   const savePrompt = () => { const url=URL.createObjectURL(new Blob([prompt],{type:'text/plain;charset=utf-8'})); const link=document.createElement('a');link.href=url;link.download=`menu-tree-${job?.jobId || 'request'}.txt`;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000) }
@@ -57,7 +57,7 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready }: { submiss
     <aside><h3>내 LLM으로 메뉴트리 작성</h3>
       <p>① 공통 지침을 LLM에 한 번 등록 → ② 화면 수집 완료 후 제품별 프롬프트 복사 → ③ LLM JSON 응답 가져오기 → ④ 검토·Excel 출력</p>
       <a className="quiet-button" href="/downloads/menu-tree-common-rules.md" download>공통 작성 규칙.md 다운로드</a>
-      <p>지침 버전 self-llm-v2 · 기존 v1 지침은 새 MD로 교체하세요. LLM은 E0001 같은 근거 번호만 선택하고 원문 인용은 프로그램이 복원합니다. 화면 이미지 자체는 포함되지 않습니다.</p>
+      <p>지침 버전 self-llm-v3 · 기존 v1 지침은 새 MD로 교체하세요. LLM은 E0001 같은 근거 번호만 선택하고 원문 인용은 프로그램이 복원합니다. 화면 이미지 자체는 포함되지 않습니다.</p>
     </aside>
     <p>화면 수집 결과 + 기능리스트 + 매뉴얼을 고정해 작성합니다. 제품명은 1depth, 분류는 2~4depth, 마지막 기능은 5depth에 출력합니다.</p>
     <div className="playwright-grid"><label>Excel 1depth 제품명<input value={product} maxLength={120} onChange={event=>setProduct(event.target.value)} disabled={busy||running} /></label>
@@ -65,13 +65,13 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready }: { submiss
         {!view.crawls.length && <option value="">완료된 화면 수집이 필요합니다</option>}{view.crawls.map(item=><option key={item.jobId} value={item.jobId}>{item.targetUrl} · {new Date(item.createdAt).toLocaleString()} · {item.pageCount}개 · {item.jobId.slice(0,8)}</option>)}
       </select></label></div>
     <div className="dialog-actions"><button type="button" className="primary-button" disabled={busy||running||dirty||!product.trim()||!view.crawls.length} onClick={()=>void action(()=>start('EXTERNAL'))}>내 LLM용 제품 프롬프트 만들기</button>
-      <button type="button" className="quiet-button" disabled={busy||running||dirty||!product.trim()||!view.crawls.length} onClick={()=>void action(()=>start('AUTO'))}>로컬 LLM 자동 생성</button>
       <button type="button" disabled={busy||dirty} onClick={()=>void action(()=>refresh())}>수집 결과·작업 새로고침</button></div>
     <p>업로드한 기능리스트·매뉴얼과 같은 제품의 수집 대상을 선택하세요.</p>
     {error&&<p className="error-copy" role="alert">{error}</p>}
     {notice&&<p role="status">{notice}</p>}
     {view.history.length>0&&<label>작성 이력<select value={selected||job?.jobId||''} disabled={busy||dirty} onChange={event=>{setSelected(event.target.value);setPrompt('');setExternal('')}}>{view.history.map(item=><option key={item.jobId} value={item.jobId}>{item.productName} · {item.status} · {item.jobId.slice(0,8)}</option>)}</select></label>}
     {job&&<>
+      {job.output?.coverageReport&&<details><summary>문서 구간 참조 점검 · {job.output.coverageReport.referencedDocumentSourceCount}/{job.output.coverageReport.documentSourceCount}</summary><p>{job.output.coverageReport.note}</p>{job.output.coverageReport.unreferencedDocumentSources.map(item=><button type="button" key={item.sourceId} onClick={()=>void action(()=>showEvidence(item.sourceId))}>{item.filename || item.role} · {item.sourceId}</button>)}</details>}
       <p role="status">{job.productName} · {job.status} · {job.generationMode}{running&&` · ${job.progress?.completed||0}/${job.progress?.total||job.sources.length}개 근거 분석`}</p>
       {job.targetUrl&&<p>고정한 수집 대상: {job.targetUrl}</p>}
       {job.webStructure&&<details open><summary>실제 웹 메뉴 구조 · {job.productName}</summary>
@@ -90,7 +90,7 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready }: { submiss
         {job.output.diagnosticsTruncated&&<p>화면 진단은 최대 100건이며 전체 실패 건수는 위에 표시됩니다.</p>}</details>}
       {job.warnings?.map((warning,index)=><p className="functional-menu-warning" key={index}>{warning}</p>)}
       {running&&<button type="button" disabled={busy} onClick={()=>void action(async()=>apply(await request(`${base}/${job.jobId}/cancel`,{method:'POST'})))}>생성 중단</button>}
-      {!running&&<details open={job.generationMode==='EXTERNAL'||!!prompt}><summary>제품별 프롬프트·JSON 가져오기</summary><p>공통 작성 규칙 self-llm-v2을 먼저 등록하세요. 아래 요청에는 제품명·고정된 전체 문서 및 수집 근거·웹 구조가 포함됩니다. 자료는 자동으로 외부 LLM에 전송되지 않습니다.</p>
+      {!running&&<details open={job.generationMode==='EXTERNAL'||!!prompt}><summary>제품별 프롬프트·JSON 가져오기</summary><p>공통 작성 규칙 self-llm-v3을 먼저 등록하세요. 아래 요청에는 제품명·고정된 전체 문서 및 수집 근거·웹 구조가 포함됩니다. 자료는 자동으로 외부 LLM에 전송되지 않습니다.</p>
         <button type="button" disabled={busy||dirty} onClick={()=>void action(()=>makePrompt(job.jobId))}>이 실행의 제품 프롬프트 다시 만들기</button>
         {prompt&&<><p>전체 {prompt.length.toLocaleString()}자 · LLM 입력 한도를 확인하세요. 자료를 임의로 줄이지 않았습니다.</p><textarea ref={promptArea} readOnly rows={10} value={prompt} aria-label="제품별 메뉴트리 프롬프트"/><button type="button" onClick={()=>void copyPrompt()}>제품 프롬프트 전체 복사</button><button type="button" onClick={savePrompt}>동일 내용 TXT 다운로드</button></>}
         <label>LLM JSON 응답<textarea rows={5} value={external} onChange={event=>setExternal(event.target.value)} placeholder={'{"requestId":"요청 ID","rows":[...]}'} /></label>
