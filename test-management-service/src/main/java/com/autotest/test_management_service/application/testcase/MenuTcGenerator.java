@@ -36,9 +36,11 @@ public class MenuTcGenerator {
             if (!Set.of("로그인", "주요기능", "부가기능", "CRUD").contains(explicit)) throw invalid("TC_FEATURE_TYPE_INVALID", "기능구분은 로그인·주요기능·부가기능·CRUD 중 하나여야 합니다.");
             return explicit;
         }
-        String name = feature.path("functionName").asText().toLowerCase(Locale.ROOT);
+        String name = feature.path("functionName").asText().strip().toLowerCase(Locale.ROOT);
         boolean history = name.matches(".*(기록|이력|조회|history|audit).*");
-        return !history && (name.contains("로그인") || name.equals("login")) ? "로그인" : "주요기능";
+        if (!history && (name.contains("로그인") || name.equals("login"))) return "로그인";
+        String[] words = name.split("(?U)\\s+");
+        return Set.of("조회", "생성", "삭제", "등록", "수정").contains(words[words.length - 1]) ? "CRUD" : "주요기능";
     }
     public ObjectNode generate(String product, JsonNode features, JsonNode source) {
         if (product == null || product.isBlank() || product.length() > 160) throw invalid("TC_PRODUCT_REQUIRED", "제품명이 필요합니다.");

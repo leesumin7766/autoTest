@@ -15,6 +15,22 @@ class MenuTcGeneratorTest {
     final ObjectMapper mapper=new ObjectMapper();
     final MenuTcGenerator generator=new MenuTcGenerator(mapper);
     final MenuTcWorkbook workbook=new MenuTcWorkbook(mapper);
+    @Test void fallbackClassificationUsesFinalWordAfterLoginAndPreservesExplicitType() {
+        for(String word:List.of("조회","생성","삭제","등록","수정")) {
+            var feature=mapper.createObjectNode().put("functionName","  사용자 "+word+"  ");
+            assertEquals("CRUD",generator.classify(feature));
+            feature.put("featureType","부가기능");assertEquals("부가기능",generator.classify(feature));
+            feature.put("featureType","주요기능");assertEquals("주요기능",generator.classify(feature));
+        }
+        for(String name:List.of("작업 실행","삭제 취소","사용자조회","등록 내역 확인",""))
+            assertEquals("주요기능",generator.classify(mapper.createObjectNode().put("functionName",name)));
+        for(String name:List.of("로그인"," LOGIN ","로그인 생성"))
+            assertEquals("로그인",generator.classify(mapper.createObjectNode().put("functionName",name)));
+        assertEquals("CRUD",generator.classify(mapper.createObjectNode().put("functionName","로그인 기록 조회")));
+        assertEquals("CRUD",generator.classify(mapper.createObjectNode().put("functionName","삭제")));
+        var rows=feature(null);((ObjectNode)rows.get(0)).put("functionName","사용자 삭제");
+        assertEquals(84,generator.generate("제품",rows,mapper.createObjectNode()).path("caseCount").asInt());
+    }
     ArrayNode feature(String type) {
         var rows=mapper.createArrayNode();var row=rows.addObject().put("featureId","feature-1").put("functionName","파일 업로드").put("description","파일을 업로드하는 기능");
         if(type!=null)row.put("featureType",type);row.putArray("featurePath").add("제품").add("업로드");row.putArray("evidence");return rows;

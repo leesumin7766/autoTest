@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { classifyTcFeature } from './tcClassification'
 
 // Refresh persisted sources on tab entry while retaining local review state.
 
@@ -58,9 +59,10 @@ export function MenuTcPanel({ submissionId, memberId, active = true, onGenerated
   const action = async (work: () => Promise<void>) => { setBusy(true); setError(''); try { await work() } catch (failure) { setError(failure instanceof Error ? failure.message : '요청 실패') } finally { setBusy(false) } }
   const menu = menuView.job
   const features = useMemo(() => menu?.output?.rows.filter(row => row.included && row.rowType !== 'MENU_OBSERVATION') || [], [menu])
-  const typeFor = (row: MenuRow): FeatureType => types[row.rowId] || row.featureType || (/로그인|^login$/i.test(row.functionName) && !/기록|이력|조회|history|audit/i.test(row.functionName) ? '로그인' : '주요기능')
+  const typeFor = (row: MenuRow): FeatureType => classifyTcFeature(row.functionName, types[row.rowId], row.featureType)
   const loginCount = features.filter(row => typeFor(row) === '로그인').length
-  const expectedCount = loginCount * 27 + (features.length - loginCount) * 9 + 68
+  const crudCount = features.filter(row => typeFor(row) === 'CRUD').length
+  const expectedCount = loginCount * 27 + crudCount * 16 + (features.length - loginCount - crudCount) * 9 + 68
   const ready = (!selectedMenu || selectedMenu === menu?.jobId) && menu?.status === 'APPROVED' && !menu.stale && menu.generationMode !== 'MOCK' && menu.output?.completionStatus !== 'PARTIAL' && features.length > 0
   const output = view.set?.output
   const filtered = useMemo(() => (output?.testCases || []).filter(tc => `${tc.tcId} ${tc.featurePath.join(' ')} ${tc.scenario} ${tc.qualityCharacteristic}`.toLowerCase().includes(search.toLowerCase())), [output, search])
@@ -99,7 +101,7 @@ export function MenuTcPanel({ submissionId, memberId, active = true, onGenerated
     {menu && <p className="menu-job-status">{menu.productName} · {statusLabels[menu.status] || menu.status} · 버전 {menu.revision}{menu.stale ? ' · 원본 변경됨' : ''}</p>}
     {!ready && !loading && <p className="functional-menu-warning">기능이 포함된 완전한 메뉴트리를 검토·승인한 뒤 생성할 수 있습니다.</p>}
     {!!features.length && <details className="menu-generation-settings"><summary>기능구분 확인 · {features.length}개 기능</summary>
-      <p>원본에 구분이 없으면 로그인 또는 주요기능으로 제안합니다. 필요하면 변경하세요. CRUD 기능은 행별 9개 시험을 적용하며 존재하지 않는 동작을 추가하지 않습니다.</p>
+      <p>사용자 선택과 원본 기능구분을 우선합니다. 구분이 없으면 로그인을 먼저 확인하고, 5depth 기능명의 마지막 단어가 조회·생성·삭제·등록·수정이면 CRUD, 나머지는 주요기능으로 제안합니다. CRUD는 기능당 16개 시험을 생성합니다.</p>
       <div className="tc-feature-list">{features.map(row => <label key={row.rowId}><span>{[...row.menuPath, row.functionName].join(' / ')}<small>{row.menuDescription}</small></span><select aria-label={`${row.functionName} 기능구분`} value={typeFor(row)} disabled={busy || loading} onChange={event => setTypes(current => ({ ...current, [row.rowId]: event.target.value as FeatureType }))}>{featureTypes.map(type => <option key={type}>{type}</option>)}</select></label>)}</div>
     </details>}
     <div className="tc-generate-toolbar"><span>{features.length ? `${features.length}개 기능 · 예상 ${expectedCount.toLocaleString()}개 TC + 인증 보완 가능` : '메뉴트리 선택 필요'}</span><button className="primary-button" disabled={!ready || !tcAvailable || busy || loading} onClick={() => void action(async () => {
