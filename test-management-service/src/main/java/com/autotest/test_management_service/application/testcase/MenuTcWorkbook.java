@@ -76,7 +76,7 @@ public class MenuTcWorkbook {
             var heading = book.createCellStyle(); heading.cloneStyleFrom(style); heading.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex()); heading.setFillPattern(FillPatternType.SOLID_FOREGROUND);
             Row top = sheet.createRow(0); top.setHeightInPoints(32); for (int i = 0; i < headers.length; i++) { cell(top, i, headers[i], heading); sheet.setColumnWidth(i, (i < 5 ? 21 : i >= 9 ? 55 : 22) * 256); }
             Sheet execution = book.createSheet("실행 정보");
-            String[] detailHeaders = {"TC-ID", "기능 ID", "규칙 ID", "기능 설명", "전체 기능 경로", "시험 절차", "실행 준비", "필요 정보", "적용 조건·N/A 기준", "대상 URL", "근거", "고유 TC ID"};
+            String[] detailHeaders = {"TC-ID", "기능 ID", "규칙 ID", "기능 설명", "전체 기능 경로", "시험 절차", "실행 준비", "필요 정보", "적용 조건·N/A 기준", "대상 URL", "근거", "고유 TC ID", "TC 내용 버전", "템플릿 버전", "자동화 방식", "실행 선택 상태", "선택 검토 사유", "구조화 실행 명세", "대기·재시도 정책", "정리·복구"};
             for (int i = 0; i < detailHeaders.length; i++) { cell(execution.getRow(0) == null ? execution.createRow(0) : execution.getRow(0), i, detailHeaders[i], heading); execution.setColumnWidth(i, 45 * 256); }
             int index = 1;
             for (JsonNode tc : output.path("testCases")) {
@@ -87,7 +87,7 @@ public class MenuTcWorkbook {
                 row.getCell(12).setBlank();
                 Row detail = execution.createRow(index++); detail.setHeightInPoints(90);
                 JsonNode plan = tc.path("executionPlan");
-                String[] details = {tc.path("tcId").asText(), tc.path("featureId").asText(), tc.path("ruleId").asText(), tc.path("scopeDescription").asText(), join(tc.path("featurePath"), " → "), join(plan.path("steps"), "\n"), "환경·절차 구체화 필요", join(plan.path("requiredContext"), "\n"), plan.path("applicability").asText() + "\n" + plan.path("naPolicy").asText(), plan.path("targetUrl").asText(), tc.path("evidence").toString(), tc.path("id").asText()};
+                String[] details = {tc.path("tcId").asText(), tc.path("featureId").asText(), tc.path("ruleId").asText(), tc.path("scopeDescription").asText(), join(tc.path("featurePath"), " → "), join(plan.path("steps"), "\n"), plan.path("readinessReason").asText("환경·절차 구체화 필요"), join(plan.path("requiredContext"), "\n"), plan.path("applicability").asText() + "\n" + plan.path("naPolicy").asText(), plan.path("targetUrl").asText(), tc.path("evidence").toString(), tc.path("id").asText(), plan.path("tcContentDigest").asText(), tc.path("templateVersion").asText(), tc.path("automationMode").asText(), plan.path("selection").path("status").asText("PENDING_LLM"), plan.path("selection").path("reason").asText(), plan.path("specification").toString(), plan.path("specification").path("retryPolicy").asText(), plan.path("specification").path("cleanup").asText()};
                 for (int i = 0; i < details.length; i++) cell(detail, i, details[i], style);
                 fitHeight(sheet, row); fitHeight(execution, detail);
             }
@@ -98,7 +98,7 @@ public class MenuTcWorkbook {
             var rule = validation.createValidation(constraint, new CellRangeAddressList(1, Math.max(1, index - 1), 12, 12));
             rule.setEmptyCellAllowed(true); rule.setShowErrorBox(true); sheet.addValidationData(rule);
             var metadata = book.createSheet("생성 정보");
-            List<String> notes = List.of("생성 결과는 미실행 초안입니다. 결과 P/F/N/A는 실행 후 판정합니다.", "결함 열은 실패 시 작성 예시이며 실제 발견 결함이 아닙니다.", "기능별 공통 시험을 모두 생성합니다. 비적용은 실행 시 사유와 증거를 남기고 N/A로 판정합니다.", "구체적인 입력·선택자·계정·기대값은 이 메뉴트리만으로 확정할 수 없습니다.", "Excel 편집은 서버에 자동 반영되지 않습니다.", output.path("templateVersion").asText(), output.path("templateDigest").asText(), output.path("source").toString(), output.path("summary").toString());
+            List<String> notes = List.of("생성 결과는 미실행 초안입니다. 결과 P/F/N/A는 실행 후 판정합니다.", "결함 열은 실패 시 작성 예시이며 실제 발견 결함이 아닙니다.", "로그인 27개·주요/부가 9개·CRUD 16개 템플릿 전체를 생성합니다. 실행 제외는 원본 TC 삭제나 N/A 확정이 아닙니다.", "구체적인 입력·선택자·계정·기대값은 이 메뉴트리만으로 확정할 수 없습니다.", "Excel 편집은 서버에 자동 반영되지 않습니다.", "CRUD 16번째 항목은 삭제 취소 시 원본 유지 검증입니다. 공통·문서 68개는 제품당 한 번 생성합니다.", "PENDING_LLM은 실제 적용 여부 판단 전 상태입니다. 정보 부족은 준비 필요이며 N/A와 다릅니다.", output.path("templateVersion").asText(), output.path("templateDigest").asText(), output.path("source").toString(), output.path("summary").toString());
             metadata.setColumnWidth(0, 110 * 256); for (int i = 0; i < notes.size(); i++) { var r = metadata.createRow(i); r.setHeightInPoints(40); cell(r, 0, notes.get(i), style); }
             book.write(bytes); return bytes.toByteArray();
         } catch (IOException failure) { throw new IllegalStateException("TC Excel export failed", failure); }

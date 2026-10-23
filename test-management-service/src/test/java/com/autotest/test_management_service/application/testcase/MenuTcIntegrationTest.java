@@ -224,6 +224,11 @@ class MenuTcIntegrationTest {
             mvc.perform(post(progressUrl).header("X-Internal-Token","test-token").contentType(MediaType.APPLICATION_JSON).content(trace.toString())).andExpect(status().isConflict());
             trace.put("caseId",caseId).put("attempt",UUID.randomUUID().toString());
             mvc.perform(post(progressUrl).header("X-Internal-Token","test-token").contentType(MediaType.APPLICATION_JSON).content(trace.toString())).andExpect(status().isConflict());
+            jdbc.update("UPDATE test_execution_runs SET snapshot=jsonb_set(snapshot,'{items,0,executionStatus}','\"EXCLUDED\"'::jsonb) WHERE run_id=?",traceId);
+            var selectionCounts=executions.status(submission,member,traceId).path("run");
+            assertEquals(1,selectionCounts.path("excludedCount").asInt());
+            assertEquals(0,selectionCounts.path("notExecutedCount").asInt());
+            assertTrue(selectionCounts.path("snapshot").path("items").get(0).path("result").isNull());
             executions.transition(submission,member,traceId,true);
         } finally {worker.close();fakeAi.stop(0);}
         jdbc.update("UPDATE functional_menu_jobs SET revision=2 WHERE job_id=?",menu);

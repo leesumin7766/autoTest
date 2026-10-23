@@ -13,14 +13,14 @@ import org.springframework.http.HttpStatus;
 /** Deterministic expansion. Templates describe checks, never observed product behavior. */
 @Component
 public class MenuTcGenerator {
-    public static final String VERSION = "menu-tc-v2";
+    public static final String VERSION = "menu-tc-v3";
     private final ObjectMapper mapper;
     private final JsonNode bank;
     public MenuTcGenerator(ObjectMapper mapper) {
         this.mapper = mapper;
-        try (var stream = getClass().getResourceAsStream("/tc-templates/menu-tc-v1.json")) {
+        try (var stream = getClass().getResourceAsStream("/tc-templates/menu-tc-v3.json")) {
             bank = mapper.readTree(Objects.requireNonNull(stream));
-            if (!"menu-tc-v1".equals(bank.path("version").asText())) throw new IllegalStateException("TC template version mismatch");
+            if (!"menu-tc-v3".equals(bank.path("version").asText())) throw new IllegalStateException("TC template version mismatch");
         } catch (IOException failure) { throw new IllegalStateException("Cannot load TC templates", failure); }
     }
     public static String hash(String text) {
@@ -61,7 +61,7 @@ public class MenuTcGenerator {
             ObjectNode normalizedFeature = feature.deepCopy(); normalizedFeature.put("featureType", type);
             normalizedFeature.put("classificationSource", feature.path("featureType").asText().isBlank() ? "SUGGESTED" : "EXPLICIT");
             normalized.add(normalizedFeature);
-            expand(cases, normalizedFeature, type.equals("로그인") ? "LOGIN" : "FEATURE", ++index, type, source);
+            expand(cases, normalizedFeature, type.equals("로그인") ? "LOGIN" : type.equals("CRUD") ? "CRUD" : "FEATURE", ++index, type, source);
         }
         for (String group : List.of("COMMON", "PRODUCT_DOCUMENT", "USER_MANUAL")) {
             String title = switch (group) { case "COMMON" -> "공통"; case "PRODUCT_DOCUMENT" -> "제품설명서"; default -> "사용자취급설명서"; };
@@ -130,6 +130,7 @@ public class MenuTcGenerator {
                 plan.set("steps",steps);
                 if(policy.path("evidence").isArray())tc.set("evidence",policy.path("evidence").deepCopy());
             }
+            TcTemplateBinding.bind(mapper,tc,feature,template,group);
             tc.putArray("reviewNotes").add("공통 시험 기준에서 생성한 초안입니다. 시험 결과와 결함 예시는 별개입니다.")
                 .add(feature.path("classificationSource").asText().equals("SUGGESTED") ? "기능구분은 제안값입니다. 검토 후 생성하세요." : "실행 전 필요한 환경·입력·관찰 기준을 보완하세요.");
         }

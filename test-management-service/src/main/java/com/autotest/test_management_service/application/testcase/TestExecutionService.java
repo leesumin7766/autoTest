@@ -92,14 +92,14 @@ public class TestExecutionService {
         },selected,submission,member);
         if(values.isEmpty())throw error(HttpStatus.NOT_FOUND,"EXECUTION_NOT_FOUND","시험 실행 이력을 찾을 수 없습니다.");
         var run=values.getFirst();run.put("stale",cases.status(submission,member,UUID.fromString(run.path("tcSetId").asText())).path("set").path("stale").asBoolean());
-        int completed=0,p=0,f=0,na=0,notExecuted=0,review=0,pending=0,errors=0;
+        int completed=0,p=0,f=0,na=0,notExecuted=0,review=0,pending=0,errors=0,excluded=0;
         for(var item:run.path("snapshot").path("items")) {
             if(!"PENDING".equals(item.path("executionStatus").asText()))completed++;
-            switch(item.path("executionStatus").asText()){case "NEEDS_CONTEXT"->notExecuted++;case "ERROR"->errors++;case "PENDING"->pending++;case "COMPLETED"->{if(item.path("result").isNull())review++;}default->{}}
+            switch(item.path("executionStatus").asText()){case "NEEDS_CONTEXT"->notExecuted++;case "EXCLUDED"->excluded++;case "ERROR"->errors++;case "PENDING"->pending++;case "COMPLETED"->{if(item.path("result").isNull())review++;}default->{}}
             switch(item.path("result").asText()) { case "P"->p++;case "F"->f++;case "N/A"->na++;default->{} }
         }
         run.put("completedCount",completed).put("passCount",p).put("failCount",f).put("naCount",na).put("unjudgedCount",run.path("snapshot").path("caseCount").asInt()-p-f-na);
-        run.put("notExecutedCount",notExecuted).put("reviewCount",review).put("pendingCount",pending).put("errorCount",errors);
+        run.put("notExecutedCount",notExecuted).put("reviewCount",review).put("pendingCount",pending).put("errorCount",errors).put("excludedCount",excluded);
         boolean active=Set.of("WAITING_EXECUTOR","RUNNING").contains(run.path("status").asText());
         try{var start=java.time.Instant.parse(run.path("snapshot").path("startedAt").asText(run.path("snapshot").path("requestedAt").asText()));var end=active?java.time.Instant.now():java.time.Instant.parse(run.path("snapshot").path("finishedAt").asText(run.path("updatedAt").asText()));run.put("elapsedMs",Math.max(0,java.time.Duration.between(start,end).toMillis()));}catch(Exception ignored){run.put("elapsedMs",0);}
         result.set("run",run);return result;
