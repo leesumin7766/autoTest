@@ -45,7 +45,7 @@ tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
             "com/autotest/test_management_service/application/testcase/ExecutionReadinessService.class",
             "com/autotest/test_management_service/application/testcase/TestExecutionWorker.class",
             "com/autotest/test_management_service/application/testcase/ExecutionReviewService.class",
-            "tc-templates/menu-tc-v1.json"
+            "tc-templates/menu-tc-v3.json"
         )
         ZipFile(archiveFile.get().asFile).use { jar ->
             check(required.all { jar.getEntry("BOOT-INF/classes/$it") != null }) {
@@ -61,5 +61,5 @@ tasks.register<JavaExec>("generateMenuTcSamples") {
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass.set("com.autotest.test_management_service.application.testcase.MenuTcCli")
     args(rootProject.file("sample/menu sample/menu sample.xlsx").absolutePath,
-        rootProject.file("output/menu-tc-samples").absolutePath)
+        (findProperty("tcSampleOutput")?.toString() ?: rootProject.file("output/menu-tc-samples").absolutePath))
 }

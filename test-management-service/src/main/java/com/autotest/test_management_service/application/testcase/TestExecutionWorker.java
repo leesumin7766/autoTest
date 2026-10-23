@@ -89,7 +89,7 @@ public class TestExecutionWorker {
                 if(setup!=null)payload.set("setup",mapper.valueToTree(setup));
                 if(password!=null)payload.put("password",password);
                 var cases=mapper.createArrayNode();for(var item:snapshot.path("items"))if(ids.contains(item.path("caseId").asText())&&"PENDING".equals(item.path("executionStatus").asText())){
-                    var tc=mapper.createObjectNode();for(String key:List.of("id","tcId","ruleId","scenario","inputs","expectedResult","scopeDescription"))tc.set(key,item.path("tc").path(key));cases.add(tc);
+                    var tc=mapper.createObjectNode();for(String key:List.of("id","tcId","ruleId","scenario","inputs","expectedResult","scopeDescription","executionPlan","automationMode","templateVersion"))tc.set(key,item.path("tc").path(key));cases.add(tc);
                 }
                 for(var selectedCase:cases){
                 if(!active(run,attempt))return;
@@ -113,7 +113,7 @@ public class TestExecutionWorker {
                 payload.set("navigationHints",hints);
                 Set<String> expectedIds=Set.of(selectedCase.path("id").asText());
                 snapshot.put("currentCaseId",selectedCase.path("id").asText()).put("caseStartedAt",java.time.Instant.now().toString());
-                snapshot.putObject("progress").put("stage","CONNECTING");
+                snapshot.putObject("progress").put("stage",selectedCase.path("executionPlan").path("selection").path("exclusionCandidate").asBoolean()?"SELECTING":"CONNECTING");
                 snapshot.put("currentFeatureId",group.path("featureId").asText());save(run,attempt,snapshot,"RUNNING");
                 var request=HttpRequest.newBuilder(URI.create(aiUrl+"/api/v1/test-executions/feature")).timeout(Duration.ofMinutes(18)).header("Content-Type","application/json").header("X-Internal-Token",token).POST(HttpRequest.BodyPublishers.ofString(payload.toString())).build();
                 var response=http.send(request,HttpResponse.BodyHandlers.ofString());
@@ -143,7 +143,7 @@ public class TestExecutionWorker {
                             if(!guarded||previousFailure)((ObjectNode)item).putNull("result").put("proposedResult","P").put("judgmentStatus","NEEDS_REVIEW").put("reason",previousFailure?"이전 실패 후 성공입니다. 이전 실행과 함께 검토하세요.":"P 확정에 필요한 TC별 확인 조건·증거가 없습니다.");
                         }
                         String actual="";for(var evidence:answer.path("evidence"))if(evidence.hasNonNull("text"))actual=evidence.path("text").asText();
-                        ((ObjectNode)item).put("actualResult",actual.isBlank()?"기능별 관찰 증거와 동작 기록을 확인하세요.":actual.substring(0,Math.min(2000,actual.length())));
+                        ((ObjectNode)item).put("actualResult","EXCLUDED".equals(value.path("executionStatus").asText())?"실행 범위 판단으로 브라우저 수행에서 제외되었습니다. 실제 기능 시험 증거가 아닙니다.":actual.isBlank()?"기능별 관찰 증거와 동작 기록을 확인하세요.":actual.substring(0,Math.min(2000,actual.length())));
                     }
                 }
                 if(!received.equals(expectedIds))throw new IllegalStateException("EXECUTION_RESULT_INCOMPLETE");

@@ -56,7 +56,7 @@ class MenuTcGeneratorTest {
         Path sample=Path.of("../sample/menu sample/menu sample.xlsx");assertTrue(Files.exists(sample),"User sample workbook required");
         byte[] bytes=Files.readAllBytes(sample);String digest=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         List<ObjectNode> inputs=workbook.read(new ByteArrayInputStream(bytes),digest);assertEquals(4,inputs.size());
-        int[] featureCounts={133,86,172,44},caseCounts={1283,842,1670,482};
+        int[] featureCounts={133,86,172,44},caseCounts={1283,842,1670,671};
         Path directory=Path.of("build/test-artifacts/menu-tc");Files.createDirectories(directory);
         var report=mapper.createObjectNode().put("sourceFile","sample/menu sample/menu sample.xlsx").put("sourceSha256",digest).put("templateVersion",MenuTcGenerator.VERSION);
         var products=report.putArray("products");Set<String> allIds=new HashSet<>();
@@ -86,11 +86,33 @@ class MenuTcGeneratorTest {
             product.set("classificationCounts",output.path("summary"));product.set("skippedRows",input.path("skippedRows"));
         }
         Files.writeString(directory.resolve("verification.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
-        assertEquals(4277,allIds.size());
+        assertEquals(4466,allIds.size());
     }
     @Test void samePathDifferentFunctionsStaySeparateAndFormulaLikeTextIsLiteral() {
         var features=feature("CRUD");var other=features.get(0).deepCopy();((ObjectNode)other).put("featureId","other").put("description","=1+1");features.add(other);
-        var output=generator.generate("제품",features,mapper.createObjectNode());assertEquals(86,output.path("caseCount").asInt());
+        var output=generator.generate("제품",features,mapper.createObjectNode());assertEquals(100,output.path("caseCount").asInt());
         assertEquals(2,output.path("featureCount").asInt());
+    }
+    @Test void fullCrudRecipesRemainWhileSelectionAndProductBindingsAreSeparate() throws Exception {
+        var rows=feature("CRUD");((ObjectNode)rows.get(0)).put("functionName","사용자 삭제").put("description","선택한 사용자를 삭제하는 기능");
+        var output=generator.generate("제품",rows,mapper.createObjectNode());
+        assertEquals(84,output.path("caseCount").asInt());
+        var featureCases=new ArrayList<JsonNode>();for(var tc:output.path("testCases"))if(tc.path("featureId").asText().equals("feature-1"))featureCases.add(tc);
+        assertEquals(16,featureCases.size());
+        assertTrue(featureCases.stream().anyMatch(tc->tc.path("ruleId").asText().equals("CRUD-16")));
+        var create=featureCases.stream().filter(tc->tc.path("ruleId").asText().equals("CRUD-06")).findFirst().orElseThrow();
+        var delete=featureCases.stream().filter(tc->tc.path("ruleId").asText().equals("CRUD-09")).findFirst().orElseThrow();
+        assertTrue(create.path("executionPlan").path("selection").path("exclusionCandidate").asBoolean());
+        assertFalse(delete.path("executionPlan").path("selection").path("exclusionCandidate").asBoolean());
+        assertEquals("PENDING_LLM",create.path("executionPlan").path("selection").path("status").asText());
+        assertTrue(create.path("result").isNull());
+        for(var tc:featureCases){assertTrue(tc.has("templateOriginal"));assertFalse(tc.path("defectExample").toString().contains("AAA"));assertTrue(tc.path("executionPlan").path("specification").path("checks").isArray());}
+        assertEquals("",TcTemplateBinding.operation("사용자 추가/수정/삭제"));
+        assertEquals("DELETE",TcTemplateBinding.operation("사용자 삭제"));
+        try(var book=new XSSFWorkbook(new ByteArrayInputStream(workbook.export(output)))) {
+            assertEquals(16,book.getSheet("TestCase").getRow(0).getLastCellNum());
+            assertEquals(20,book.getSheet("실행 정보").getRow(0).getLastCellNum());
+            assertEquals("고유 TC ID",book.getSheet("실행 정보").getRow(0).getCell(11).getStringCellValue());
+        }
     }
 }

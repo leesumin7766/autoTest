@@ -12,6 +12,7 @@ from product_description.api import require_internal_token
 from execution_evidence import Condition, assess, gate, semantic_requirement
 from execution_contract import compiled_conditions, prerequisites, navigation_record, performed_test, requirements, planner_history
 from execution_profiles import profile, target_terms, target_observed, navigation_plan, loop_key, public_trace, single_action_done, literal_assertion
+from execution_selection import preflight, select_with_qwen
 
 router = APIRouter(prefix='/api/v1/test-executions', dependencies=[Depends(require_internal_token)])
 
@@ -86,7 +87,7 @@ INSTRUCTIONS += '''\nexecutionProgress.testActionPerformed is computed by the ex
 Never click the current screen's menu again. If a previous action is rejected, choose another relevant action or NEEDS_INPUT; never repeat it.'''
 
 def compact_case(tc):
-    return {key: tc.get(key) for key in ('id', 'tcId', 'ruleId', 'scenario', 'inputs', 'expectedResult', 'scopeDescription', 'conditionAssessments')}
+    return {key: tc.get(key) for key in ('id', 'tcId', 'ruleId', 'scenario', 'inputs', 'expectedResult', 'scopeDescription', 'conditionAssessments', 'executionPlan')}
 
 async def plan_with_qwen(payload):
     # Separate from the existing generation provider: never fall back to an external LLM.
@@ -328,11 +329,16 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
                 try: await client.post(f'{crawler}/api/v1/tc-browser/{session}/close', json={})
                 except Exception: pass
 
-async def execute_feature(request, planner=plan_with_qwen, judge=judge_with_jev, transport=None, check_active=True):
+async def execute_feature(request, planner=plan_with_qwen, judge=judge_with_jev, transport=None, check_active=True, selector=select_with_qwen):
     combined={'items':[],'evidence':[],'plans':[]}
     for index,tc in enumerate(request.cases):
         isolated=request.model_copy(update={'cases':[tc]})
-        result=await _execute_case(isolated,planner,judge,transport,check_active)
+        result=await preflight(tc, selector)
+        if result is None:
+            if tc.get('automationMode') == 'ADDITIONAL_EVIDENCE':
+                result={'items':pending([tc],'브라우저 관찰만으로 검증할 수 없는 항목입니다. 추가 도구·내부 증거 또는 수동 검토가 필요합니다.','NEEDS_CONTEXT'),'evidence':[],'plans':[]}
+            else:
+                result=await _execute_case(isolated,planner,judge,transport,check_active)
         prefix=f'case-{index+1}:'
         for evidence in result['evidence']:evidence['id']=prefix+evidence['id'];evidence['caseId']=tc['id']
         for item in result['items']:
