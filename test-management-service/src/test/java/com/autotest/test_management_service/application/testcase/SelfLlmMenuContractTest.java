@@ -13,10 +13,10 @@ class SelfLlmMenuContractTest {
         var evidence=snapshot.putArray("evidence");evidence.addObject().put("id","doc").put("kind","DOCUMENT").put("text","사용자 목록을 조회하는 기능");
         var screen=evidence.addObject().put("id","menu").put("kind","MENU").put("menuKey","users").put("text","사용자 목록").put("location","SIDEBAR");screen.putArray("webPath").add("관리");
         var web=snapshot.putObject("webStructure").put("version","web-first-v1");web.putArray("nodes").addObject().putArray("path").add("관리");
-        var description=contract.describe(job,snapshot);assertEquals("self-llm-v3",description.path("instructionVersion").asText());
+        var description=contract.describe(job,snapshot);assertEquals("self-llm-v4",description.path("instructionVersion").asText());
         assertTrue(description.path("prompt").asText().contains("evidenceCatalog"));assertEquals(description,contract.describe(job,snapshot));
         String prompt=description.path("prompt").asText();
-        assertTrue(prompt.contains("등록된 메뉴트리 공통 지침 self-llm-v3"));
+        assertTrue(prompt.contains("등록된 메뉴트리 공통 지침 self-llm-v4"));
         assertFalse(prompt.contains("# 메뉴트리 공통 작성 지침"));
         assertFalse(prompt.contains("# 출력 JSON 스키마"));
         var payload=mapper.readTree(prompt.substring(prompt.indexOf('{')));

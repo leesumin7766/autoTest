@@ -11,7 +11,7 @@ import com.fasterxml.jackson.databind.node.*;
 
 /** 사용자 LLM에는 요청에 고정된 근거 번호만 전달하고 원문은 서버가 복원한다. */
 public class SelfLlmMenuContract {
-    public static final String VERSION="self-llm-v3";
+    public static final String VERSION="self-llm-v4";
     private final ObjectMapper mapper;
     public SelfLlmMenuContract(ObjectMapper mapper){this.mapper=mapper;}
     private ProductDescriptionException invalid(String code,String message){return new ProductDescriptionException(HttpStatus.BAD_REQUEST,code,message);}

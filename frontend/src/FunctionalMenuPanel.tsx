@@ -42,7 +42,7 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready, active = tr
   useEffect(() => { if (!running) return; const timer = window.setInterval(() => { void refresh().catch(failure => setError(failure.message)) }, 3000); return () => window.clearInterval(timer) }, [running, refresh])
   useEffect(() => () => { if (image) URL.revokeObjectURL(image) }, [image])
   const action = async (work: () => Promise<void>) => { setBusy(true); setError(''); try { await work() } catch (failure) { setError(failure instanceof Error ? failure.message : '요청 실패') } finally { setBusy(false) } }
-  const makePrompt = async (jobId: string) => { setPrompt(''); setNotice(''); const result=await request(`${base}/${jobId}/prompt`,{method:'POST'}); if(result.instructionVersion!=='self-llm-v3')throw new Error('공통 지침 버전이 다릅니다. 화면과 서비스를 최신 버전으로 갱신하세요.'); setPrompt(result.prompt) }
+  const makePrompt = async (jobId: string) => { setPrompt(''); setNotice(''); const result=await request(`${base}/${jobId}/prompt`,{method:'POST'}); if(result.instructionVersion!=='self-llm-v4')throw new Error('공통 지침 버전이 다릅니다. 화면과 서비스를 최신 버전으로 갱신하세요.'); setPrompt(result.prompt) }
   const start = async (mode: string) => { const next = await request(base,{method:'POST',body:JSON.stringify({ productName:product, crawlJobId:crawl || view.crawls[0]?.jobId, mode })}); setSelected(next.job.jobId); apply(next); setPrompt(''); setExternal(''); setNotice(''); if(mode==='EXTERNAL')await makePrompt(next.job.jobId) }
   const copyPrompt = async () => { try { await navigator.clipboard.writeText(prompt); setNotice('제품별 프롬프트 전체를 복사했습니다. 공통 지침을 등록한 LLM에 붙여넣으세요.') } catch { promptArea.current?.focus(); promptArea.current?.select(); setNotice('자동 복사를 사용할 수 없어 전체 내용을 선택했습니다. Ctrl+C로 복사하세요.') } }
   const savePrompt = () => { const url=URL.createObjectURL(new Blob([prompt],{type:'text/plain;charset=utf-8'})); const link=document.createElement('a');link.href=url;link.download=`menu-tree-${job?.jobId || 'request'}.txt`;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000) }
@@ -57,7 +57,7 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready, active = tr
     <aside><h3>내 LLM으로 메뉴트리 작성</h3>
       <p>① 공통 지침을 LLM에 한 번 등록 → ② 화면 수집 완료 후 제품별 프롬프트 복사 → ③ LLM JSON 응답 가져오기 → ④ 검토·Excel 출력</p>
       <a className="quiet-button" href="/downloads/menu-tree-common-rules.md" download>공통 작성 규칙.md 다운로드</a>
-      <p>지침 버전 self-llm-v3 · 기존 v1 지침은 새 MD로 교체하세요. LLM은 E0001 같은 근거 번호만 선택하고 원문 인용은 프로그램이 복원합니다. 화면 이미지 자체는 포함되지 않습니다.</p>
+      <p>지침 버전 self-llm-v4 · 기존 v1 지침은 새 MD로 교체하세요. LLM은 E0001 같은 근거 번호만 선택하고 원문 인용은 프로그램이 복원합니다. 화면 이미지 자체는 포함되지 않습니다.</p>
     </aside>
     <p>화면 수집 결과 + 기능리스트 + 매뉴얼을 고정해 작성합니다. 제품명은 1depth, 분류는 2~4depth, 마지막 기능은 5depth에 출력합니다.</p>
     <div className="playwright-grid"><label>Excel 1depth 제품명<input value={product} maxLength={120} onChange={event=>setProduct(event.target.value)} disabled={busy||running} /></label>
@@ -90,7 +90,7 @@ export function FunctionalMenuPanel({ submissionId, memberId, ready, active = tr
         {job.output.diagnosticsTruncated&&<p>화면 진단은 최대 100건이며 전체 실패 건수는 위에 표시됩니다.</p>}</details>}
       {job.warnings?.map((warning,index)=><p className="functional-menu-warning" key={index}>{warning}</p>)}
       {running&&<button type="button" disabled={busy} onClick={()=>void action(async()=>apply(await request(`${base}/${job.jobId}/cancel`,{method:'POST'})))}>생성 중단</button>}
-      {!running&&<details open={job.generationMode==='EXTERNAL'||!!prompt}><summary>제품별 프롬프트·JSON 가져오기</summary><p>공통 작성 규칙 self-llm-v3을 먼저 등록하세요. 아래 요청에는 제품명·고정된 전체 문서 및 수집 근거·웹 구조가 포함됩니다. 자료는 자동으로 외부 LLM에 전송되지 않습니다.</p>
+      {!running&&<details open={job.generationMode==='EXTERNAL'||!!prompt}><summary>제품별 프롬프트·JSON 가져오기</summary><p>공통 작성 규칙 self-llm-v4을 먼저 등록하세요. 아래 요청에는 제품명·고정된 전체 문서 및 수집 근거·웹 구조가 포함됩니다. 자료는 자동으로 외부 LLM에 전송되지 않습니다.</p>
         <button type="button" disabled={busy||dirty} onClick={()=>void action(()=>makePrompt(job.jobId))}>이 실행의 제품 프롬프트 다시 만들기</button>
         {prompt&&<><p>전체 {prompt.length.toLocaleString()}자 · LLM 입력 한도를 확인하세요. 자료를 임의로 줄이지 않았습니다.</p><textarea ref={promptArea} readOnly rows={10} value={prompt} aria-label="제품별 메뉴트리 프롬프트"/><button type="button" onClick={()=>void copyPrompt()}>제품 프롬프트 전체 복사</button><button type="button" onClick={savePrompt}>동일 내용 TXT 다운로드</button></>}
         <label>LLM JSON 응답<textarea rows={5} value={external} onChange={event=>setExternal(event.target.value)} placeholder={'{"requestId":"요청 ID","rows":[...]}'} /></label>
