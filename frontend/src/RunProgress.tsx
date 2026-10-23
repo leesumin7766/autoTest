@@ -5,9 +5,10 @@ export function duration(ms: number) {
   return `${Math.floor(seconds / 3600).toString().padStart(2, '0')}:${Math.floor(seconds / 60 % 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`
 }
 
-export function RunProgress({ title, active, elapsedMs, receivedAt, taskKey, startedAt, endedAt, tone, completed, total, current, metrics, note }: {
+export function RunProgress({ title, active, elapsedMs, receivedAt, taskKey, startedAt, endedAt, tone, completed, total, current, metrics, note, progressText, progressAriaLabel }: {
   title: string; active: boolean; elapsedMs?: number; receivedAt: number; taskKey: string; startedAt?: string | number; endedAt?: string; tone?: 'active' | 'success' | 'danger' | 'neutral'; completed: number; total?: number;
   current: string; metrics: { label: string; value: number; tone?: string }[]; note?: string
+  progressText?: string; progressAriaLabel?: string
 }) {
   const [, tick] = useState(0)
   const clock = useRef<{ key: string; at: number; value: number; active: boolean } | null>(null)
@@ -26,7 +27,7 @@ export function RunProgress({ title, active, elapsedMs, receivedAt, taskKey, sta
   return <div className={`run-progress is-${tone || (active ? 'active' : 'neutral')}`} aria-label="작업 진행 현황">
     <div className="run-progress-heading"><div><span className="run-status-dot" /><strong>{title}</strong></div><div className="run-clock"><span>소요 시간</span><b>{duration(elapsed)}</b></div></div>
     <div className="run-progress-current" role="status">{active && <span className="spinner" />}<span>{current}</span></div>
-    <div className="run-progress-track">{total ? <progress aria-label="전체 항목 처리율" value={completed} max={total} /> : <progress aria-label={active ? '화면 탐색 진행 중 · 전체 수 미확정' : '화면 탐색 종료'} {...(active ? {} : { value: 0, max: 1 })} />}<span>{percentage === null ? `${completed.toLocaleString()}개 캡처 저장 · ${active ? '전체 수 탐색 중' : '탐색 종료'}` : `${completed.toLocaleString()} / ${total!.toLocaleString()}개 처리 · ${percentage}%`}</span></div>
+    <div className="run-progress-track">{total ? <progress aria-label={progressAriaLabel || '전체 항목 처리율'} value={completed} max={total} /> : <progress aria-label={active ? '화면 탐색 진행 중 · 전체 수 미확정' : '화면 탐색 종료'} {...(active ? {} : { value: 0, max: 1 })} />}<span>{progressText || (percentage === null ? `${completed.toLocaleString()}개 캡처 저장 · ${active ? '전체 수 탐색 중' : '탐색 종료'}` : `${completed.toLocaleString()} / ${total!.toLocaleString()}개 처리 · ${percentage}%`)}</span></div>
     <div className="run-progress-metrics">{metrics.map(metric => <div key={metric.label} className={metric.tone || ''}><b>{metric.value.toLocaleString()}</b><span>{metric.label}</span></div>)}</div>
     {note && <p className="run-progress-note">{note}</p>}
   </div>
