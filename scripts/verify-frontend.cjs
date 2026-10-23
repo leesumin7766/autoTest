@@ -21,6 +21,7 @@ const origin = process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173'
       const request = route.request(), path = new URL(request.url()).pathname
       calls.push([request.method(), path])
       const json = value => route.fulfill({ contentType: 'application/json', body: JSON.stringify(value) })
+      if(path.endsWith('/playwright-setup/tls-policy'))return json({ignoreHTTPSErrors:new URL(new URL(request.url()).searchParams.get('targetUrl')).origin==='https://example.com'})
       if (request.method() === 'POST' && (path === '/api/submissions' || path === '/api/submissions/qa-set/files')) {
         const role = request.postDataBuffer().toString().match(/name="role"\r\n\r\n(\w+)/)[1]
         const doc = { role, fileId: role, fileType: 'PDF', format: 'pdf', originalFilename: role + '.pdf', storedPath: '/qa/' + role, extractedText: '사용자를 조회할 수 있습니다.', status: 'PARSED', failureReason: null, aiDelivery: delivery }
@@ -41,15 +42,16 @@ const origin = process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173'
       if (path.endsWith('/playwright-crawls')) {
         if (request.method() === 'POST') {
           const body = request.postDataJSON()
+          if(body.purpose==='CONNECTION')assert.equal(body.draft.automation.ignoreHTTPSErrors,true,'화면 수집 연결 테스트에도 승인된 인증서 예외를 전달해야 함')
           const result = { jobId: 'check-' + body.purpose, status: 'COMPLETED', agentName: '현재 서버', pageCount: 0, errorCode: null, stopReason: 'DONE', result: { httpStatus: 200, elapsedMs: 234, loginVerified: true } }
-          if (body.purpose === 'CRAWL') crawl = result
+          if (body.purpose === 'CRAWL') { await new Promise(resolve=>setTimeout(resolve,2300)); crawl = result }
           else checks = { ...checks, [body.purpose]: result }
         }
         return json({ job: crawl, pages: [], checks })
       }
       if (path.endsWith('/evidence')) return json({ id: 'source-1', kind: 'DOCUMENT', filename: '매뉴얼.pdf', text: '사용자를 조회할 수 있습니다.' })
       if (path.endsWith('/download')) return route.fulfill({ contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', body: 'fixture' })
-      if (path.endsWith('/prompt')) return json({ instructionVersion: 'self-llm-v2', requestId: 'qa-request', prompt: '검증용 외부 LLM 프롬프트' })
+      if (path.endsWith('/prompt')) return json({ instructionVersion: 'self-llm-v3', requestId: 'qa-request', prompt: '검증용 외부 LLM 프롬프트' })
       if (/\/functional-menu\/menu-1\/(draft|approval|import)$/.test(path)) {
         job = { ...job, status: path.endsWith('/approval') ? 'APPROVED' : 'DRAFT', revision: job.revision + 1, output: { rows: request.postDataJSON().rows } }
         return json(view())
@@ -67,6 +69,7 @@ const origin = process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173'
     const inputs = page.locator('input[type=file]')
     for (let i = 0; i < 3; i++) await inputs.nth(i).setInputFiles({ name: '문서-' + i + '.pdf', mimeType: 'application/pdf', buffer: Buffer.from('test fixture') })
     await page.getByRole('button', { name: '03 메뉴트리' }).click()
+    assert.equal(await page.getByRole('button',{name:'로컬 LLM 자동 생성',exact:true}).count(),0)
     await page.getByRole('button', { name: '01 자료 등록' }).click()
     assert.equal(await inputs.nth(1).evaluate(el => el.files[0].name), '문서-1.pdf')
     await page.getByRole('button', { name: '자료 업로드·검증' }).click()
@@ -80,6 +83,14 @@ const origin = process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173'
     await page.getByRole('tab', { name: '진행 상태' }).click()
     await page.getByRole('button', { name: '02 화면 수집' }).click()
     await page.getByLabel('화면 수집 시작 URL').fill('https://example.com')
+    await page.getByLabel('이 시험 환경의 인증서 오류 허용').waitFor()
+    await page.getByText('인증서 예외 적용 · 연결 테스트·로그인·화면 수집에 동일하게 사용합니다.').waitFor()
+    assert.equal(await page.getByLabel('이 시험 환경의 인증서 오류 허용').isChecked(),true)
+    await page.getByLabel('화면 수집 시작 URL').fill('https://other.example.com')
+    await page.getByText('인증서를 검증합니다. 예외는 이 시험 환경에만 적용할 수 있습니다.').waitFor()
+    assert.equal(await page.getByLabel('이 시험 환경의 인증서 오류 허용').isChecked(),false)
+    await page.getByLabel('화면 수집 시작 URL').fill('https://example.com')
+    await page.getByText('인증서 예외 적용 · 연결 테스트·로그인·화면 수집에 동일하게 사용합니다.').waitFor()
     await page.getByLabel('접속·로그인·화면 수집 권한이 있는 테스트 환경과 계정입니다.').check()
     await page.getByRole('button', { name: '연결 테스트', exact: true }).click()
     await page.getByText(/연결 확인 · HTTP 200/).waitFor()
@@ -88,9 +99,13 @@ const origin = process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173'
     await page.getByRole('button', { name: '로그인·화면 수집 설정 저장' }).click()
     await page.getByText('설정을 저장했습니다.', { exact: false }).waitFor()
     await page.getByRole('button', { name: '로그인하고 화면 수집 시작' }).click()
+    await page.getByText('화면 수집 요청 중',{exact:true}).waitFor()
+    await page.waitForFunction(()=>Number(document.querySelector('.run-clock b')?.textContent?.split(':').at(-1))>=1)
     await page.getByText(/현재 서버 · 수집 완료/).waitFor()
+    const finishedClock=await page.locator('.run-clock b').innerText();assert(Number(finishedClock.split(':').at(-1))>=2,'Collection time starts at click, including request latency');await page.waitForTimeout(1100);assert.equal(await page.locator('.run-clock b').innerText(),finishedClock)
     await page.getByRole('button', { name: '03 메뉴트리' }).click()
     await page.getByLabel('1행 기능명').fill('사용자 검색')
+    assert.equal(await page.getByRole('button',{name:'로컬 LLM 자동 생성',exact:true}).count(),0)
     await page.getByRole('button', { name: '02 화면 수집' }).click()
     assert.equal(await page.getByLabel('화면 수집 시작 URL').inputValue(), 'https://example.com')
     await page.getByRole('button', { name: '03 메뉴트리' }).click()

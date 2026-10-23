@@ -14,11 +14,11 @@ public record CrawlAutomation(
         String successUrl, String successSelector, List<String> allowedOrigins,
         List<String> includePaths, List<String> excludePaths,
         int maxPages, int maxDepth, int maxDurationSeconds, int viewportWidth, int viewportHeight,
-        Integer pageLoadTimeoutSeconds) {
+        Integer pageLoadTimeoutSeconds, Boolean ignoreHTTPSErrors) {
 
     public static CrawlAutomation defaults() {
         return new CrawlAutomation("", "", "", "", "", "", "", "", List.of(), List.of(),
-                List.of("/logout*", "/signout*"), 100, 5, 600, 1440, 900, 30);
+                List.of("/logout*", "/signout*"), 500, 10, 3000, 1440, 900, 60, false);
     }
 
     public CrawlAutomation normalized() {
@@ -26,7 +26,7 @@ public record CrawlAutomation(
                 text(passwordSelector), text(submitSelector), text(successUrl), text(successSelector),
                 list(allowedOrigins), list(includePaths), list(excludePaths),
                 maxPages, maxDepth, maxDurationSeconds, viewportWidth, viewportHeight,
-                pageLoadTimeoutSeconds == null ? 30 : pageLoadTimeoutSeconds);
+                pageLoadTimeoutSeconds == null ? 60 : pageLoadTimeoutSeconds, Boolean.TRUE.equals(ignoreHTTPSErrors));
     }
 
     public void validate(String targetUrl, String loginMethod) {

@@ -20,7 +20,10 @@ async function runJob(config, job, dependencies = {}) {
     finally { inFlight = false; }
   }, 10000);
   try {
-    const result = await execute(job, { signal: controller.signal, onPage: async page => {
+    const result = await execute(job, { signal: controller.signal, onProgress: async progress => {
+      try { await event({event:'heartbeat',progress}); }
+      catch(error){if(error.status===409)throw error;} // A transient display update must not discard captured work.
+    }, onPage: async page => {
       try { await event({ ...page, event: 'page' }); }
       catch (error) { if (error.status === 409) throw error; await event({ ...page, event: 'page' }); }
     } });
@@ -48,7 +51,7 @@ async function main() {
     try {
       await request(config, 'heartbeat');
       if (!reported) { console.log('관리 서버 연결 완료 · 작업 대기'); reported = true; }
-      const job = await request(config, 'claim');
+      const job = await request(config, 'claim', {capabilities:['crawl-resume-v1','crawl-progress-v1']});
       if (job.jobId) { console.log('화면 수집 시작'); await runJob(config, job); console.log('작업 종료 · 다음 작업 대기'); }
     } catch { if (reported) console.log('서버 연결 확인 중 · 자동 재시도'); reported = false; }
     await new Promise(resolve => setTimeout(resolve, 5000));

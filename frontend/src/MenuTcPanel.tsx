@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+// Refresh persisted sources on tab entry while retaining local review state.
+
 type FeatureType = '로그인' | '주요기능' | '부가기능' | 'CRUD'
 type MenuRow = { rowId: string; included: boolean; rowType?: string; functionName: string; menuPath: string[]; menuDescription: string; featureType?: FeatureType }
 type Menu = { jobId: string; productName: string; status: string; revision: number; stale: boolean; generationMode: string; output?: { rows: MenuRow[]; completionStatus?: string } }
 type MenuView = { job: Menu | null; history: { jobId: string; productName: string; status: string }[] }
 type Tc = { id: string; tcId: string; featureId: string; featurePath: string[]; featureType: string; qualityCharacteristic: string; subCharacteristic: string; scenario: string; inputs: string; expectedResult: string; result: null; scopeDescription: string; ruleId: string; evidence: unknown[]; defectExample: { summary: string; severity: string; content: string }; executionPlan: { targetUrl: string; steps: string[]; applicability: string; requiredContext: string[] } }
-type Output = { productName: string; featureCount: number; caseCount: number; templateVersion: string; testCases: Tc[]; summary: Record<string, number> }
+type Output = { productName: string; featureCount: number; caseCount: number; templateVersion: string; testCases: Tc[]; summary: Record<string, number>; source?: {authentication?: {required:boolean;failedAttemptLimit?:number;policyNote?:string}} }
 type SetView = { set: { setId: string; stale: boolean; menuJobId: string; menuRevision: number; output: Output } | null; history: { setId: string; createdAt: string; menuRevision: number }[] }
 const featureTypes: FeatureType[] = ['로그인', '주요기능', '부가기능', 'CRUD']
 const statusLabels: Record<string, string> = { APPROVED: '승인 완료', DRAFT: '초안', GENERATING: '생성 중', FAILED: '실패', CANCELED: '중단' }
 
-export function MenuTcPanel({ submissionId, memberId }: { submissionId: string; memberId: string }) {
+export function MenuTcPanel({ submissionId, memberId, active = true, onGenerated }: { submissionId: string; memberId: string; active?: boolean; onGenerated?: (setId: string) => void }) {
   const [menuView, setMenuView] = useState<MenuView>({ job: null, history: [] })
   const [selectedMenu, setSelectedMenu] = useState('')
   const [types, setTypes] = useState<Record<string, FeatureType>>({})
@@ -18,39 +20,48 @@ export function MenuTcPanel({ submissionId, memberId }: { submissionId: string; 
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState('')
   const [search, setSearch] = useState(''), [page, setPage] = useState(0), [detail, setDetail] = useState<Tc | null>(null)
   const menuVersion = useRef('')
+  const tcVersion = useRef('')
+  useEffect(() => { tcVersion.current = view.set?.setId || '' }, [view.set?.setId])
   const [uploadedFile, setUploadedFile] = useState('')
+  const [tcAvailable, setTcAvailable] = useState(false)
   const base = `/api/submissions/${submissionId}/menu-test-cases`
   const request = useCallback(async (url: string, options: RequestInit = {}) => {
     const response = await fetch(url, { ...options, headers: { 'X-Member-Id': memberId, ...(options.body ? { 'Content-Type': 'application/json' } : {}) } })
     let body
     try { body = await response.json() } catch { throw new Error('TC 서비스에 연결하지 못했습니다. 최신 서버가 실행 중인지 확인해주세요.') }
-    if (!response.ok) throw new Error(body.message || 'TC 요청을 처리하지 못했습니다.')
+    if (!response.ok) throw new Error(body.message || (response.status === 404 && url.includes('/menu-test-cases') ? '현재 서버에 TC 생성 API가 반영되지 않았습니다. 메뉴트리는 보존되어 있으며 서버 업데이트가 필요합니다. (HTTP 404)' : `TC 요청을 처리하지 못했습니다. (HTTP ${response.status})`))
     return body
   }, [memberId])
   const load = useCallback(async (signal?: AbortSignal) => {
-    const [menus, sets] = await Promise.all([
+    const [menus, sets] = await Promise.allSettled([
       request(`/api/submissions/${submissionId}/functional-menu${selectedMenu ? `?job=${encodeURIComponent(selectedMenu)}` : ''}`, { signal }) as Promise<MenuView>,
       request(base, { signal }) as Promise<SetView>,
     ])
     if (signal?.aborted) return
-    setMenuView(menus); setView(sets)
-    const version = `${menus.job?.jobId}:${menus.job?.revision}`
-    if (version !== menuVersion.current) { setTypes({}); menuVersion.current = version }
-    setDetail(null); setPage(0)
+    const errors: string[] = []
+    if (menus.status === 'fulfilled') {
+      setMenuView(menus.value)
+      const version = `${menus.value.job?.jobId}:${menus.value.job?.revision}`
+      if (version !== menuVersion.current) { setTypes({}); menuVersion.current = version }
+    } else errors.push(menus.reason instanceof Error ? menus.reason.message : '메뉴트리 조회 실패')
+    if (sets.status === 'fulfilled') { if(tcVersion.current !== (sets.value.set?.setId || '')){setDetail(null);setPage(0)} setView(sets.value); setTcAvailable(true) }
+    else { setTcAvailable(false); errors.push(sets.reason instanceof Error ? sets.reason.message : 'TC 조회 실패') }
+    setError(errors.join(' '))
   }, [base, request, selectedMenu, submissionId])
   useEffect(() => {
+    if (!active) return
     const controller = new AbortController(); setLoading(true); setError('')
     void load(controller.signal).catch(failure => { if (!controller.signal.aborted) setError(failure.message) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [load])
+  }, [load, active])
   const action = async (work: () => Promise<void>) => { setBusy(true); setError(''); try { await work() } catch (failure) { setError(failure instanceof Error ? failure.message : '요청 실패') } finally { setBusy(false) } }
   const menu = menuView.job
   const features = useMemo(() => menu?.output?.rows.filter(row => row.included && row.rowType !== 'MENU_OBSERVATION') || [], [menu])
-  const typeFor = (row: MenuRow): FeatureType => types[row.rowId] || row.featureType || (/로그인|로그아웃|^login$|^logout$/i.test(row.functionName) && !/기록|이력|조회|history|audit/i.test(row.functionName) ? '로그인' : '주요기능')
+  const typeFor = (row: MenuRow): FeatureType => types[row.rowId] || row.featureType || (/로그인|^login$/i.test(row.functionName) && !/기록|이력|조회|history|audit/i.test(row.functionName) ? '로그인' : '주요기능')
   const loginCount = features.filter(row => typeFor(row) === '로그인').length
   const expectedCount = loginCount * 27 + (features.length - loginCount) * 9 + 68
-  const ready = menu?.status === 'APPROVED' && !menu.stale && menu.generationMode !== 'MOCK' && menu.output?.completionStatus !== 'PARTIAL' && features.length > 0
+  const ready = (!selectedMenu || selectedMenu === menu?.jobId) && menu?.status === 'APPROVED' && !menu.stale && menu.generationMode !== 'MOCK' && menu.output?.completionStatus !== 'PARTIAL' && features.length > 0
   const output = view.set?.output
   const filtered = useMemo(() => (output?.testCases || []).filter(tc => `${tc.tcId} ${tc.featurePath.join(' ')} ${tc.scenario} ${tc.qualityCharacteristic}`.toLowerCase().includes(search.toLowerCase())), [output, search])
   const pages = Math.max(1, Math.ceil(filtered.length / 25)), activePage = Math.min(page, pages - 1)
@@ -71,6 +82,9 @@ export function MenuTcPanel({ submissionId, memberId }: { submissionId: string; 
           let body; try { body = await response.json() } catch { throw new Error('메뉴트리 업로드 응답을 읽지 못했습니다.') }
           if (!response.ok) throw new Error(body.message || (response.status === 404 ? '현재 서버에 메뉴트리 업로드 API가 반영되지 않았습니다. 서버 업데이트 후 다시 시도해주세요.' : '메뉴트리를 업로드하지 못했습니다.'))
           if (!body.job?.jobId) throw new Error('업로드 결과에 메뉴트리 정보가 없습니다.')
+          const history = [...(body.history || menuView.history)].filter((item: {jobId: string}) => item.jobId !== body.job.jobId)
+          setMenuView({ job: body.job, history: [{ jobId: body.job.jobId, productName: body.job.productName, status: body.job.status }, ...history] })
+          setTypes({}); menuVersion.current = `${body.job.jobId}:${body.job.revision}`
           setSelectedMenu(body.job.jobId)
           setUploadedFile(file.name)
         }).finally(() => { input.value = '' })
@@ -88,11 +102,12 @@ export function MenuTcPanel({ submissionId, memberId }: { submissionId: string; 
       <p>원본에 구분이 없으면 로그인 또는 주요기능으로 제안합니다. 필요하면 변경하세요. CRUD 기능은 행별 9개 시험을 적용하며 존재하지 않는 동작을 추가하지 않습니다.</p>
       <div className="tc-feature-list">{features.map(row => <label key={row.rowId}><span>{[...row.menuPath, row.functionName].join(' / ')}<small>{row.menuDescription}</small></span><select aria-label={`${row.functionName} 기능구분`} value={typeFor(row)} disabled={busy || loading} onChange={event => setTypes(current => ({ ...current, [row.rowId]: event.target.value as FeatureType }))}>{featureTypes.map(type => <option key={type}>{type}</option>)}</select></label>)}</div>
     </details>}
-    <div className="tc-generate-toolbar"><span>{features.length ? `${features.length}개 기능 · 예상 ${expectedCount.toLocaleString()}개 TC` : '메뉴트리 선택 필요'}</span><button className="primary-button" disabled={!ready || busy || loading} onClick={() => void action(async () => {
+    <div className="tc-generate-toolbar"><span>{features.length ? `${features.length}개 기능 · 예상 ${expectedCount.toLocaleString()}개 TC + 인증 보완 가능` : '메뉴트리 선택 필요'}</span><button className="primary-button" disabled={!ready || !tcAvailable || busy || loading} onClick={() => void action(async () => {
       const featureTypes = Object.fromEntries(features.map(row => [row.rowId, typeFor(row)]))
-      setView(await request(base, { method: 'POST', body: JSON.stringify({ menuJobId: menu!.jobId, featureTypes }) })); setSearch(''); setPage(0); setDetail(null)
+      const next: SetView = await request(base, { method: 'POST', body: JSON.stringify({ menuJobId: menu!.jobId, featureTypes }) }); setView(next); if(next.set)onGenerated?.(next.set.setId); setSearch(''); setPage(0); setDetail(null)
     })}>{busy ? '처리 중…' : 'TC 초안 생성'}</button></div>
     {output && <>
+      {output.source?.authentication?.required&&<p className="functional-menu-warning">로그인 TC를 먼저 배치했습니다. {output.source.authentication.policyNote} 잠금 시험은 전용 계정과 복구 절차를 준비하세요.</p>}
       <div className="response-heading"><h3>{output.productName} · TC 초안</h3><span className="workspace-badge badge-success">{output.caseCount.toLocaleString()}개 생성 · 시험 미실행</span></div>
       {view.set?.stale && <p className="functional-menu-warning">원본 메뉴트리나 문서가 변경되었습니다. 이 결과는 이전 초안이며 새 승인본으로 다시 생성해야 합니다.</p>}
       <div className="tc-output-toolbar">

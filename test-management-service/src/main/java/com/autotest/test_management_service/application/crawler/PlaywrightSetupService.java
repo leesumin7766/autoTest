@@ -62,7 +62,7 @@ public class PlaywrightSetupService {
         CrawlAutomation automation=request.automation()==null?CrawlAutomation.defaults():request.automation().normalized();
         if(connectionOnly) {
             automation=new CrawlAutomation("","","","","","","","",automation.allowedOrigins(),
-                    java.util.List.of(),java.util.List.of(),1,1,30,1440,900,automation.pageLoadTimeoutSeconds());
+                    java.util.List.of(),java.util.List.of(),1,1,30,1440,900,automation.pageLoadTimeoutSeconds(),automation.ignoreHTTPSErrors());
             request=new SetupRequest(request.targetUrl(),"NONE","","","","",request.testEnvironmentConfirmed(),automation,null,false);
         }
         validate(request); automation.validate(request.targetUrl().trim(),request.loginMethod());
@@ -116,6 +116,20 @@ public class PlaywrightSetupService {
         } catch (Exception failure) {
             throw error(HttpStatus.CONFLICT, "PREFLIGHT_NOT_VERIFIED", "Jev 검증 기록을 확인할 수 없습니다.");
         }
+    }
+
+    public boolean trustedTargetCertificate(UUID id,long memberId,String targetUrl) {
+        var submission=repository.findById(SubmissionId.of(id)).orElseThrow(()->error(HttpStatus.NOT_FOUND,"SUBMISSION_NOT_FOUND","문서 세트를 찾을 수 없습니다."));
+        if(submission.memberId().value()!=memberId)throw error(HttpStatus.FORBIDDEN,"FORBIDDEN","이 문서 세트에 접근할 수 없습니다.");
+        String origin=CrawlAutomation.origin(targetUrl);
+        var current=get(id,memberId);
+        if(current!=null&&origin.equals(CrawlAutomation.origin(current.targetUrl())))return Boolean.TRUE.equals(current.automation().ignoreHTTPSErrors());
+        return jdbc.query("SELECT setup_snapshot->>'targetUrl' FROM playwright_crawl_jobs WHERE member_id=? AND status='COMPLETED' AND setup_snapshot->'automation'->>'ignoreHTTPSErrors'='true' ORDER BY created_at DESC LIMIT 500",
+                (rs,n)->rs.getString(1),memberId).stream().anyMatch(url->{try{return origin.equals(CrawlAutomation.origin(url));}catch(Exception invalid){return false;}});
+    }
+
+    public String configurationVersion(UUID id,long member){
+        return jdbc.query("SELECT updated_at::text FROM playwright_crawl_setups WHERE submission_id=? AND member_id=?",(rs,n)->rs.getString(1),id,member).stream().findFirst().orElse("");
     }
 
     public SetupView get(UUID id, long memberId) {

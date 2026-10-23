@@ -86,6 +86,12 @@ public class RemoteCrawlService {
         return start(submission,member,agentId,"REMOTE","CRAWL",null);
     }
     public ObjectNode start(UUID submission,long member,UUID agentId,String executionMode,String purpose,PlaywrightSetupService.SetupRequest draft) {
+        return start(submission,member,agentId,executionMode,purpose,draft,null);
+    }
+    public ObjectNode resume(UUID submission,long member,UUID job,UUID agent,String mode){
+        return start(submission,member,agent,mode,"CRAWL",null,job);
+    }
+    private ObjectNode start(UUID submission,long member,UUID agentId,String executionMode,String purpose,PlaywrightSetupService.SetupRequest draft,UUID resume) {
         if(!Set.of("LOCAL","REMOTE").contains(executionMode) || !Set.of("CONNECTION","LOGIN","CRAWL").contains(purpose))
             throw error(HttpStatus.BAD_REQUEST,"CRAWL_REQUEST_INVALID","실행 위치와 테스트 유형을 확인해 주세요.");
         recover(); owner(submission,member);
@@ -107,10 +113,27 @@ public class RemoteCrawlService {
                     throw error(HttpStatus.CONFLICT,"LOGIN_METHOD_UNSUPPORTED","현재 자동 실행은 일반 로그인·Basic 인증·로그인 없음만 지원합니다.");
                 String password=prepared==null?jdbc.queryForObject("SELECT password_ciphertext FROM playwright_crawl_setups WHERE submission_id=?",String.class,submission):prepared.passwordCiphertext();
                 if(!"NONE".equals(setup.loginMethod()) && password==null) throw error(HttpStatus.CONFLICT,"PLAYWRIGHT_PASSWORD_REQUIRED","로그인 비밀번호를 저장해 주세요.");
+                ObjectNode snapshot=(ObjectNode)mapper.valueToTree(setup);ObjectNode continuation=null;
+                if(resume!=null){
+                    var originals=jdbc.query("SELECT setup_snapshot::text,document_digest,status,page_count,screenshot_bytes,updated_at,crawl_result::text,created_at FROM playwright_crawl_jobs WHERE job_id=? AND submission_id=? AND member_id=? AND purpose='CRAWL' FOR UPDATE",(rs,n)->{
+                        var value=mapper.createObjectNode();value.set("setup",parse(rs.getString(1)));value.put("digest",rs.getString(2).trim()).put("status",rs.getString(3)).put("count",rs.getInt(4)).put("bytes",rs.getLong(5));value.put("createdAt",rs.getTimestamp(8).toInstant().toString()).put("updatedAt",rs.getTimestamp(6).toInstant().toString());value.set("crawlResult",rs.getString(7)==null?mapper.createObjectNode():parse(rs.getString(7)));return value;
+                    },resume,submission,member);
+                    if(originals.isEmpty())throw error(HttpStatus.NOT_FOUND,"CRAWL_NOT_FOUND","이어서 진행할 수집을 찾을 수 없습니다.");
+                    var old=originals.getFirst();
+                    if(Set.of("QUEUED","RUNNING").contains(old.path("status").asText()))throw error(HttpStatus.CONFLICT,"CRAWL_ALREADY_ACTIVE","기존 작업을 중단한 뒤 이어서 진행하세요.");
+                    if(!old.path("digest").asText().equals(setups.verifiedDigest(submission,member))||!resumeIdentity(old.path("setup")).equals(resumeIdentity(snapshot)))throw error(HttpStatus.CONFLICT,"CRAWL_SOURCE_CHANGED","문서·대상·접속·수집 범위가 변경되었습니다. 새 수집을 시작하세요.");
+                    if(old.path("count").asInt()>=500||old.path("bytes").asLong()>=64L*1024*1024)throw error(HttpStatus.CONFLICT,"CRAWL_RESUME_LIMIT","보존할 화면이 작업 저장 한도에 도달했습니다. 수집 범위를 나눠 새 수집을 시작하세요.");
+                    ((ObjectNode)snapshot.path("automation")).put("maxPages",Math.min(500,old.path("count").asInt()+snapshot.path("automation").path("maxPages").asInt(100)));
+                    continuation=mapper.createObjectNode().put("resumedFrom",resume.toString()).put("elapsedMs",elapsed(old)).put("segmentStartedAt",Instant.now().toString()).put("preservedCount",old.path("count").asInt());
+                }
                 jdbc.update("""
                         INSERT INTO playwright_crawl_jobs(job_id,submission_id,member_id,agent_id,status,setup_snapshot,password_ciphertext,document_digest,created_at,execution_mode,purpose)
                         VALUES (?,?,?,?,'QUEUED',?::jsonb,?,?,clock_timestamp(),?,?)
-                        """,id,submission,member,agent,json(setup),password,setups.verifiedDigest(submission,member),executionMode,purpose);
+                        """,id,submission,member,agent,json(snapshot),password,setups.verifiedDigest(submission,member),executionMode,purpose);
+                if(resume!=null){
+                    jdbc.update("INSERT INTO playwright_crawl_pages(job_id,page_index,url,title,body_text,elements,links,screenshot,navigation,screen_state,nav_transition) SELECT ?,page_index,url,title,body_text,elements,links,screenshot,navigation,screen_state,nav_transition FROM playwright_crawl_pages WHERE job_id=?",id,resume);
+                    jdbc.update("UPDATE playwright_crawl_jobs SET page_count=(SELECT count(*) FROM playwright_crawl_pages WHERE job_id=?),screenshot_bytes=(SELECT COALESCE(sum(octet_length(screenshot)),0) FROM playwright_crawl_pages WHERE job_id=?),crawl_result=?::jsonb WHERE job_id=?",id,id,json(continuation),id);
+                }
             });
         } catch(DuplicateKeyException busy) { throw error(HttpStatus.CONFLICT,"CRAWL_ALREADY_ACTIVE","이 문서 또는 실행 위치에서 테스트·수집 작업이 이미 진행 중입니다."); }
         if("LOCAL".equals(executionMode)) {
@@ -134,8 +157,11 @@ public class RemoteCrawlService {
                     value.put("agentName",rs.getString("agent_name")); value.put("pageCount",rs.getInt("page_count"));
                     value.put("errorCode",rs.getString("error_code")); value.put("stopReason",rs.getString("stop_reason"));
                     value.put("purpose",rs.getString("purpose"));value.put("executionMode",rs.getString("execution_mode"));
+                    value.put("createdAt",rs.getTimestamp("created_at").toInstant().toString()).put("updatedAt",rs.getTimestamp("updated_at").toInstant().toString());
                     value.set("result",rs.getString("check_result")==null?mapper.nullNode():parse(rs.getString("check_result")));
                     value.set("crawlResult",rs.getString("crawl_result")==null?mapper.nullNode():parse(rs.getString("crawl_result")));
+                    value.put("elapsedMs",elapsed(value));
+                    value.put("resumeAvailable","CRAWL".equals(rs.getString("purpose"))&&!Set.of("QUEUED","RUNNING").contains(rs.getString("status"))&&rs.getInt("page_count")<500&&rs.getLong("screenshot_bytes")<64L*1024*1024&&(!"COMPLETED".equals(rs.getString("status"))||!"DONE".equals(rs.getString("stop_reason"))||"INCOMPLETE".equals(value.path("crawlResult").path("coverageStatus").asText())));
                     return value;
                 },submission);
         ObjectNode result=mapper.createObjectNode();
@@ -187,12 +213,19 @@ public class RemoteCrawlService {
         return rows.getFirst();
     }
     public ObjectNode claim(UUID agent) {
+        return claim(agent,false);
+    }
+    public ObjectNode claim(UUID agent,boolean supportsResume) {
         seen(agent); recover();
         return tx.execute(status->{
             var rows=jdbc.query("SELECT job_id,submission_id,member_id,document_digest,setup_snapshot::text,password_ciphertext,purpose FROM playwright_crawl_jobs WHERE agent_id=? AND status='QUEUED' ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED",
                     (rs,n)->new Pending(rs.getObject(1,UUID.class),rs.getObject(2,UUID.class),rs.getLong(3),rs.getString(4).trim(),rs.getString(5),rs.getString(6),rs.getString(7)),agent);
             if(rows.isEmpty()) return mapper.createObjectNode();
-            return claimJob(rows.getFirst());
+            var pending=rows.getFirst();
+            if(!supportsResume&&jdbc.queryForObject("SELECT page_count FROM playwright_crawl_jobs WHERE job_id=?",Integer.class,pending.id())>0){
+                jdbc.update("UPDATE playwright_crawl_jobs SET status='FAILED',error_code='AGENT_UPDATE_REQUIRED',password_ciphertext=NULL,updated_at=now() WHERE job_id=?",pending.id());return mapper.createObjectNode();
+            }
+            return claimJob(pending);
         });
     }
     private ObjectNode claimJob(Pending job) {
@@ -207,6 +240,11 @@ public class RemoteCrawlService {
             if(job.password()!=null) payload.put("password",cipher.decrypt(job.submission(),job.password()));
             payload.put("jobId",job.id().toString());payload.put("claimToken",token.toString());
             payload.put("purpose",job.purpose());
+            if("CRAWL".equals(job.purpose())){
+                var resume=payload.putObject("resume");var pages=resume.putArray("pages");
+                jdbc.query("SELECT page_index,screen_state::text,nav_transition::text FROM playwright_crawl_pages WHERE job_id=? ORDER BY page_index",rs->{var page=pages.addObject().put("pageIndex",rs.getInt(1));page.set("screenState",parse(rs.getString(2)));page.set("transition",parse(rs.getString(3)));},job.id());
+                resume.put("pageCount",pages.size());resume.put("bytes",jdbc.queryForObject("SELECT screenshot_bytes FROM playwright_crawl_jobs WHERE job_id=?",Long.class,job.id()));
+            }
             jdbc.update("UPDATE playwright_crawl_jobs SET status='RUNNING',claim_token=?,lease_expires_at=now()+interval '45 seconds',updated_at=now() WHERE job_id=?",token,job.id());
             return payload;
     }
@@ -240,25 +278,32 @@ public class RemoteCrawlService {
                 String reason=body.path("stopReason").asText("DONE");
                 if(!Set.of("DONE","PAGE_LIMIT","DEPTH_LIMIT","TIME_LIMIT","STORAGE_LIMIT").contains(reason)) reason="DONE";
                 ObjectNode summary=mapper.createObjectNode();
-                for(String field:List.of("incompleteCount","navigationFailureCount","noChangeCount","uniqueScreenCount"))
+                for(String field:List.of("incompleteCount","unresolvedCount","navigationFailureCount","noChangeCount","uniqueScreenCount"))
                     summary.put(field,Math.max(0,Math.min(500,body.path("result").path(field).asInt())));
                 summary.put("coverageStatus", "DONE".equals(reason) && summary.path("incompleteCount").asInt()==0
-                        && summary.path("navigationFailureCount").asInt()==0 && summary.path("noChangeCount").asInt()==0 ? "COMPLETE" : "INCOMPLETE");
+                        && summary.path("navigationFailureCount").asInt()==0 && summary.path("noChangeCount").asInt()==0 && summary.path("unresolvedCount").asInt()==0 ? "COMPLETE" : "INCOMPLETE");
                 var skipped=body.path("result").path("skipped");
                 if(skipped.isArray() && skipped.size()<=500 && json(skipped).length()<200_000) summary.set("skipped",skipped);
-                jdbc.update("UPDATE playwright_crawl_jobs SET status=?,error_code=?,stop_reason=?,crawl_result=?::jsonb,password_ciphertext=NULL,updated_at=now() WHERE job_id=?",
+                jdbc.update("UPDATE playwright_crawl_jobs SET status=?,error_code=?,stop_reason=?,crawl_result=COALESCE(crawl_result,'{}'::jsonb)||?::jsonb,password_ciphertext=NULL,updated_at=now() WHERE job_id=?",
                         active.count()>0?"COMPLETED":"FAILED",active.count()>0?null:"NO_PAGES_CAPTURED",reason,json(summary),job);
                 }
             } else if("failed".equals(event)) {
                 String code=body.path("errorCode").asText();
                 jdbc.update("UPDATE playwright_crawl_jobs SET status='FAILED',error_code=?,password_ciphertext=NULL,updated_at=now() WHERE job_id=?",FAILURES.contains(code)?code:"CRAWL_FAILED",job);
             } else if(!"heartbeat".equals(event)) throw error(HttpStatus.BAD_REQUEST,"CRAWL_EVENT_INVALID","지원하지 않는 수집 이벤트입니다.");
+            var incoming=body.path("progress");
+            if(incoming.isObject()&&Set.of("CONNECTING","LOGIN","DISCOVERING","NAVIGATING","LOADING","CAPTURING").contains(incoming.path("stage").asText())){
+                var progress=mapper.createObjectNode().put("stage",incoming.path("stage").asText()).put("current",incoming.path("current").asText().substring(0,Math.min(500,incoming.path("current").asText().length()))).put("remaining",Math.max(0,Math.min(5000,incoming.path("remaining").asInt())));
+                jdbc.update("UPDATE playwright_crawl_jobs SET crawl_result=COALESCE(crawl_result,'{}'::jsonb)||jsonb_build_object('progress',?::jsonb) WHERE job_id=? AND status='RUNNING'",json(progress),job);
+            }
             jdbc.update("UPDATE playwright_crawl_jobs SET lease_expires_at=now()+interval '45 seconds',updated_at=now() WHERE job_id=? AND status='RUNNING'",job);
             if(agent!=null) seen(agent);
             return mapper.createObjectNode().put("accepted",true);
         });
     }
     private record Active(JsonNode setup,int count,long bytes,String purpose) { }
+    private JsonNode resumeIdentity(JsonNode setup){var value=setup.deepCopy();var result=mapper.createObjectNode();result.set("targetUrl",value.path("targetUrl"));result.set("loginMethod",value.path("loginMethod"));var config=(ObjectNode)value.path("automation");config.remove(List.of("maxPages","maxDepth","maxDurationSeconds","pageLoadTimeoutSeconds"));result.set("automation",config);return result;}
+    private long elapsed(JsonNode job){try{var result=job.path("crawlResult");var start=Instant.parse(result.path("segmentStartedAt").asText(job.path("createdAt").asText()));var end=Set.of("QUEUED","RUNNING").contains(job.path("status").asText())?Instant.now():Instant.parse(job.path("updatedAt").asText());return result.path("elapsedMs").asLong()+Math.max(0,java.time.Duration.between(start,end).toMillis());}catch(Exception ignored){return 0;}}
     private void storePage(UUID job,Active active,JsonNode body) {
         int index=body.path("pageIndex").asInt(-1);
         if(index<active.count() && index>=0) return; // Retry after a lost acknowledgement.

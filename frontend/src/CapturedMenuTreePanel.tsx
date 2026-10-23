@@ -37,10 +37,10 @@ export function CapturedMenuTreePanel({ base, jobId, memberId, busy, showPage }:
       {node.url && <small className="captured-menu-url">{node.url}</small>}
       {node.sources.length > 0 && <small>발견 근거: {node.sources.map(source => `화면 ${source.pageIndex + 1}`).join(', ')}</small>}
     </div>
-    {node.children.length > 0 && render(node.children)}
+    {node.children.length > 0 && <details open><summary>하위 메뉴 {node.children.length}개</summary>{render(node.children)}</details>}
   </li>)}</ul>
-  return <section className="captured-menu-panel" aria-label="수집 기반 메뉴트리">
-    <h4>수집 기반 메뉴트리 초안</h4>
+  return <details className="captured-menu-panel" aria-label="수집 기반 메뉴트리" onToggle={event => { if (event.currentTarget.open && !tree && !loading) void load() }}>
+    <summary>수집 기반 메뉴트리 초안{tree && ` · ${tree.nodeCount}개 항목`}</summary>
     <p>메뉴를 실제로 클릭한 결과와 연결합니다. 같은 URL이라도 탭·iframe·화면 상태가 다르면 별도로 보존합니다. 로딩 미완료·변화 미확인은 정상 화면과 구분합니다.</p>
     <button type="button" className="quiet-button" disabled={loading} onClick={() => void load()}>
       {loading ? '불러오는 중…' : tree ? '메뉴트리 새로고침' : '메뉴트리 보기'}</button>
@@ -51,5 +51,5 @@ export function CapturedMenuTreePanel({ base, jobId, memberId, busy, showPage }:
       {tree.pagesWithoutNavigation > 0 && <p>{tree.pagesWithoutNavigation}개 화면에는 메뉴 계층 근거가 없습니다. 이전 실행기로 수집한 결과는 최신 실행기로 다시 수집해야 합니다.</p>}
       {tree.nodes.length ? render(tree.nodes) : <p>저장된 메뉴 계층이 없습니다. 메뉴가 있는 화면을 최신 실행기로 수집해 주세요.</p>}
     </>}
-  </section>
+  </details>
 }

@@ -70,7 +70,7 @@ public class FunctionalMenuService {
             int index=page.path("pageIndex").asInt();
             var state=jdbc.queryForObject("SELECT screen_state::text FROM playwright_crawl_pages WHERE job_id=? AND page_index=?",String.class,crawl,index);
             String readiness=parse(state).path("readiness").asText("UNVERIFIED");
-            chunks(evidence,page.path("bodyText").asText(),mapper.createObjectNode().put("kind","SCREEN").put("pageIndex",index).put("url",page.path("url").asText()).put("readiness",readiness),"screen:"+index);
+            chunks(evidence,page.path("bodyText").asText(),mapper.createObjectNode().put("kind","SCREEN").put("pageIndex",index).put("url",page.path("url").asText()).put("readiness",readiness).put("authenticationStage",page.path("transition").path("scope").asText()),"screen:"+index);
             for(JsonNode nav:page.path("navigation")){
                 String key=nav.path("menuKey").asText();if(key.isBlank() || !seen.add(key))continue;
                 ObjectNode item=mapper.createObjectNode().put("id","menu:"+key).put("kind","GROUP".equals(nav.path("kind").asText())?"MENU_GROUP":"MENU").put("menuKey",key).put("pageIndex",index)
@@ -194,6 +194,14 @@ public class FunctionalMenuService {
         if(job.path("snapshot").has("webStructure"))job.set("webStructure",job.path("snapshot").path("webStructure"));
         job.remove(List.of("snapshot","documentDigest"));response.set("job",job);return response;
     }
+    public JsonNode authentication(UUID id,long member,UUID job){
+        var value=stored(id,member,job);
+        var result=AuthenticationTcContext.detect(mapper,value.path("snapshot"),value.path("output").path("rows"));
+        if(!value.hasNonNull("crawlJobId"))return result;
+        var methods=jdbc.query("SELECT setup_snapshot->>'loginMethod' FROM playwright_crawl_jobs WHERE job_id=? AND submission_id=? AND member_id=? AND status='COMPLETED' AND purpose='CRAWL'",(rs,n)->rs.getString(1),UUID.fromString(value.path("crawlJobId").asText()),id,member);
+        if(methods.stream().anyMatch(method->Set.of("FORM_AUTO","BASIC_AUTH").contains(method==null?"":method)))result.put("required",true).put("verifiedCrawlAuthentication",true);
+        return result;
+    }
     public JsonNode prompt(UUID id,long member,UUID job){var stored=stored(id,member,job);return new SelfLlmMenuContract(mapper).describe(job,stored.path("snapshot"));}
     public ObjectNode imported(UUID id,long member,UUID job,int revision,JsonNode rows,String requestId){
         boolean numbered=false;if(rows.isArray())for(var row:rows)if(row.has("evidenceRefIds"))numbered=true;
@@ -204,6 +212,7 @@ public class FunctionalMenuService {
     public ObjectNode imported(UUID id,long member,UUID job,int revision,JsonNode rows){var old=stored(id,member,job);
         if("GENERATING".equals(old.path("status").asText()))throw error(HttpStatus.CONFLICT,"MENU_RUNNING","생성이 끝난 뒤 가져오세요.");
         ArrayNode validated=validator.validate(ensureMenus(rows,old.path("snapshot")),old.path("snapshot"),null);ObjectNode output=mapper.createObjectNode().put("schemaVersion",VERSION).put("rulesVersion",VERSION).put("generationMode","EXTERNAL");output.set("rows",validated);
+        output.set("coverageReport",new SelfLlmMenuContract(mapper).coverage(old.path("snapshot"),validated));
         if(jdbc.update("UPDATE functional_menu_jobs SET status='DRAFT',generation_mode='EXTERNAL',output=?::jsonb,revision=revision+1,error_code=NULL,updated_at=now() WHERE job_id=? AND revision=? AND status<>'GENERATING'",output.toString(),job,revision)!=1)throw error(HttpStatus.CONFLICT,"MENU_REVISION_CONFLICT","다른 변경이 있습니다. 다시 조회하세요.");return status(id,member,job);}
     public ObjectNode edit(UUID id,long member,UUID job,int revision,JsonNode rows,boolean approve){
         owner(id,member);
@@ -215,6 +224,7 @@ public class FunctionalMenuService {
             ArrayNode valid=validator.validate(rows,old.path("snapshot"),old.path("output").path("rows"));
             if(approve&&java.util.stream.StreamSupport.stream(valid.spliterator(),false).noneMatch(row->row.path("included").asBoolean()))throw error(HttpStatus.BAD_REQUEST,"MENU_EMPTY","한 개 이상의 기능을 포함하세요.");
             ObjectNode output=old.path("output").deepCopy();output.set("rows",valid);
+            output.set("coverageReport",new SelfLlmMenuContract(mapper).coverage(old.path("snapshot"),valid));
             if(jdbc.update("UPDATE functional_menu_jobs SET status=?,output=?::jsonb,revision=revision+1,updated_at=now() WHERE job_id=? AND revision=? AND status IN ('DRAFT','APPROVED')",approve?"APPROVED":"DRAFT",output.toString(),job,revision)!=1)throw error(HttpStatus.CONFLICT,"MENU_REVISION_CONFLICT","다른 변경이 있습니다. 다시 조회하세요.");return null;});return status(id,member,job);
     }
     public void cancel(UUID id,long member,UUID job){stored(id,member,job);jdbc.update("UPDATE functional_menu_jobs SET status='CANCELED',updated_at=now() WHERE job_id=? AND status='GENERATING'",job);var future=tasks.remove(job);if(future!=null)future.cancel(true);}

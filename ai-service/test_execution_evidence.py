@@ -2,6 +2,18 @@ import unittest
 from execution_evidence import Condition, assess, gate
 
 class EvidenceTest(unittest.TestCase):
+    def test_planner_history_preserves_failure_without_repeating_unchanged_pages(self):
+        from execution_contract import planner_history
+        text='unchanged\n'*1000
+        source=[{'id':'first','kind':'BROWSER_ACTIONS','records':[{'status':'COMPLETED','beforeText':text+'저장 전','text':text+'저장 실패','isNavigation':False}]}]
+        history=planner_history(source)
+        self.assertIn('저장 실패',history[0]['records'][0]['observedChanges'])
+        self.assertLess(len(str(history)),1000)
+        self.assertIn('저장 실패',source[0]['records'][0]['text'])
+    def test_positive_literal_cannot_be_compiled_as_absence(self):
+        from execution_contract import compiled_conditions
+        condition=Condition(requirementQuote='성공',method='TEXT_ABSENT',expected='성공')
+        self.assertEqual('TEXT_PRESENT',compiled_conditions({'expectedResult':'성공'},[condition])[0].method)
     def evidence(self,final='성공',action=True):
         return [{'id':'before','kind':'BROWSER_OBSERVATION','text':'시험 화면'}, {'id':'action','kind':'BROWSER_ACTIONS','records':[{'action':'click','status':'COMPLETED'}] if action else []}, {'id':'after','kind':'BROWSER_OBSERVATION','text':final}]
     def verdict(self,tc,conditions,evidence,scope='YES',coverage='COMPLETE'):
@@ -20,6 +32,12 @@ class EvidenceTest(unittest.TestCase):
           ({'expectedResult':'성공'},[],self.evidence(),'YES','COMPLETE')]
         for tc,checks,observed,scope,coverage in scenarios:
             with self.subTest(tc=tc,scope=scope,coverage=coverage):self.assertIsNone(self.verdict(tc,checks,observed,scope,coverage)['result'])
+    def test_whole_requirement_quote_does_not_turn_one_word_into_full_coverage(self):
+        tc={'expectedResult':'성공 그리고 취소가 정상적으로 동작함'}
+        condition=Condition(requirementQuote=tc['expectedResult'],method='TEXT_PRESENT',expected='성공')
+        self.assertIsNone(self.verdict(tc,[condition],self.evidence())['result'])
+        condition=Condition(requirementQuote=tc['expectedResult'],method='TEXT_ABSENT',expected='취소가 정상적으로 동작함')
+        self.assertIsNone(self.verdict(tc,[condition],self.evidence())['result'])
     def test_save_toast_does_not_prove_persistence(self):
         tc={'expectedResult':'성공','scenario':'데이터 저장 후 재조회'}
         c=[Condition(requirementQuote='성공',method='TEXT_PRESENT',expected='성공')]

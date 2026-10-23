@@ -1,17 +1,23 @@
 # dev5 — 로컬 Qwen + Jev 실행 프로토타입
 
+2026-10-22 단계 간 연결·배포 수정 및 실제 준비 화면 검증은 [연결 점검](PIPELINE_AUDIT_2026-10-22.md)을 참고한다. 현재 서버의 653개 TC와 이전 검증 Excel의 671개 TC는 별도 자료다.
+
 최신 우선순위·완료 기준은 [개발 계획](DEVELOPMENT_PLAN.md)을 따른다. 속도보다 충분한 수행과 F→P 오판 방지를 우선하며, 사전 필요 파일·폴더 업로드는 후속 보관 항목이다. 아래 구현 설명과 개선 계획을 구분한다.
 
 ## 흐름
 
+최신 수행 계약: 메뉴 이동은 crawler가 탐색으로 표시하며 실제 시험 조작으로 세지 않는다. 계획은 최대 12회/TC 900초이며, 실제 동작과 명시적 FINISH 이후에만 판정한다. 기대 결과의 설명형 문장은 요구별 SEMANTIC 조건으로 변환한다. 화면은 네트워크·본문 안정·로딩 종료를 기다린다. 고정 progressbar는 로딩이 아니다. 파일 공급/공통 시험은 미수행으로 분리한다. 증거는 V25 별도 테이블과 회원 소유권 검사 상세 API를 사용한다. 접속 설정이 준비 이후 바뀌면 재준비가 필요하다.
+
+05의 Test connection 팝업에서 `로그인 필요`를 선택하면 일반 로그인 또는 Basic 인증의 아이디·비밀번호를 입력해 LOGIN 검사를 수행한다. 같은 사이트의 기존 설정을 불러오고, 저장된 비밀번호는 재입력 없이 재사용할 수 있다. 로그인 성공 근거가 없는 HTTP 200은 로그인 성공으로 표시하지 않는다. 미선택 시 CONNECTION 접속 검사만 수행한다. 성공한 설정만 저장하며 실제 TC 실행에서 같은 설정과 암호화된 비밀번호를 사용한다. 실패 시 기존 설정을 덮지 않는다. 실제 NeoFlow 계정 로그인·저장과 비밀번호 미노출을 확인했고 TC 자체는 이 검사에서 실행하지 않았다.
+
 TC 선택 → 실행 snapshot → 대기 작업 claim → 기능별 문서 구간·화면 관찰 → 로컬 Qwen 계획 → Playwright 수행 → Jev 판정 → 실행 이력 저장.
 
-- Qwen: Ollama `qwen3:4b`, JSON schema로 제한된 조작 배치 생성. 외부 생성형 LLM fallback 없음.
+- Qwen: Ollama `qwen3:8b`, JSON schema로 제한된 조작 배치 생성. 외부 생성형 LLM fallback 없음.
 - Playwright: 실제 관찰된 요소 ID만 클릭·입력·선택. 관찰된 같은 출처 링크로 이동. 임의 JS·명령 실행·임의 파일 경로 불허.
 - Jev: 실제 화면 텍스트·수행 기록과 TC를 비교. P/F/N_A/INSUFFICIENT 중 선택. 기본 confidence 0.9 미만은 미판정 유지. confidence는 실측 정확도 수치가 아님.
 - Jev는 기존과 같이 외부 TypeSafe API를 사용한다. 전체 구성이 완전한 오프라인 실행은 아니다. 계정 비밀번호는 Qwen/Jev에 전달하지 않는다.
 
-Qwen에 화면 변경마다 호출하지 않는다. NAVIGATE 배치가 필요한 때만 다음 화면으로 재계획하며, TEST 배치가 끝나면 프로그램이 바로 증거 판정으로 넘긴다. 최대 4배치·배치당 8조작으로 제한한다. 기대 결과를 얻으려고 같은 제출을 반복하도록 맡기지 않는다.
+화면 변경 이벤트마다 Qwen을 호출하지 않는다. 조작 배치 뒤 관찰로 다음 절차를 계획하며 실제 시험 동작과 명시적 FINISH 뒤 판정한다. 최대 12배치·배치당 8조작, 계획 호출 600초·TC 전체 900초로 제한한다. 기대 결과를 얻으려고 같은 제출을 반복하도록 맡기지 않는다. 실제 sample3에서는 과도한 입력과 반복 메뉴 탐색 때문에 시간 한도에 걸렸다. [실물 흐름 보고서](SAMPLE3_E2E_2026-10-22.md)의 결과를 프로토타입 성공 범위와 구분한다.
 
 ## 구현 위치
 
@@ -92,8 +98,16 @@ Qwen에 화면 변경마다 호출하지 않는다. NAVIGATE 배치가 필요한
 
 ## 반영 조건
 
+### 소요 시간·현재 단계·미완료 이어가기
+
+05는 실행 대기, 브라우저 접속, Qwen 계획, Playwright 조작, 재조회, Jev 판정 단계를 표시한다. 내부 progress API는 토큰·run·attempt·RUNNING 상태를 검사하며 중단/이전 시도의 갱신을 거절한다. 종료 시각을 고정하여 나중에 사용자 검토를 저장해도 소요 시간이 늘어나지 않는다. 상태 표시의 일시적 전송 실패는 결과를 버리는 사유로 쓰지 않는다.
+
+`POST .../executions/{run}/resume`은 종료된 실행에서 미완료 브라우저 TC만 골라 새 PREPARED 실행을 만든다. 기존 결과·증거·판정 수정 이력을 보존하고 원본 실행을 연결한다. 완료된 미판정은 자동 재수행하지 않으며 검토/선택 재시험을 사용한다. 공통·문서 시험은 실행 방식 보완 대상이다. 데이터 변경 허용 시 중단 당시 현재 TC와 오류/정보 부족 TC는 반영 여부가 불확실하므로 자동 반복하지 않고 resumeNeedsReview에 남긴다. 남은 TC 준비 뒤 실행 요청으로 시작한다.
+
+02의 화면 이어서 수집 계약은 REMOTE_CRAWL_AGENT.md를 따른다. 실제 브라우저의 화면 수 한도 중단→재개, 격리 DB의 캡처·TC 결과 보존과 이전 claim/attempt 거절, 실시간 시계·종료 고정·모바일 표시를 검증했다. 원격 실행기의 재개 capability를 확인하며 구형 실행기는 업데이트 안내와 함께 거절한다. 운영 배포는 별도다.
+
 운영 V24 적용 전 DB 백업. TMS bootJar와 crawler 재빌드·재시작, AI source mount를 현재 dev5 작업 폴더로 맞춘 뒤 재시작 필요. 현재 실행 중 서비스에 자동 반영했다고 가정하면 안 된다. 운영 컨테이너 반영은 별도 승인 후 수행한다.
 
 위 절차에 따른 2026-10-22 서버 반영은 완료됐다. 다음 변경을 반영할 때도 소스·실행 경로·이미지·마이그레이션을 별도로 확인한다. 개발 계획에 적힌 미구현 항목까지 배포됐다는 의미는 아니다.
 
-환경 선택: `EXECUTION_QWEN_MODEL` 기본 qwen3:4b, `OLLAMA_BASE_URL`, `CRAWLER_SERVICE_URL`, `MANAGEMENT_SERVICE_URL`, `TYPESAFE_API_KEY`, `PRODUCT_DESCRIPTION_INTERNAL_TOKEN`. `EXECUTION_JEV_MIN_CONFIDENCE` 기본 .9. 테스트에서는 `execution.worker.enabled=false`로 scheduler를 막고 동기 워커 저장 검증을 별도로 수행한다.
+환경 선택: `EXECUTION_QWEN_MODEL` 기본 qwen3:8b, `OLLAMA_BASE_URL`, `CRAWLER_SERVICE_URL`, `MANAGEMENT_SERVICE_URL`, `TYPESAFE_API_KEY`, `PRODUCT_DESCRIPTION_INTERNAL_TOKEN`. `EXECUTION_JEV_MIN_CONFIDENCE` 기본 .9. 테스트에서는 `execution.worker.enabled=false`로 scheduler를 막고 동기 워커 저장 검증을 별도로 수행한다.

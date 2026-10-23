@@ -3,6 +3,7 @@ import math
 import re
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
+from execution_profiles import verified_read_check
 
 class Condition(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -10,9 +11,14 @@ class Condition(BaseModel):
     method: Literal['TEXT_PRESENT', 'TEXT_ABSENT', 'SEMANTIC', 'VALUE_AFTER_RELOAD', 'DOWNLOAD_TEXT']
     expected: str = Field(min_length=1, max_length=1000)
 
+def semantic_requirement(text):
+    return bool(re.search(r'동작|기능|제공|표시|명확|목적|제약|여부|정보|취소되|업로드 되|정상적으로|한다|된다|됨$|함$|그리고| 및 ',text))
+
 def assess(tc, conditions, evidence):
     expected = tc.get('expectedResult') or ''
     coverage = [not ch.isalnum() for ch in expected]
+    for connector in re.finditer(r'\s+(?:그리고|및|또한)\s+',expected):
+        for position in range(connector.start(),connector.end()):coverage[position]=True
     observations = [e for e in evidence if e.get('kind') == 'BROWSER_OBSERVATION']
     actions = [r for e in evidence if e.get('kind') == 'BROWSER_ACTIONS' for r in e.get('records', [])]
     final = observations[-1] if observations else {}
@@ -24,7 +30,7 @@ def assess(tc, conditions, evidence):
         c = condition.model_dump() if isinstance(condition, Condition) else condition
         quote, value, method = c['requirementQuote'], c['expected'], c['method']
         start = expected.find(quote)
-        grounded = start >= 0
+        grounded = start >= 0 and not (method in ('TEXT_PRESENT','TEXT_ABSENT') and (semantic_requirement(quote) or value != quote))
         if grounded:
             for j in range(start, start + len(quote)): coverage[j] = True
         # Concrete values must come from TC expected text or supplied input, never a model invention.
@@ -32,7 +38,7 @@ def assess(tc, conditions, evidence):
         outcome = 'UNKNOWN'; ids = []
         if grounded and (value_grounded or method == 'SEMANTIC'):
             if method in ('TEXT_PRESENT', 'TEXT_ABSENT') and final:
-                matched = value in final.get('text', '')
+                matched = value in (final.get('mainText', '') if verified_read_check(tc,evidence) else final.get('text', ''))
                 outcome = 'PASS' if matched == (method == 'TEXT_PRESENT') else 'FAIL'
                 ids = [final['id']]
             elif method == 'VALUE_AFTER_RELOAD' and rechecks:
@@ -49,7 +55,7 @@ def assess(tc, conditions, evidence):
                     ids = [e['id'] for e in evidence if e.get('downloads')]
         results.append({'conditionId': f'C{i+1}', **c, 'grounded': grounded and (value_grounded or method == 'SEMANTIC'), 'outcome': outcome, 'evidenceIds': ids})
     return {'conditions': results, 'completeRequirementCoverage': bool(expected.strip()) and bool(results) and all(coverage),
-            'performed': any(r.get('status') == 'COMPLETED' and r.get('action') != 'wait' for r in actions),
+            'performed': verified_read_check(tc,evidence) or any(r.get('status') == 'COMPLETED' and r.get('action') != 'wait' and not r.get('isNavigation',False) for r in actions) or bool(downloads),
             'actionError': any(r.get('status') == 'ERROR' for r in actions),
             'requiresPersistence': bool(re.search(r'재조회|반영|실제.*저장|저장된|삭제된|저장.*데이터|데이터.*저장', tc.get('scenario') or '')) or (tc.get('ruleId') == 'FEATURE-01' and bool(re.search(r'저장|등록|삭제|수정|생성|편집|적용|업로드', tc.get('scopeDescription') or ''))),
             'hasPersistenceEvidence': any(c['method'] == 'VALUE_AFTER_RELOAD' and c['outcome'] == 'PASS' for c in results)}

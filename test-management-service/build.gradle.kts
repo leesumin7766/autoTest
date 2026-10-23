@@ -1,3 +1,5 @@
+import java.util.zip.ZipFile
+
 // Inherit from root
 dependencies {
     implementation(project(":common-lib"))
@@ -29,6 +31,28 @@ tasks.test {
 
 tasks.processResources {
     from(rootProject.file("frontend/public/downloads/menu-tree-common-rules.md")) { into("menu-templates") }
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    doLast {
+        val required = listOf(
+            "com/autotest/test_management_service/presentation/controller/MenuTcController.class",
+            "com/autotest/test_management_service/application/testcase/MenuTcService.class",
+            "com/autotest/test_management_service/application/testcase/MenuTcGenerator.class",
+            "com/autotest/test_management_service/application/testcase/UploadedMenuService.class",
+            "com/autotest/test_management_service/presentation/controller/TestExecutionController.class",
+            "com/autotest/test_management_service/presentation/controller/TestExecutionInternalController.class",
+            "com/autotest/test_management_service/application/testcase/ExecutionReadinessService.class",
+            "com/autotest/test_management_service/application/testcase/TestExecutionWorker.class",
+            "com/autotest/test_management_service/application/testcase/ExecutionReviewService.class",
+            "tc-templates/menu-tc-v1.json"
+        )
+        ZipFile(archiveFile.get().asFile).use { jar ->
+            check(required.all { jar.getEntry("BOOT-INF/classes/$it") != null }) {
+                "TC 업로드·생성 API 또는 템플릿이 실행 JAR에서 누락되었습니다."
+            }
+        }
+    }
 }
 
 tasks.register<JavaExec>("generateMenuTcSamples") {

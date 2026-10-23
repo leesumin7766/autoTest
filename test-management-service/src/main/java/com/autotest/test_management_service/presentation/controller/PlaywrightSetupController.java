@@ -22,19 +22,25 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class PlaywrightSetupController {
     private final PlaywrightSetupService service;
-    public record SetupResponse(PlaywrightSetupService.SetupView setup) { }
+    public record SetupResponse(PlaywrightSetupService.SetupView setup,String configVersion) { }
+
+    @GetMapping("/tls-policy")
+    public ResponseEntity<?> tlsPolicy(@PathVariable UUID submissionId,@RequestHeader("X-Member-Id")long memberId,
+            @org.springframework.web.bind.annotation.RequestParam String targetUrl){
+        return ResponseEntity.ok().header("Cache-Control","no-store").body(Map.of("ignoreHTTPSErrors",service.trustedTargetCertificate(submissionId,memberId,targetUrl)));
+    }
 
     @GetMapping
     public ResponseEntity<SetupResponse> get(@PathVariable UUID submissionId, @RequestHeader("X-Member-Id") long memberId) {
         return ResponseEntity.ok().header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(new SetupResponse(service.get(submissionId, memberId)));
+                .body(new SetupResponse(service.get(submissionId, memberId),service.configurationVersion(submissionId,memberId)));
     }
 
     @PutMapping
     public ResponseEntity<SetupResponse> save(@PathVariable UUID submissionId, @RequestHeader("X-Member-Id") long memberId,
             @RequestBody PlaywrightSetupService.SetupRequest request) {
         return ResponseEntity.ok().header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(new SetupResponse(service.save(submissionId, memberId, request)));
+                .body(new SetupResponse(service.save(submissionId, memberId, request),service.configurationVersion(submissionId,memberId)));
     }
 
     @ExceptionHandler(ProductDescriptionException.class)

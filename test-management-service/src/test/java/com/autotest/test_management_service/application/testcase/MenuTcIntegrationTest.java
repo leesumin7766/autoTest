@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties={"execution.worker.enabled=false","s3.enabled=false","s3.access-key=test","s3.secret-key=test","playwright.credentials-key-file=./build/test-playwright/credentials.key"})
+@SpringBootTest(properties={"execution.worker.enabled=false","product-description.internal-token=test-token","s3.enabled=false","s3.access-key=test","s3.secret-key=test","playwright.credentials-key-file=./build/test-playwright/credentials.key"})
 @AutoConfigureMockMvc
 @Transactional
 class MenuTcIntegrationTest {
@@ -29,6 +29,10 @@ class MenuTcIntegrationTest {
             if(!URI.create(url.substring(5)).getPath().endsWith("_test"))throw new IllegalStateException("An isolated *_test database is required");
             return url;
         });
+    }
+    @org.springframework.test.context.bean.override.mockito.MockitoBean ExecutionReadinessService readiness;
+    @org.junit.jupiter.api.BeforeEach void readyRuntime(){
+        org.mockito.Mockito.when(readiness.status()).thenReturn(new ObjectMapper().createObjectNode().put("executorConnected",true).put("judgeConnected",true));
     }
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
@@ -62,6 +66,27 @@ class MenuTcIntegrationTest {
         mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(Map.of("menuJobId",uploadedJob))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.set.output.caseCount").value(77));
+        // Real XLSX upload -> persisted selectable menu -> generated TC -> downloadable workbook.
+        byte[] menuExcel;
+        try(var book=new org.apache.poi.xssf.usermodel.XSSFWorkbook();var bytes=new java.io.ByteArrayOutputStream()){
+            var sheet=book.createSheet("메뉴트리");var header=sheet.createRow(0);String[] labels={"1depth","2depth","3depth","4depth","5depth","메뉴 설명"};
+            for(int i=0;i<labels.length;i++)header.createCell(i).setCellValue(labels[i]);
+            var row=sheet.createRow(1);String[] values={"업로드 검증 제품","관리","사용자 관리","","사용자 조회","사용자를 조회하는 기능"};for(int i=0;i<values.length;i++)row.createCell(i).setCellValue(values[i]);book.write(bytes);menuExcel=bytes.toByteArray();
+        }
+        var xlsx=new org.springframework.mock.web.MockMultipartFile("file","메뉴트리.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",menuExcel);
+        var excelUpload=mapper.readTree(mvc.perform(multipart(uploadUrl).file(xlsx).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.job.status").value("APPROVED")).andReturn().getResponse().getContentAsByteArray());
+        String excelMenu=excelUpload.path("job").path("jobId").asText();
+        mvc.perform(get("/api/submissions/"+submission+"/functional-menu").param("job",excelMenu).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.job.output.rows[0].functionName").value("사용자 조회"));
+        var excelSet=mapper.readTree(mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("menuJobId",excelMenu)))).andExpect(status().isOk()).andExpect(jsonPath("$.set.output.caseCount").value(77)).andReturn().getResponse().getContentAsByteArray());
+        mvc.perform(get(base+"/"+excelSet.path("set").path("setId").asText()+"/download").header("X-Member-Id",member)).andExpect(status().isOk());
+        // Authentication is generated even when absent from the approved sidebar features.
+        jdbc.update("UPDATE functional_menu_jobs SET snapshot=?::jsonb WHERE job_id=?", "{\"warnings\":[],\"evidence\":[{\"id\":\"doc:auth\",\"kind\":\"DOCUMENT\",\"text\":\"아이디와 비밀번호로 로그인합니다. 비밀번호 5회 실패 시 계정 잠금\"}]}",menu);
+        var authenticationSet=mapper.readTree(mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("menuJobId",menu))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.set.output.caseCount").value(104))
+                .andExpect(jsonPath("$.set.output.testCases[0].ruleId").value("LOGIN-04"))
+                .andExpect(jsonPath("$.set.output.source.authentication.failedAttemptLimit").value(5)).andReturn().getResponse().getContentAsByteArray());
+        mvc.perform(get(base+"/"+authenticationSet.path("set").path("setId").asText()+"/download").header("X-Member-Id",member)).andExpect(status().isOk());
+        jdbc.update("UPDATE functional_menu_jobs SET snapshot='{\"warnings\":[],\"evidence\":[]}'::jsonb WHERE job_id=?",menu);
         jdbc.update("DELETE FROM menu_tc_sets WHERE submission_id=?",submission);
         String payload=mapper.writeValueAsString(Map.of("menuJobId",menu,"featureTypes",Map.of("feature","부가기능")));
         var first=mapper.readTree(mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(payload)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
@@ -82,9 +107,21 @@ class MenuTcIntegrationTest {
         String run=execution.path("run").path("runId").asText();
         var snapshot=execution.path("run").path("snapshot");assertEquals(77,snapshot.path("items").size());
         assertEquals(4,snapshot.path("groups").size());
-        for(var item:snapshot.path("items")){assertTrue(item.path("result").isNull());assertEquals("PENDING",item.path("executionStatus").asText());assertTrue(item.path("evidence").isEmpty());}
+        for(var item:snapshot.path("items")){assertTrue(item.path("result").isNull());assertEquals(item.path("tc").path("featureId").asText().startsWith("scope:")?"NEEDS_CONTEXT":"PENDING",item.path("executionStatus").asText());assertTrue(item.path("evidence").isEmpty());}
         mvc.perform(get(executionBase).param("run",run).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.snapshot.caseCount").value(77));
         mvc.perform(get(executionBase).param("run",run).header("X-Member-Id",member+1)).andExpect(status().isForbidden());
+        org.mockito.Mockito.doThrow(new com.autotest.test_management_service.application.productdescription.ProductDescriptionException(
+                org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"EXECUTION_NOT_READY","실행기 준비 필요")).when(readiness).requireReady();
+        mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("EXECUTION_NOT_READY"));
+        assertEquals("PREPARED",executions.status(submission,member,UUID.fromString(run)).path("run").path("status").asText());
+        org.mockito.Mockito.doNothing().when(readiness).requireReady();
+        mvc.perform(put("/api/submissions/"+submission+"/playwright-setup").header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetUrl\":\"https://other.example.com\",\"loginMethod\":\"NONE\",\"testEnvironmentConfirmed\":true}"))
+                .andExpect(status().isOk());
+        mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EXECUTION_LOGIN_SETUP_MISMATCH"));
+        mvc.perform(put("/api/submissions/"+submission+"/playwright-setup").header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content("{\"targetUrl\":\"https://example.com\",\"loginMethod\":\"NONE\",\"testEnvironmentConfirmed\":true}")).andExpect(status().isOk());
+        mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EXECUTION_LOGIN_SETUP_CHANGED"));
+        jdbc.update("DELETE FROM playwright_crawl_setups WHERE submission_id=?",submission);
         mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.status").value("WAITING_EXECUTOR"));
         mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isOk());
         var other=mapper.readTree(mvc.perform(post(executionBase).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(prepare)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
@@ -92,9 +129,41 @@ class MenuTcIntegrationTest {
         mvc.perform(post(executionBase+"/"+otherRun+"/start").header("X-Member-Id",member)).andExpect(status().isConflict());
         mvc.perform(post(executionBase+"/"+run+"/cancel").header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.status").value("CANCELED"));
         mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isConflict());
+        String commonId="";for(var item:snapshot.path("items"))if(item.path("tc").path("featureId").asText().startsWith("scope:")){commonId=item.path("caseId").asText();break;}
+        var common=executions.prepare(submission,member,UUID.fromString(set),"https://example.com","",List.of(commonId),false).path("run");
+        assertEquals(1,common.path("notExecutedCount").asInt());
+        mvc.perform(post(executionBase+"/"+common.path("runId").asText()+"/start").header("X-Member-Id",member)).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EXECUTION_PREREQUISITES_REQUIRED"));
+        // Continue only unfinished function TCs; common/manual cases and completed verdicts stay preserved.
+        var oldSnapshot=(com.fasterxml.jackson.databind.node.ObjectNode)snapshot.deepCopy();
+        ((com.fasterxml.jackson.databind.node.ObjectNode)oldSnapshot.path("items").get(0)).put("executionStatus","COMPLETED").put("result","F");
+        jdbc.update("UPDATE test_execution_runs SET snapshot=?::jsonb WHERE run_id=?",oldSnapshot.toString(),UUID.fromString(run));
+        mvc.perform(post(executionBase+"/"+run+"/resume").header("X-Member-Id",member+1)).andExpect(status().isForbidden());
+        var continued=mapper.readTree(mvc.perform(post(executionBase+"/"+run+"/resume").header("X-Member-Id",member)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray()).path("run");
+        assertEquals(run,continued.path("snapshot").path("resumedFrom").asText());assertTrue(continued.path("snapshot").path("caseCount").asInt()<77);
+        for(var item:continued.path("snapshot").path("items")){assertNotEquals(oldSnapshot.path("items").get(0).path("caseId"),item.path("caseId"));assertFalse(item.path("tc").path("featureId").asText().startsWith("scope:"));}
+        assertEquals("F",executions.status(submission,member,UUID.fromString(run)).path("run").path("snapshot").path("items").get(0).path("result").asText());
+        oldSnapshot.put("allowMutation",true).put("currentCaseId",oldSnapshot.path("items").get(1).path("caseId").asText());
+        jdbc.update("UPDATE test_execution_runs SET snapshot=?::jsonb WHERE run_id=?",oldSnapshot.toString(),UUID.fromString(run));
+        var safeContinuation=mapper.readTree(mvc.perform(post(executionBase+"/"+run+"/resume").header("X-Member-Id",member)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray()).path("run").path("snapshot");
+        assertEquals(1,safeContinuation.path("resumeNeedsReview").size());assertEquals(1,safeContinuation.path("preservedCount").asInt());
+        for(var item:safeContinuation.path("items"))assertNotEquals(oldSnapshot.path("currentCaseId"),item.path("caseId"));
+        jdbc.update("UPDATE test_execution_runs SET snapshot=?::jsonb WHERE run_id=?",snapshot.toString(),UUID.fromString(run));
+        UUID progressAttempt=UUID.randomUUID();
+        jdbc.update("UPDATE test_execution_runs SET status='RUNNING',attempt=? WHERE run_id=?",progressAttempt,UUID.fromString(otherRun));
+        String progressBody=mapper.writeValueAsString(Map.of("attempt",progressAttempt,"stage","PLANNING","round",1));
+        String progressEndpoint="/api/internal/test-executions/"+otherRun+"/progress";
+        mvc.perform(post(progressEndpoint).header("X-Internal-Token","invalid").contentType(MediaType.APPLICATION_JSON).content(progressBody)).andExpect(status().isForbidden());
+        mvc.perform(post(progressEndpoint).header("X-Internal-Token","test-token").contentType(MediaType.APPLICATION_JSON).content(progressBody)).andExpect(status().isOk());
+        assertEquals("PLANNING",executions.status(submission,member,UUID.fromString(otherRun)).path("run").path("snapshot").path("progress").path("stage").asText());
+        jdbc.update("UPDATE test_execution_runs SET status='PREPARED',attempt=NULL WHERE run_id=?",UUID.fromString(otherRun));
+        mvc.perform(post(progressEndpoint).header("X-Internal-Token","test-token").contentType(MediaType.APPLICATION_JSON).content(progressBody)).andExpect(status().isConflict());
         // Exercise the actual persistence worker with a deterministic AI transport, separately from live model QA.
         var fakeAi=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+        var aiHttpStatus=new java.util.concurrent.atomic.AtomicInteger(200);
         fakeAi.createContext("/api/v1/test-executions/feature",exchange->{
+            // Uvicorn's HTTP/1 endpoint must not receive Java's default h2c upgrade.
+            if(exchange.getRequestHeaders().containsKey("Upgrade")){exchange.sendResponseHeaders(400,-1);exchange.close();return;}
+            if(aiHttpStatus.get()!=200){exchange.sendResponseHeaders(aiHttpStatus.get(),-1);exchange.close();return;}
             var body=mapper.readTree(exchange.getRequestBody());var answer=mapper.createObjectNode();var values=answer.putArray("items");
             body.path("cases").forEach(tc->{var item=values.addObject().put("caseId",tc.path("id").asText()).put("executionStatus","COMPLETED").put("judgmentStatus","COMPLETED").put("result","P").put("reason","격리된 워커 저장 검증").put("requirementCoverageComplete",true);item.putArray("conditionAssessments").addObject().put("conditionId","C1").put("outcome","PASS").put("grounded",true);});
             answer.putArray("evidence").addObject().put("id","fixture-observation").put("text","테스트 증거");answer.putArray("plans");
@@ -112,6 +181,10 @@ class MenuTcIntegrationTest {
             assertEquals("COMPLETED",finished.path("status").asText());assertEquals(1,finished.path("passCount").asInt());
             assertEquals("P",finished.path("snapshot").path("items").get(0).path("result").asText());
             assertTrue(finished.path("snapshot").path("groupResults").size()>0);
+            assertTrue(finished.path("snapshot").path("groupResults").get(0).path("evidence").isEmpty());
+            assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM test_execution_evidence WHERE run_id=?",Integer.class,workerRunId));
+            mvc.perform(get(executionBase+"/"+workerRunId+"/evidence").param("caseId",caseId).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.evidence[0].text").value("테스트 증거"));
+            mvc.perform(get(executionBase+"/"+workerRunId+"/evidence").param("caseId",caseId).header("X-Member-Id",member+1)).andExpect(status().isForbidden());
             // A stale worker attempt cannot be considered active after completion.
             UUID attempt=jdbc.queryForObject("SELECT attempt FROM test_execution_runs WHERE run_id=?",UUID.class,workerRunId);
             assertFalse(worker.active(workerRunId,attempt));
@@ -132,6 +205,26 @@ class MenuTcIntegrationTest {
             assertTrue(guarded.path("snapshot").path("items").get(0).path("reason").asText().contains("이전 실패"));
             assertEquals("F",executions.status(submission,member,workerRunId).path("run").path("snapshot").path("items").get(0).path("result").asText());
             var audits=executions.status(submission,member,workerRunId).path("run").path("snapshot").path("reviews");assertEquals(1,audits.size());assertEquals("P",audits.get(0).path("before").asText());
+            aiHttpStatus.set(422);
+            var rejected=executions.prepare(submission,member,UUID.fromString(set),"https://example.com","",List.of(caseId),false).path("run");
+            UUID rejectedId=UUID.fromString(rejected.path("runId").asText());executions.transition(submission,member,rejectedId,false);worker.processNext();
+            var rejectedResult=executions.status(submission,member,rejectedId).path("run");
+            assertEquals("FAILED",rejectedResult.path("status").asText());
+            assertEquals("EXECUTION_AI_REQUEST_REJECTED",rejectedResult.path("snapshot").path("errorCode").asText());
+            assertEquals(422,rejectedResult.path("snapshot").path("errorHttpStatus").asInt());
+            var traceRun=executions.prepare(submission,member,UUID.fromString(set),"https://example.com","",List.of(caseId),false).path("run");
+            UUID traceId=UUID.fromString(traceRun.path("runId").asText()),traceAttempt=UUID.randomUUID();
+            jdbc.update("UPDATE test_execution_runs SET status='RUNNING',attempt=?,snapshot=jsonb_set(snapshot,'{currentCaseId}',to_jsonb(?::text)) WHERE run_id=?",traceAttempt,caseId,traceId);
+            String progressUrl="/api/internal/test-executions/"+traceId+"/progress";
+            var trace=mapper.createObjectNode().put("attempt",traceAttempt.toString()).put("stage","ACTING").put("round",1).put("caseId",caseId);
+            trace.putArray("trace").addObject().put("planner","QWEN").put("decision","EXECUTE").put("explanation","관찰된 검색 버튼을 클릭");
+            mvc.perform(post(progressUrl).header("X-Internal-Token","test-token").contentType(MediaType.APPLICATION_JSON).content(trace.toString())).andExpect(status().isOk());
+            assertEquals("QWEN",executions.status(submission,member,traceId).path("run").path("snapshot").path("progress").path("trace").get(0).path("planner").asText());
+            trace.put("caseId","another-case");
+            mvc.perform(post(progressUrl).header("X-Internal-Token","test-token").contentType(MediaType.APPLICATION_JSON).content(trace.toString())).andExpect(status().isConflict());
+            trace.put("caseId",caseId).put("attempt",UUID.randomUUID().toString());
+            mvc.perform(post(progressUrl).header("X-Internal-Token","test-token").contentType(MediaType.APPLICATION_JSON).content(trace.toString())).andExpect(status().isConflict());
+            executions.transition(submission,member,traceId,true);
         } finally {worker.close();fakeAi.stop(0);}
         jdbc.update("UPDATE functional_menu_jobs SET revision=2 WHERE job_id=?",menu);
         mvc.perform(post(executionBase+"/"+otherRun+"/start").header("X-Member-Id",member)).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EXECUTION_SOURCE_CHANGED"));

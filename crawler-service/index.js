@@ -11,7 +11,7 @@ function internalAuth(req, res, next) {
   if (!expected.length || expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) return res.sendStatus(401);
   next();
 }
-require('./tc-execution').register(app, internalAuth, () => { if (localBusy) return false; localBusy = true; return true; }, () => { localBusy = false; });
+require('./tc-execution').register(app, internalAuth, () => { if (localBusy) return false; localBusy = true; return true; }, () => { localBusy = false; },()=>localBusy);
 app.post('/api/v1/browser-jobs', (req, res) => {
   const expected = Buffer.from(process.env.PRODUCT_DESCRIPTION_INTERNAL_TOKEN || '');
   const provided = Buffer.from(req.get('X-Internal-Token') || '');

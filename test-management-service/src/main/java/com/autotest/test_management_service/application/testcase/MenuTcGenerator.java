@@ -13,14 +13,14 @@ import org.springframework.http.HttpStatus;
 /** Deterministic expansion. Templates describe checks, never observed product behavior. */
 @Component
 public class MenuTcGenerator {
-    public static final String VERSION = "menu-tc-v1";
+    public static final String VERSION = "menu-tc-v2";
     private final ObjectMapper mapper;
     private final JsonNode bank;
     public MenuTcGenerator(ObjectMapper mapper) {
         this.mapper = mapper;
         try (var stream = getClass().getResourceAsStream("/tc-templates/menu-tc-v1.json")) {
             bank = mapper.readTree(Objects.requireNonNull(stream));
-            if (!VERSION.equals(bank.path("version").asText())) throw new IllegalStateException("TC template version mismatch");
+            if (!"menu-tc-v1".equals(bank.path("version").asText())) throw new IllegalStateException("TC template version mismatch");
         } catch (IOException failure) { throw new IllegalStateException("Cannot load TC templates", failure); }
     }
     public static String hash(String text) {
@@ -38,7 +38,7 @@ public class MenuTcGenerator {
         }
         String name = feature.path("functionName").asText().toLowerCase(Locale.ROOT);
         boolean history = name.matches(".*(기록|이력|조회|history|audit).*");
-        return !history && (name.contains("로그인") || name.contains("로그아웃") || name.equals("login") || name.equals("logout")) ? "로그인" : "주요기능";
+        return !history && (name.contains("로그인") || name.equals("login")) ? "로그인" : "주요기능";
     }
     public ObjectNode generate(String product, JsonNode features, JsonNode source) {
         if (product == null || product.isBlank() || product.length() > 160) throw invalid("TC_PRODUCT_REQUIRED", "제품명이 필요합니다.");
@@ -49,7 +49,9 @@ public class MenuTcGenerator {
         output.set("source", source.deepCopy());
         var cases = output.putArray("testCases"); var normalized = output.putArray("features");
         Set<String> ids = new HashSet<>(); int index = 0;
-        for (JsonNode feature : features) {
+        var ordered=new ArrayList<JsonNode>();features.forEach(ordered::add);
+        ordered.sort(Comparator.comparingInt(feature -> "로그인".equals(classify(feature)) ? 0 : 1));
+        for (JsonNode feature : ordered) {
             String id = feature.path("featureId").asText();
             if (id.isBlank() || !ids.add(id)) throw invalid("TC_FEATURE_ID_INVALID", "기능 ID가 비어 있거나 중복됩니다.");
             if (!feature.path("featurePath").isArray() || feature.path("featurePath").isEmpty() || feature.path("featurePath").size() > 5)
@@ -74,12 +76,14 @@ public class MenuTcGenerator {
             summary.put(type, count);
         }
         summary.put("commonCaseCount", 68);
-        output.put("inputDigest", hash(mapper.createObjectNode().put("product", product).set("features", normalized).toString() + source + output.path("templateDigest")));
+        output.put("inputDigest", hash(VERSION + mapper.createObjectNode().put("product", product).set("features", normalized).toString() + source + output.path("templateDigest")));
         return output;
     }
     private void expand(ArrayNode cases, JsonNode feature, String group, int groupIndex, String type, JsonNode source) {
         int local = 0;
-        for (JsonNode template : bank.path("groups").path(group)) {
+        var templates=new ArrayList<JsonNode>();bank.path("groups").path(group).forEach(templates::add);
+        if(group.equals("LOGIN"))templates.sort(Comparator.comparingInt(t -> "LOGIN-04".equals(t.path("ruleId").asText()) ? 0 : 1));
+        for (JsonNode template : templates) {
             String rule = template.path("ruleId").asText(); String scope = feature.path("featureId").asText();
             String scenario = template.path("scenario").asText();
             local++;
@@ -107,6 +111,25 @@ public class MenuTcGenerator {
             plan.set("menuKeys", feature.path("matchedMenuKeys").isArray() ? feature.path("matchedMenuKeys").deepCopy() : mapper.createArrayNode());
             plan.putArray("steps").add("기능 경로와 대상 화면을 확인한다.").add(scenario).add("기대 결과와 실제 동작·증거를 비교한다.");
             plan.putArray("requiredContext").add("접속·인증 정보").add("시험 계정·권한·데이터").add("적용 조건·입력 제약").add("화면 요소·관찰 가능한 판정 기준");
+            if(group.equals("LOGIN")&&(rule.equals("LOGIN-17")||rule.equals("LOGIN-18"))) {
+                var policy=source.path("authentication");
+                tc.set("authenticationPolicy",policy.deepCopy());
+                plan.withArray("requiredContext").add("잠금 시험 전용 계정과 잠금 해제·복구 절차 (운영 관리자 계정 사용 금지)");
+                var steps=mapper.createArrayNode().add("문서 근거와 시험 계정의 실제 잠금 정책을 확인한다.");
+                if(policy.has("failedAttemptLimit")) {
+                    int count=policy.path("failedAttemptLimit").asInt();
+                    tc.put("scenario",rule.equals("LOGIN-17")?"비밀번호 연속 "+count+"회 실패 시 문서에 명시된 로그인 제한이 적용되는지 확인":"로그인 제한 후 새 세션에서도 제한이 유지되는지 확인");
+                    tc.put("inputs","시험 전용 계정, 잘못된 비밀번호, 문서 기준 실패 횟수 "+count+"회");
+                    tc.put("expectedResult","문서의 잠금 조건과 해제 절차에 따라 접근이 제한된다. 화면 메시지만으로 성공 판정하지 않는다.");
+                    steps.add("새 시험 계정 상태에서 잘못된 비밀번호로 "+count+"회 시도하고 매회 결과를 기록한다.");
+                } else {
+                    steps.add("잠금 횟수가 확정되지 않으면 반복 시도를 수행하지 않고 정책 확인 대상으로 남긴다.");
+                    plan.withArray("requiredContext").add("문서에 근거한 실패 허용 횟수·잠금 조건");
+                }
+                steps.add("정상 비밀번호의 접근 제한과 새 세션의 상태를 관찰하고, 복구 절차로 계정을 복원한다.");
+                plan.set("steps",steps);
+                if(policy.path("evidence").isArray())tc.set("evidence",policy.path("evidence").deepCopy());
+            }
             tc.putArray("reviewNotes").add("공통 시험 기준에서 생성한 초안입니다. 시험 결과와 결함 예시는 별개입니다.")
                 .add(feature.path("classificationSource").asText().equals("SUGGESTED") ? "기능구분은 제안값입니다. 검토 후 생성하세요." : "실행 전 필요한 환경·입력·관찰 기준을 보완하세요.");
         }

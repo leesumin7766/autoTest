@@ -85,6 +85,20 @@ class PlaywrightSetupIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
     }
 
+    @Test void certificateApprovalMatchesMemberAndExactOriginAcrossDocumentSets() throws Exception {
+        UUID other=UUID.randomUUID();
+        jdbc.update("INSERT INTO submissions(submission_id,member_id,product_id,status,uploaded_at) VALUES(?,8101,1,'PARSED',now())",other);
+        jdbc.update("INSERT INTO playwright_crawl_jobs(job_id,submission_id,member_id,status,setup_snapshot,document_digest,execution_mode,purpose) VALUES(?,?,8101,'COMPLETED',?::jsonb,'test','LOCAL','CONNECTION')",
+                UUID.randomUUID(),other,"{\"targetUrl\":\"https://trusted.example/login\",\"automation\":{\"ignoreHTTPSErrors\":true}}");
+        String policy=endpoint+"/tls-policy";
+        mvc.perform(get(policy).param("targetUrl","https://trusted.example/").header("X-Member-Id",8101)).andExpect(status().isOk()).andExpect(jsonPath("$.ignoreHTTPSErrors").value(true));
+        for(String target:List.of("https://trusted.example:8443/","http://trusted.example/","https://other.example/"))
+            mvc.perform(get(policy).param("targetUrl",target).header("X-Member-Id",8101)).andExpect(status().isOk()).andExpect(jsonPath("$.ignoreHTTPSErrors").value(false));
+        mvc.perform(get(policy).param("targetUrl","https://trusted.example/").header("X-Member-Id",8102)).andExpect(status().isForbidden());
+        var setup=request();setup.put("targetUrl","https://trusted.example/");((ObjectNode)setup.path("automation")).put("loginUrl","https://trusted.example/login").put("ignoreHTTPSErrors",false);save(setup);
+        mvc.perform(get(policy).param("targetUrl","https://trusted.example/").header("X-Member-Id",8101)).andExpect(status().isOk()).andExpect(jsonPath("$.ignoreHTTPSErrors").value(false));
+    }
+
     @Test void storesEncryptedCredentialReturnsOnlyFlagAndPreservesPasswordOnEdit() throws Exception {
         String response = save(request());
         assertFalse(response.contains("test-secret-password"));
@@ -93,10 +107,12 @@ class PlaywrightSetupIntegrationTest {
         assertNotEquals("test-secret-password", ciphertext);
         assertEquals("test-secret-password", cipher.decrypt(id, ciphertext));
         var edit = request(); edit.put("password", ""); edit.put("crawlScopeNotes", "dashboard");
+        ((ObjectNode)edit.path("automation")).put("ignoreHTTPSErrors",true);
         save(edit);
         assertEquals(ciphertext, jdbc.queryForObject("SELECT password_ciphertext FROM playwright_crawl_setups WHERE submission_id=?", String.class, id));
         mvc.perform(get(endpoint).header("X-Member-Id", "8101")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.setup.automation.productVersion").value("2.0"))
+                .andExpect(jsonPath("$.setup.automation.ignoreHTTPSErrors").value(true))
                 .andExpect(jsonPath("$.setup.password").doesNotExist())
                 .andExpect(jsonPath("$.setup.passwordConfigured").value(true));
         mvc.perform(get(endpoint).header("X-Member-Id", "8102")).andExpect(status().isForbidden());
@@ -211,6 +227,29 @@ class PlaywrightSetupIntegrationTest {
         assertEquals("COMPLETED",remote.status(id,8101).path("job").path("status").asText());
         assertNull(jdbc.queryForObject("SELECT password_ciphertext FROM playwright_crawl_jobs WHERE job_id=?",String.class,jobId));
         channel(agent,"event",page,409);
+        // Resume keeps original captures and credentials are reloaded, never recovered from old results.
+        jdbc.update("UPDATE playwright_crawl_jobs SET created_at=now()-interval '5 seconds' WHERE job_id=?",jobId);
+        String resumeEndpoint="/api/submissions/"+id+"/playwright-crawls/"+jobId+"/resume";
+        String resumeBody=mapper.writeValueAsString(java.util.Map.of("executionMode","REMOTE","agentId",agent.agent().agentId()));
+        mvc.perform(post(resumeEndpoint).header("X-Member-Id",8102).contentType(MediaType.APPLICATION_JSON).content(resumeBody)).andExpect(status().isForbidden());
+        var resumed=mapper.readTree(mvc.perform(post(resumeEndpoint).header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(resumeBody)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
+        assertEquals(1,resumed.path("job").path("pageCount").asInt());assertEquals(jobId.toString(),resumed.path("job").path("crawlResult").path("resumedFrom").asText());assertTrue(resumed.path("job").path("elapsedMs").asLong()>=4000);
+        var capabilities=mapper.createObjectNode();capabilities.putArray("capabilities").add("crawl-resume-v1");
+        var continuation=channel(agent,"claim",capabilities,200);assertEquals(1,continuation.path("resume").path("pages").size());
+        assertEquals(1,continuation.path("resume").path("pageCount").asInt());assertNotEquals(job.path("claimToken"),continuation.path("claimToken"));
+        channel(agent,"event",page,409);
+        var heartbeat=mapper.createObjectNode().put("event","heartbeat").put("jobId",continuation.path("jobId").asText()).put("claimToken",continuation.path("claimToken").asText());
+        heartbeat.putObject("progress").put("stage","LOADING").put("current","작업 → 목록").put("remaining",3);channel(agent,"event",heartbeat,200);
+        assertEquals("LOADING",remote.status(id,8101).path("job").path("crawlResult").path("progress").path("stage").asText());
+        page.put("jobId",continuation.path("jobId").asText()).put("claimToken",continuation.path("claimToken").asText()).put("pageIndex",1);channel(agent,"event",page,200);
+        assertEquals(2,remote.status(id,8101).path("job").path("pageCount").asInt());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM playwright_crawl_pages WHERE job_id=?",Integer.class,jobId));
+        complete.put("jobId",continuation.path("jobId").asText()).put("claimToken",continuation.path("claimToken").asText()).put("stopReason","DONE");channel(agent,"event",complete,200);
+        assertEquals(1,remote.status(id,8101).path("job").path("crawlResult").path("preservedCount").asInt());
+        assertFalse(remote.status(id,8101).path("job").path("resumeAvailable").asBoolean());
+        remote.resume(id,8101,jobId,agent.agent().agentId(),"REMOTE");
+        assertFalse(channel(agent,"claim",mapper.createObjectNode(),200).has("jobId"));
+        assertEquals("AGENT_UPDATE_REQUIRED",remote.status(id,8101).path("job").path("errorCode").asText());
     }
     @Test void workerCannotReplayRequestsUseOtherAgentOrFinishCanceledJob() throws Exception {
         saveCrawlSetup(); var agent=onlineAgent();remote.start(id,8101,agent.agent().agentId());

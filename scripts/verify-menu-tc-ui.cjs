@@ -7,7 +7,7 @@ const assert = require('node:assert/strict')
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
     const errors = []; page.on('pageerror', error => errors.push(error.message))
-    let set = null, generated = 0, failure = false, uploadStatus = 200, uploaded = false
+    let set = null, generated = 0, failure = false, uploadStatus = 200, uploaded = false, apiMissing = false
     const job = { jobId: 'menu-qa', productName: output.productName, revision: 1, status: 'APPROVED', stale: false, generationMode: 'REAL', sources: [], warnings: [], output: { rows: output.features.map(f => ({ rowId: f.featureId, included: true, functionName: f.functionName, menuPath: f.featurePath.slice(0, -1), menuDescription: f.description, featureType: f.featureType })) } }
     const menus = { job, history: [{ jobId: job.jobId, productName: job.productName, status: job.status }], crawls: [] }
     await page.route('**/api/**', async route => {
@@ -25,9 +25,10 @@ const assert = require('node:assert/strict')
         return json(uploaded ? { ...menus, job: { ...job, jobId: 'uploaded-menu', productName: '업로드한 제품' }, history: [...menus.history, { jobId: 'uploaded-menu', productName: '업로드한 제품', status: 'APPROVED' }] } : menus)
       }
       if (path.endsWith('/menu-test-cases')) {
+        if(apiMissing)return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({status:404,error:'Not Found'})})
         if (failure) return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ message: '검증용 오류: 원본이 변경되었습니다.' }) })
         if (request.method() === 'POST') {
-          generated++; const payload = request.postDataJSON(); assert.equal(payload.menuJobId, 'menu-qa'); assert.equal(Object.keys(payload.featureTypes).length, 133)
+          generated++; const payload = request.postDataJSON(); assert.equal(payload.menuJobId, uploaded ? 'uploaded-menu' : 'menu-qa'); assert.equal(Object.keys(payload.featureTypes).length, 133)
           set = { setId: 'tc-qa', stale: false, menuRevision: 1, output }
         }
         return json({ set, history: set ? [{ setId: 'tc-qa', menuRevision: 1, createdAt: '2026-10-21T00:00:00Z' }] : [] })
@@ -40,7 +41,7 @@ const assert = require('node:assert/strict')
     await page.getByRole('button', { name: '세트 조회', exact: true }).click()
     await page.getByRole('button', { name: '04 TC 생성', exact: true }).click()
     await page.getByRole('button', { name: 'TC 초안 생성', exact: true }).waitFor()
-    await page.getByText('133개 기능 · 예상 1,283개 TC', { exact: true }).waitFor()
+    await page.getByText('133개 기능 · 예상 1,283개 TC + 인증 보완 가능', { exact: true }).waitFor()
     await page.getByRole('button', { name: 'TC 초안 생성', exact: true }).click()
     await page.getByText('1,283개 생성 · 시험 미실행', { exact: true }).waitFor()
     assert.equal(generated, 1)
@@ -77,11 +78,20 @@ const assert = require('node:assert/strict')
     uploadStatus = 404
     await page.getByLabel('메뉴트리 파일 업로드').setInputFiles(file)
     await page.getByRole('alert').filter({ hasText: '현재 서버에 메뉴트리 업로드 API가 반영되지 않았습니다' }).waitFor()
-    uploadStatus = 200
+    uploadStatus = 200; apiMissing = true
     await page.getByLabel('메뉴트리 파일 업로드').setInputFiles(file)
     await page.getByText('검증-메뉴.json 업로드 완료', { exact: true }).waitFor()
     await page.getByText(/업로드한 제품 · 승인 완료 · 버전 1/).waitFor()
     assert.equal(await page.getByLabel('메뉴트리 선택').inputValue(), 'uploaded-menu')
+    await page.getByRole('alert').filter({hasText:'현재 서버에 TC 생성 API가 반영되지 않았습니다'}).waitFor()
+    assert(await page.getByRole('button',{name:'TC 초안 생성',exact:true}).isDisabled())
+    assert(!(await page.getByLabel('메뉴트리 선택').isDisabled()),'TC endpoint failure must not hide or disable an uploaded menu')
+    apiMissing=false
+    await page.getByRole('button',{name:'메뉴트리·TC 새로고침',exact:true}).click()
+    await page.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).find(button=>button.textContent==='TC 초안 생성')?.disabled)
+    await page.getByRole('button',{name:'TC 초안 생성',exact:true}).click()
+    await page.getByText('1,283개 생성 · 시험 미실행',{exact:true}).waitFor()
+    assert.equal(generated,2,'Uploaded menu must reach the actual TC generation request after API recovery')
     assert.deepEqual(errors, [])
     console.log('PASS: real generated sample preview, 133 feature assignments, 1283 case view, search/pagination/detail, state retention, Excel/JSON download, API error, stale-source guard and mobile layout.')
   } finally { await browser.close() }
