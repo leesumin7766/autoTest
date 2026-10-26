@@ -1,8 +1,9 @@
 package com.autotest.test_management_service.application.service;
 
 import java.io.IOException;
+import com.autotest.test_management_service.exception.TestManagementException;
+import static com.autotest.test_management_service.exception.TestManagementErrorCode.*;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.List;
 
@@ -89,10 +90,10 @@ public class SubmissionService {
         Submission submission = submissionPersistenceService.findById(submissionId)
                 .orElseThrow(() -> new IllegalArgumentException("Submission not found"));
         if (!submission.memberId().equals(memberId)) {
-            throw new IllegalArgumentException("Submission does not belong to the requested member");
+            throw new TestManagementException(FORBIDDEN);
         }
         if (submissionPersistenceService.hasDocumentForRole(submissionId, role)) {
-            throw new IllegalArgumentException("A file already exists for submission role: " + role);
+            throw new TestManagementException(DOCUMENT_ALREADY_EXISTS);
         }
 
         PreparedFile prepared = prepare(file);
@@ -127,7 +128,7 @@ public class SubmissionService {
         Submission submission = submissionPersistenceService.findById(submissionId)
                 .orElseThrow(() -> new IllegalArgumentException("Submission not found"));
         if (!submission.memberId().equals(memberId)) {
-            throw new IllegalArgumentException("Submission does not belong to the requested member");
+            throw new TestManagementException(FORBIDDEN);
         }
         SubmittedDocument failedDocument = submissionPersistenceService.findDocumentsBySubmissionId(submissionId)
                 .stream()
@@ -136,7 +137,7 @@ public class SubmissionService {
                 .orElseThrow(() -> new IllegalArgumentException("No document exists for submission role: " + role));
         if (failedDocument.status() != SubmissionStatus.FAILED
                 && !submissionPersistenceService.isAiDeliveryBlocked(submissionId)) {
-            throw new IllegalArgumentException("Only a failed or AI-blocked document can be replaced");
+            throw new TestManagementException(DOCUMENT_REPLACE_NOT_ALLOWED);
         }
 
         PreparedFile prepared = prepare(file);
@@ -180,15 +181,15 @@ public class SubmissionService {
 
     private PreparedFile prepare(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Submission file must not be empty");
+            throw new TestManagementException(DOCUMENT_EMPTY);
         }
         if (file.getSize() > MAX_FILE_SIZE_BYTES) {
-            throw new IllegalArgumentException("File size must not exceed 100 MiB");
+            throw new TestManagementException(DOCUMENT_TOO_LARGE);
         }
 
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isBlank()) {
-            throw new IllegalArgumentException("Submission file must have a filename");
+            throw new TestManagementException(DOCUMENT_FILENAME_REQUIRED);
         }
 
         String contentType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
@@ -206,7 +207,9 @@ public class SubmissionService {
         try (InputStream storageInput = file.getInputStream()) {
             return fileStoragePort.store(storageInput, prepared.originalFilename(), prepared.contentType());
         } catch (IOException exception) {
-            throw new UncheckedIOException("Failed to open submission file for storage", exception);
+            throw new TestManagementException(DOCUMENT_STORAGE_UNAVAILABLE, exception);
+        } catch (RuntimeException exception) {
+            throw new TestManagementException(DOCUMENT_STORAGE_UNAVAILABLE, exception);
         }
     }
 

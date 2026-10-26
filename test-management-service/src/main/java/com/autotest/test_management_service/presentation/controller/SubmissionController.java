@@ -78,17 +78,17 @@ public class SubmissionController {
         SubmissionId submissionId = SubmissionId.of(id);
         Submission submission = submissionService.findById(submissionId).orElse(null);
         if (submission == null) {
-            return ResponseEntity.notFound().build();
+            throw new com.autotest.common_lib.exception.CommonException(com.autotest.common_lib.exception.CommonErrorCode.RESOURCE_NOT_FOUND);
         }
         if (!submission.memberId().equals(new MemberId(memberId))) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build();
+            throw new com.autotest.common_lib.exception.CommonException(com.autotest.common_lib.exception.CommonErrorCode.ACCESS_DENIED);
         }
         AiDocumentDeliveryService.DeliveryResult delivery = aiDocumentDeliveryService.getStatus(id);
         boolean closed = "PENDING".equals(delivery.status()) || "DELIVERED".equals(delivery.status())
                 || (delivery.attempts() > 0 && !"BLOCKED".equals(delivery.status())
                     && !"NOT_READY".equals(delivery.status()));
         if (closed) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
+            throw new com.autotest.common_lib.exception.CommonException(com.autotest.common_lib.exception.CommonErrorCode.STATE_CONFLICT);
         }
         SubmittedDocument document = submissionService.replaceFailedDocument(
                 submissionId, file, role, new MemberId(memberId));
@@ -104,7 +104,7 @@ public class SubmissionController {
                 submissionService.findDocumentsBySubmissionId(submission.submissionId()),
                 aiDocumentDeliveryService.getStatus(id)))
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new com.autotest.common_lib.exception.CommonException(com.autotest.common_lib.exception.CommonErrorCode.RESOURCE_NOT_FOUND));
     }
 
     @PostMapping("/{id}/ai-delivery/retry")
@@ -114,10 +114,10 @@ public class SubmissionController {
     ) {
         Submission submission = submissionService.findById(SubmissionId.of(id)).orElse(null);
         if (submission == null) {
-            return ResponseEntity.notFound().build();
+            throw new com.autotest.common_lib.exception.CommonException(com.autotest.common_lib.exception.CommonErrorCode.RESOURCE_NOT_FOUND);
         }
         if (!submission.memberId().equals(new MemberId(memberId))) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build();
+            throw new com.autotest.common_lib.exception.CommonException(com.autotest.common_lib.exception.CommonErrorCode.ACCESS_DENIED);
         }
         return ResponseEntity.ok(aiDocumentDeliveryService.deliverIfReady(SubmissionId.of(id)));
     }

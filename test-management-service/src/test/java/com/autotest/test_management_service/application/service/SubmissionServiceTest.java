@@ -64,7 +64,7 @@ class SubmissionServiceTest {
         );
         MockMultipartFile file = new MockMultipartFile("file", "document.txt", "text/plain", "not allowed".getBytes(StandardCharsets.UTF_8));
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        com.autotest.test_management_service.exception.TestManagementException exception = assertThrows(com.autotest.test_management_service.exception.TestManagementException.class,
                 () -> service.submit(file, MEMBER_ID, PRODUCT_ID));
 
         assertEquals("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다.", exception.getMessage());
@@ -84,7 +84,7 @@ class SubmissionServiceTest {
         MockMultipartFile file = new MockMultipartFile(
             "file", "document.docx", "application/pdf", "not a Word file".getBytes(StandardCharsets.UTF_8));
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        com.autotest.test_management_service.exception.TestManagementException exception = assertThrows(com.autotest.test_management_service.exception.TestManagementException.class,
             () -> service.submit(file, MEMBER_ID, PRODUCT_ID));
 
         assertEquals("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다.", exception.getMessage());
@@ -147,7 +147,7 @@ class SubmissionServiceTest {
             MockMultipartFile replacementFile = new MockMultipartFile("file", "replacement.pdf", "application/pdf", pdf);
             var role = com.autotest.test_management_service.domain.submission.SubmissionType.AGREEMENT;
 
-            assertThrows(IllegalArgumentException.class,
+            assertThrows(com.autotest.test_management_service.exception.TestManagementException.class,
                 () -> service.replaceFailedDocument(id, replacementFile, role, MEMBER_ID));
 
             when(persistence.isAiDeliveryBlocked(id)).thenReturn(true);

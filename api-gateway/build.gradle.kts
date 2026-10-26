@@ -9,3 +9,4 @@ dependencyManagement {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.0.0")
     }
 }
+tasks.test { useJUnitPlatform() }

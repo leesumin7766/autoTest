@@ -1,3 +1,4 @@
+import { apiFetch as fetch } from './apiFetch'
 import { useEffect, useRef, useState } from 'react'
 import type { BrowserCheck } from './RemoteCrawlPanel'
 import { browserCheckMessage } from './browserCheckMessages'

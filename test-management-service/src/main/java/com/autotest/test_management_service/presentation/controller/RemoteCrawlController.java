@@ -83,8 +83,5 @@ public class RemoteCrawlController {
         return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL,"no-store").header("X-Content-Type-Options","nosniff")
                 .contentType(MediaType.IMAGE_JPEG).body(service.screenshot(submission,member,job,index));
     }
-    @ExceptionHandler(ProductDescriptionException.class)
-    ResponseEntity<?> handle(ProductDescriptionException error) {
-        return ResponseEntity.status(error.status()).body(Map.of("code",error.code(),"message",error.getMessage()));
-    }
+
 }
