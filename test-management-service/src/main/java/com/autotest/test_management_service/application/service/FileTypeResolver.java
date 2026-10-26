@@ -19,7 +19,7 @@ public final class FileTypeResolver {
         Objects.requireNonNull(originalFilename, "originalFilename");
         int extensionSeparator = originalFilename.lastIndexOf('.');
         if (extensionSeparator < 0 || extensionSeparator == originalFilename.length() - 1) {
-            throw new IllegalArgumentException("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다.");
+            throw new com.autotest.test_management_service.exception.TestManagementException(com.autotest.test_management_service.exception.TestManagementErrorCode.DOCUMENT_FORMAT_UNSUPPORTED);
         }
         String extension = originalFilename.substring(extensionSeparator + 1).toLowerCase(Locale.ROOT);
         String mime = contentType == null
@@ -39,6 +39,6 @@ public final class FileTypeResolver {
             return SubmissionType.WORD;
         }
 
-        throw new IllegalArgumentException("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다.");
+        throw new com.autotest.test_management_service.exception.TestManagementException(com.autotest.test_management_service.exception.TestManagementErrorCode.DOCUMENT_FORMAT_UNSUPPORTED);
     }
 }

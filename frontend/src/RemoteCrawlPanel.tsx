@@ -1,3 +1,4 @@
+import { apiFetch as fetch } from './apiFetch'
 import { browserCheckMessage } from './browserCheckMessages'
 import { CapturedMenuTreePanel } from './CapturedMenuTreePanel'
 import { RunProgress } from './RunProgress'

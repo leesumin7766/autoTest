@@ -52,8 +52,5 @@ public class MenuTreeController {
         return service.approve(submissionId, memberId, approval.tree());
     }
 
-    @org.springframework.web.bind.annotation.ExceptionHandler(ProductDescriptionException.class)
-    public ResponseEntity<Map<String,String>> handle(ProductDescriptionException error) {
-        return ResponseEntity.status(error.status()).body(Map.of("code", error.code(), "message", error.getMessage()));
-    }
+
 }

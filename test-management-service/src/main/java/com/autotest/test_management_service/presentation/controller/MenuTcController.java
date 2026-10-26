@@ -16,5 +16,5 @@ public class MenuTcController {
     @GetMapping public ResponseEntity<?> status(@PathVariable UUID submission,@RequestHeader("X-Member-Id") long member,@RequestParam(required=false) UUID set){return ok(service.status(submission,member,set));}
     @PostMapping public ResponseEntity<?> generate(@PathVariable UUID submission,@RequestHeader("X-Member-Id") long member,@RequestBody Generate body){return ok(service.create(submission,member,body.menuJobId(),body.featureTypes()==null?Map.of():body.featureTypes()));}
     @GetMapping("/{set}/download") public ResponseEntity<byte[]> download(@PathVariable UUID submission,@RequestHeader("X-Member-Id") long member,@PathVariable UUID set){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("Content-Disposition","attachment; filename=test-cases.xlsx").contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).body(service.download(submission,member,set));}
-    @ExceptionHandler(ProductDescriptionException.class) public ResponseEntity<?> failure(ProductDescriptionException error){return ResponseEntity.status(error.status()).body(Map.of("code",error.code(),"message",error.getMessage()));}
+
 }

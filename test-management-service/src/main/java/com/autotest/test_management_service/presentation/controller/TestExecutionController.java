@@ -32,5 +32,5 @@ public class TestExecutionController {
         }
         readiness.requireReady();return ok(service.transition(submission,member,run,false));}
     @PostMapping("/{run}/cancel") public ResponseEntity<?> cancel(@PathVariable UUID submission,@RequestHeader("X-Member-Id") long member,@PathVariable UUID run){return ok(service.transition(submission,member,run,true));}
-    @ExceptionHandler(ProductDescriptionException.class) public ResponseEntity<?> failure(ProductDescriptionException error){return ResponseEntity.status(error.status()).body(Map.of("code",error.code(),"message",error.getMessage()));}
+
 }

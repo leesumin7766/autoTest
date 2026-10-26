@@ -4,7 +4,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -43,8 +42,5 @@ public class PlaywrightSetupController {
                 .body(new SetupResponse(service.save(submissionId, memberId, request),service.configurationVersion(submissionId,memberId)));
     }
 
-    @ExceptionHandler(ProductDescriptionException.class)
-    public ResponseEntity<Map<String, String>> handle(ProductDescriptionException error) {
-        return ResponseEntity.status(error.status()).body(Map.of("code", error.code(), "message", error.getMessage()));
-    }
+
 }

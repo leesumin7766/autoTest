@@ -47,8 +47,5 @@ public class TcGenerationController {
                 .header("X-Content-Type-Options", "nosniff").header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(exporter.export(job));
     }
-    @ExceptionHandler(ProductDescriptionException.class)
-    public ResponseEntity<Map<String,String>> handle(ProductDescriptionException error) {
-        return ResponseEntity.status(error.status()).body(Map.of("code", error.code(), "message", error.getMessage()));
-    }
+
 }

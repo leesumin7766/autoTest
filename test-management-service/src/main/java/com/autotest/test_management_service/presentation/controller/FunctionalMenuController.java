@@ -25,5 +25,5 @@ public class FunctionalMenuController {
     @PutMapping("/{job}/approval") public ResponseEntity<?> approve(@PathVariable UUID submission,@PathVariable UUID job,@RequestHeader("X-Member-Id") long member,@RequestBody Edit request){return ok(service.edit(submission,member,job,request.revision(),request.rows(),true));}
     @PostMapping("/{job}/cancel") public ResponseEntity<?> cancel(@PathVariable UUID submission,@PathVariable UUID job,@RequestHeader("X-Member-Id") long member){service.cancel(submission,member,job);return ok(service.status(submission,member,job));}
     @GetMapping("/{job}/download") public ResponseEntity<byte[]> download(@PathVariable UUID submission,@PathVariable UUID job,@RequestHeader("X-Member-Id") long member,@RequestParam(defaultValue="false") boolean draft){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("Content-Disposition","attachment; filename=menu-tree.xlsx").contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).body(service.download(submission,member,job,draft));}
-    @ExceptionHandler(ProductDescriptionException.class) public ResponseEntity<?> failure(ProductDescriptionException error){return ResponseEntity.status(error.status()).body(Map.of("code",error.code(),"message",error.getMessage()));}
+
 }
