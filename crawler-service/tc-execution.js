@@ -4,6 +4,7 @@ const { randomUUID } = require('node:crypto');
 const { login } = require('./remote-agent/engine');
 const mutation = /delete|remove|destroy|reset|purchase|payment|execute|terminate|kill|save|submit|upload|create|삭제|초기화|결제|실행|종료|저장|등록|추가|업로드|적용|승인/i;
 const sessions = new Map();
+const anonymousLoginRules = new Set(['LOGIN-01','LOGIN-03','LOGIN-04','LOGIN-05','LOGIN-06','LOGIN-15','LOGIN-17','LOGIN-18','LOGIN-21']);
 const failure = code => Object.assign(new Error(code), { code });
 function redact(value,s){const secret=s.openInput?.password;if(typeof value==='string')return secret?value.replaceAll(secret,'[REDACTED]'):value;if(Array.isArray(value))return value.map(v=>redact(v,s));if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,k==='screenshot'?v:redact(v,s)]));return value;}
 function sameEntry(actual,expected){const a=new URL(actual),b=new URL(expected);return a.origin===b.origin&&a.pathname.replace(/\/$/,'')===b.pathname.replace(/\/$/,'')&&a.search===b.search&&a.hash===b.hash;}
@@ -28,13 +29,21 @@ async function observe(s) {
     const frameIndex=s.frames.size;s.frames.set(frameIndex,frame);
     const part=await frame.evaluate(({offset,frameIndex}) => {
     const visible = el => !!(el.getBoundingClientRect().width && el.getBoundingClientRect().height);
-    const elements = [...document.querySelectorAll('a,button,input,select,textarea,[role="button"],[role="tab"],[role="option"],[role="menuitem"],[role="checkbox"],[role="radio"],[role="switch"],[role="combobox"]')].filter(visible).slice(0, 120).map((el, i) => {
+    const layers=[...document.querySelectorAll('[role="dialog"],[role="alertdialog"],[role="menu"],dialog[open]')].filter(el=>visible(el)&&(el.getAttribute('role')!=='menu'||el.dataset.state==='open'||el.contains(document.activeElement)));
+    const activeLayer=layers.findLast(el=>el.contains(document.activeElement))||layers.at(-1);
+    const actionable=el=>{
+      if(!visible(el)||el.closest('[inert],[aria-hidden="true"]')||el.matches(':disabled,[aria-disabled="true"]')||(activeLayer&&!activeLayer.contains(el)))return false;
+      const r=el.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;
+      if(x>=0&&x<innerWidth&&y>=0&&y<innerHeight){const hit=document.elementFromPoint(x,y);if(hit&&!el.contains(hit))return false;}
+      return true;
+    };
+    const elements = [...document.querySelectorAll('a,button,input,select,textarea,[role="button"],[role="tab"],[role="option"],[role="menuitem"],[role="checkbox"],[role="radio"],[role="switch"],[role="combobox"]')].filter(actionable).slice(0, 120).map((el, i) => {
       el.setAttribute('data-autotest-execution-id', String(offset+i));
       return { id: String(offset+i),frameIndex,context:el.closest('tr')?.innerText.slice(0,240)||'', tag: el.tagName.toLowerCase(),role:el.getAttribute('role')||'', type: el.getAttribute('type') || '', navigation:!!el.closest('nav,aside,[role="navigation"]') || (el.tagName==='A'&&!el.hasAttribute('download')), name: (el.getAttribute('aria-label') || el.labels?.[0]?.innerText || el.getAttribute('placeholder') || el.innerText || '').trim().slice(0, 160), href: el.tagName === 'A' ? el.href : '', options: el.tagName === 'SELECT' ? [...el.options].slice(0, 30).map(x => ({ label: x.text, value: x.value })) : undefined };
     });
-    const main=document.querySelector('main,[role="main"]');
+    const main=activeLayer||document.querySelector('main,[role="main"]');
     const headings=[...(main||document.body).querySelectorAll('h1,h2,h3')].filter(el=>visible(el)&&!el.closest('nav,aside,header,footer,[role="navigation"]')).map(el=>el.innerText.trim()).filter(Boolean).slice(0,20);
-    return { url: location.href, title: document.title, text: document.body.innerText.slice(0, 10000), mainText:main?.innerText.slice(0,8000)||'',headings,screenReady:true,elements, iframeCount: document.querySelectorAll('iframe').length };
+    return { url: location.href, title: document.title, text: document.body.innerText.slice(0, 10000), mainText:main?.innerText.slice(0,8000)||'',headings,screenReady:true,elements,activeLayer:activeLayer?{role:activeLayer.getAttribute('role')||'dialog',label:activeLayer.getAttribute('aria-label')||''}:null, iframeCount: document.querySelectorAll('iframe').length };
     },{offset:parts.reduce((count,part)=>count+part.elements.length,0),frameIndex});parts.push(part);
   }
   const observation={...parts[0],text:parts.map((part,index)=>index?`\n[frame ${index}]\n${part.text}`:part.text).join('').slice(0,16000),elements:parts.flatMap(part=>part.elements),supportedFrameCount:parts.length-1};
@@ -43,10 +52,11 @@ async function observe(s) {
   const loginEntry=s.openInput.setup?.loginMethod==='FORM_AUTO'&&new URL(s.page.url()).origin===new URL(s.openInput.targetUrl).origin
     &&observation.elements.some(el=>el.type==='password')&&observation.elements.some(el=>el.tag==='input'&&['','text','email'].includes(el.type))
     &&observation.elements.some(el=>(el.tag==='button'||el.type==='submit')&&/로그인|log\s?in|sign\s?in|접속/i.test(el.name));
-  observation.entryState={requestedUrl:publicUrl(s.openInput.targetUrl),actualUrl:observation.url,atInitialUrl,initialScreenReady:atInitialUrl||loginEntry,redirectDisposition:atInitialUrl?'NONE':loginEntry?'LOGIN_ENTRY_REDIRECT':'UNEXPECTED_REDIRECT',initialEntryRequired:s.openInput.initialEntry===true,
-    sessionMode:s.openInput.initialEntry?'FRESH_ANONYMOUS':'SETUP',authenticationState:s.authenticatedBySetup?'AUTHENTICATED_BY_SETUP':observation.elements.some(el=>el.type==='password')?'LOGIN_FORM_OBSERVED':'UNKNOWN',sessionResets:s.entryResetCount};
+  if(loginEntry){s.authenticatedBySetup=false;s.authenticatedByTest=false;}
+  observation.entryState={requestedUrl:publicUrl(s.openInput.targetUrl),actualUrl:observation.url,atInitialUrl,initialScreenReady:atInitialUrl||loginEntry,redirectDisposition:atInitialUrl?'NONE':loginEntry?'LOGIN_ENTRY_REDIRECT':s.authenticatedByTest||s.authenticatedBySetup?'AUTHENTICATED_DESTINATION':'UNEXPECTED_REDIRECT',initialEntryRequired:s.openInput.initialEntry===true,
+    sessionMode:s.anonymous?'FRESH_ANONYMOUS':'SETUP',authenticationState:s.authenticatedBySetup?'AUTHENTICATED_BY_SETUP':loginEntry?'LOGIN_FORM_OBSERVED':'UNKNOWN',sessionResets:s.entryResetCount};
   if(s.authenticatedByTest)observation.entryState.authenticationState='AUTHENTICATED_BY_TEST';
-  observation.authentication={savedAccountAvailable:!!(s.openInput.password&&s.openInput.setup?.automation?.username),dedicatedLoginAllowed:s.positiveLogin,loginAttempted:s.loginAttempted,outcome:s.loginOutcome||'NOT_ATTEMPTED'};
+  observation.authentication={savedAccountAvailable:!!(s.openInput.password&&s.openInput.setup?.automation?.username),dedicatedLoginAllowed:s.positiveLogin,loginAttempted:s.loginAttempted,outcome:s.loginOutcome||'NOT_ATTEMPTED',requiredStartState:s.requiredStartState,startStateVerified:!!s.startStateVerified,preparationMethod:s.anonymous?'FRESH_ANONYMOUS_CONTEXT':'SAVED_SETUP_LOGIN'};
   for(const el of observation.elements)if(el.href&&publicUrl(el.href)!==el.href)el.href='';
   s.observation = observation;
   let screenshot = null;
@@ -68,7 +78,8 @@ async function open(input) {
   try {
     const setup = input.setup || { loginMethod: 'NONE', automation: {} };
     const positiveLogin=input.testRuleId==='LOGIN-04';
-    const anonymous=input.initialEntry===true||positiveLogin;
+    const requiresAnonymous=anonymousLoginRules.has(input.testRuleId);
+    const anonymous=input.initialEntry===true||requiresAnonymous;
     if (!['NONE', 'FORM_AUTO', 'BASIC_AUTH'].includes(setup.loginMethod)) throw failure('EXECUTION_LOGIN_UNSUPPORTED');
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true,
       ignoreHTTPSErrors: setup.automation?.ignoreHTTPSErrors === true,
@@ -76,6 +87,7 @@ async function open(input) {
     const page = await context.newPage(); page.setDefaultTimeout(8000);
     const s = { browser, context, page, origins, effects: new Set(), pendingRequests:new Set(),loadTimeout:setup.automation?.pageLoadTimeoutSeconds||15,allowMutation: input.allowMutation === true, observation: null, busy: false, downloads: [], dialogs: [], touched: Date.now(), authenticating: !input.initialEntry && setup.loginMethod === 'FORM_AUTO', blockedRequests: 0 };
     s.openInput=input;s.entryResetCount=input.entryResetCount||0;s.entryGateOpen=false;s.authenticatedBySetup=false;s.positiveLogin=positiveLogin;s.loginAttempted=false;
+    s.anonymous=anonymous;s.requiredStartState=requiresAnonymous?'ANONYMOUS_LOGIN_FORM':'SAVED_SETUP';s.startStateVerified=false;
     s.authenticating=!anonymous&&setup.loginMethod==='FORM_AUTO';
     page.on('request',request=>{if(['document','xhr','fetch'].includes(request.resourceType()))s.pendingRequests.add(request)});
     page.on('requestfinished',request=>s.pendingRequests.delete(request));page.on('requestfailed',request=>s.pendingRequests.delete(request));
@@ -111,7 +123,9 @@ async function open(input) {
     s.runId=input.runId;s.attempt=input.attempt;
     if (page.url() === 'about:blank') throw failure('EXECUTION_TARGET_UNREACHABLE');
     await ready(s);
-    const observation = await observe(s);
+    let observation = await observe(s);
+    if(requiresAnonymous&&observation.entryState.authenticationState!=='LOGIN_FORM_OBSERVED')throw failure('EXECUTION_AUTH_START_NOT_CONFIRMED');
+    s.startStateVerified=true;observation.authentication.startStateVerified=true;
     s.entryGateOpen=input.initialEntry===true&&!observation.entryState.initialScreenReady;
     const sessionId = randomUUID(); sessions.set(sessionId, s);
     return { sessionId, observation };
@@ -190,7 +204,7 @@ async function step(s, actions) {
       await ready(s);
       record.url = publicUrl(s.page.url()); record.text = (await s.page.locator('body').innerText()).slice(0, 5000);
       records.push(record);
-    } catch (error) { records.push({ ...record, status: 'ERROR', errorCode: error.code || 'EXECUTION_ACTION_FAILED' }); break; }
+    } catch (error) { const detail=String(error.message||'');const code=error.code||(/intercepts pointer events/i.test(detail)?'EXECUTION_ELEMENT_COVERED':/detached|not attached/i.test(detail)?'EXECUTION_ELEMENT_DETACHED':error.name==='TimeoutError'?'EXECUTION_ACTION_TIMEOUT':'EXECUTION_ACTION_FAILED');records.push({ ...record, status: 'ERROR', errorCode: code }); break; }
   }
   s.touched = Date.now();
   await Promise.all(s.downloads.map(d=>d.promise));

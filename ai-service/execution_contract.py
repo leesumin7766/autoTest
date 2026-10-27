@@ -37,6 +37,23 @@ def compiled_conditions(tc, proposed):
 
 
 def prerequisites(tc):
+    unsupported_auth = {
+        'LOGIN-03': '비밀번호 마스킹 시험용 문자열 입력·관찰 동작',
+        'LOGIN-05': '잘못된 계정 시험 전용 입력 참조와 인증 제출 동작',
+        'LOGIN-08': '역할별 시험 계정·허용/제한 메뉴 접근표',
+        'LOGIN-09': '동시 로그인 시험용 복수 세션과 중복 로그인 정책',
+        'LOGIN-15': '인증 입력 검증 시험 전용 데이터와 제출 동작',
+        'LOGIN-17': '잠금 전용 시험 계정·실패 횟수·해제 절차와 제한 시험 동작',
+        'LOGIN-18': '잠금 상태 시험 계정·새 세션 검증·해제 절차',
+        'LOGIN-20': '세션 만료 정책·갱신 조건과 만료 대기 시험 동작',
+        'LOGIN-21': '초기 비밀번호 상태의 시험 계정',
+        'LOGIN-22': '비밀번호 정책별 시험값과 전용 변경 동작',
+        'LOGIN-23': '변경 전용 계정·불일치 시험값과 비밀번호 변경 동작',
+        'LOGIN-24': '변경 전용 계정과 기존 비밀번호 검증 시험 동작',
+        'LOGIN-25': '개인정보 변경 전용 데이터와 재인증 시험 동작',
+    }
+    if tc.get('ruleId') in unsupported_auth:
+        return [unsupported_auth[tc['ruleId']] + ': 현재 실행기에 연결되지 않았습니다. 임의 계정·비밀번호 입력이나 반복 클릭으로 대체하지 않습니다.']
     scenario = tc.get('scenario') or ''
     scope = tc.get('scopeDescription') or ''
     upload_test = (tc.get('ruleId') == 'FEATURE-01' and re.search(r'업로드|upload', scope, re.I))
