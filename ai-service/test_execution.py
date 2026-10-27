@@ -225,7 +225,7 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
                 evidence.append({'id':'initial-entry','kind':'BROWSER_OBSERVATION',**observation})
                 await progress('INITIALIZING')
                 try:
-                    recovery=await asyncio.wait_for(plan_initial_entry(observation.get('entryState',{})),timeout=60)
+                    recovery=await asyncio.wait_for(plan_initial_entry(observation.get('entryState',{})),timeout=min(300,max(1,deadline-time.monotonic())))
                 except (TimeoutError,httpx.TimeoutException):
                     raise RuntimeError('EXECUTION_INITIAL_RECOVERY_TIMEOUT')
                 plans.append({'planner':'QWEN_INITIAL_ENTRY','action':recovery,'caseId':request.cases[0]['id'],'initializationOnly':True})
@@ -275,7 +275,7 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
                         plan=Plan(actions=[],decision='FINISH',phase='TEST',missingInputs=[],explanation='저장 계정의 입력·제출 결과를 판정합니다. 로그인은 반복하지 않습니다.',conditions=[Condition(requirementQuote=r,method='SEMANTIC',expected=r) for r in requirements(tc)])
                     else:
                         origin='QWEN_SAVED_LOGIN'
-                        choice=await asyncio.wait_for(plan_saved_login(observation.get('authentication',{})),timeout=min(60,remaining))
+                        choice=await asyncio.wait_for(plan_saved_login(observation.get('authentication',{})),timeout=min(300,remaining))
                         plan=Plan(actions=[Action(action='login_saved_account')] if choice=='LOGIN_SAVED_ACCOUNT' else [],decision='EXECUTE' if choice=='LOGIN_SAVED_ACCOUNT' else 'NEEDS_INPUT',phase='TEST',missingInputs=[] if choice=='LOGIN_SAVED_ACCOUNT' else ['저장된 시험 계정과 로그인 화면 확인'],explanation='저장된 시험 계정을 참조해 아이디·비밀번호를 입력하고 한 번 로그인합니다.')
                 elif execution_profile=='READ_ONLY_VIEW' and target_observed(observation,terms):
                     evidence.append({'id':f'read-check-{round_number}','kind':'READ_ONLY_CHECK','caseId':tc['id'],'observationId':entry['id'],'targetTerms':terms,'profile':execution_profile})
