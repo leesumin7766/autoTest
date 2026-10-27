@@ -9,7 +9,8 @@ from login_execution import login_submitted
 def requirements(tc):
     text = (tc.get('expectedResult') or '').strip()
     # Keep the original substrings so evidence can always be traced to the TC.
-    return [part.strip() for part in re.split(r'\n+|[;；]|\s+(?:그리고|및|또한)\s+|(?<=[.!?。])\s+', text) if part.strip()][:16]
+    # A list marker such as "1. " belongs to its sentence, not a standalone oracle.
+    return [part.strip() for part in re.split(r'\n+|[;；]|\s+(?:그리고|및|또한)\s+|(?<!\d\.)(?<=[.!?。])\s+', text) if part.strip()][:16]
 
 
 def descriptive(text):
