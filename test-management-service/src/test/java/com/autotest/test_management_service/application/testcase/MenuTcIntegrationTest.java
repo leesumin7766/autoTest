@@ -41,6 +41,18 @@ class MenuTcIntegrationTest {
     @Autowired TestExecutionService executions;
     @Autowired com.autotest.test_management_service.application.crawler.PlaywrightSetupService setups;
     @Autowired com.autotest.test_management_service.application.crawler.PlaywrightCredentialCipher cipher;
+    @Test void executorStatusListsOwnActiveLocalJobsOnly() throws Exception {
+        UUID submission=UUID.randomUUID(),own=UUID.randomUUID();long member=92352;
+        jdbc.update("INSERT INTO submissions(submission_id,member_id,product_id,status,uploaded_at) VALUES(?,?,1,'PARSED',now())",submission,member);
+        for(int i=0;i<2;i++)jdbc.update("INSERT INTO playwright_crawl_jobs(job_id,submission_id,member_id,status,setup_snapshot,document_digest,execution_mode,purpose) VALUES(?,?,?,?,'{\"password\":\"never-expose\"}'::jsonb,?,'LOCAL','CONNECTION')",
+            i==0?own:UUID.randomUUID(),submission,member,i==1?"COMPLETED":"RUNNING","a".repeat(64));
+        org.mockito.Mockito.when(readiness.status()).thenReturn(mapper.createObjectNode().put("browserConnected",true).put("executorBusy",true));
+        String body=mvc.perform(get("/api/crawl-agents/local/status").header("X-Member-Id",member))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.busy").value(true)).andExpect(jsonPath("$.connected").value(true))
+            .andExpect(jsonPath("$.jobs.length()").value(1)).andExpect(jsonPath("$.jobs[0].id").value(own.toString())).andReturn().getResponse().getContentAsString();
+        assertFalse(body.contains("never-expose"));
+        mvc.perform(get("/api/crawl-agents/local/status").header("X-Member-Id",member+1)).andExpect(status().isOk()).andExpect(jsonPath("$.jobs.length()").value(0));
+    }
     @Test void sourceApprovalToDurableIdempotentSetToExcelAndStaleFencing() throws Exception {
         UUID submission=UUID.randomUUID(),crawl=UUID.randomUUID(),menu=UUID.randomUUID();long member=92351;
         jdbc.update("INSERT INTO submissions(submission_id,member_id,product_id,status,uploaded_at) VALUES(?,?,1,'PARSED',now())",submission,member);
@@ -79,6 +91,20 @@ class MenuTcIntegrationTest {
         mvc.perform(get("/api/submissions/"+submission+"/functional-menu").param("job",excelMenu).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.job.output.rows[0].functionName").value("사용자 조회"));
         var excelSet=mapper.readTree(mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("menuJobId",excelMenu)))).andExpect(status().isOk()).andExpect(jsonPath("$.set.output.caseCount").value(84)).andReturn().getResponse().getContentAsByteArray());
         mvc.perform(get(base+"/"+excelSet.path("set").path("setId").asText()+"/download").header("X-Member-Id",member)).andExpect(status().isOk());
+        // An uploaded menu has no crawl link; saved login settings must still add login TCs.
+        var loginSetup=mapper.createObjectNode().put("targetUrl","https://example.com").put("loginMethod","FORM_AUTO").put("testEnvironmentConfirmed",true).put("password","test-secret");
+        com.fasterxml.jackson.databind.node.ObjectNode config=mapper.valueToTree(com.autotest.test_management_service.application.crawler.CrawlAutomation.defaults());
+        config.put("username","fixture-user").put("loginUrl","https://example.com/sign-in");loginSetup.set("automation",config);
+        setups.save(submission,member,mapper.treeToValue(loginSetup,com.autotest.test_management_service.application.crawler.PlaywrightSetupService.SetupRequest.class));
+        var loginPayload=Map.of("menuJobId",excelMenu,"loginUrl","https://example.com");
+        var withLogin=mapper.readTree(mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(loginPayload)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.set.output.summary.로그인").value(1))
+                .andExpect(jsonPath("$.set.output.caseCount").value(111)).andReturn().getResponse().getContentAsByteArray());
+        assertEquals("https://example.com",withLogin.path("set").path("output").path("testCases").get(0).path("executionPlan").path("targetUrl").asText());
+        assertFalse(withLogin.toString().contains("test-secret"));assertFalse(withLogin.toString().contains("fixture-user"));
+        mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("menuJobId",excelMenu,"loginUrl","https://unrelated.example"))))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("TC_LOGIN_URL_INVALID"));
+        jdbc.update("DELETE FROM playwright_crawl_setups WHERE submission_id=?",submission);
         // Authentication is generated even when absent from the approved sidebar features.
         jdbc.update("UPDATE functional_menu_jobs SET snapshot=?::jsonb WHERE job_id=?", "{\"warnings\":[],\"evidence\":[{\"id\":\"doc:auth\",\"kind\":\"DOCUMENT\",\"text\":\"아이디와 비밀번호로 로그인합니다. 비밀번호 5회 실패 시 계정 잠금\"}]}",menu);
         var authenticationSet=mapper.readTree(mvc.perform(post(base).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("menuJobId",menu))))

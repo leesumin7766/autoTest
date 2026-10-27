@@ -13,12 +13,14 @@ from execution_evidence import Condition, assess, gate, semantic_requirement
 from execution_contract import compiled_conditions, prerequisites, navigation_record, performed_test, requirements, planner_history
 from execution_profiles import profile, target_terms, target_observed, navigation_plan, loop_key, public_trace, single_action_done, literal_assertion
 from execution_selection import preflight, select_with_qwen
+from initial_entry import plan_initial_entry
+from login_execution import plan_saved_login, login_attempt
 
 router = APIRouter(prefix='/api/v1/test-executions', dependencies=[Depends(require_internal_token)])
 
 class Action(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    action: Literal['click', 'fill', 'select', 'goto', 'wait']
+    action: Literal['click', 'fill', 'select', 'goto', 'wait', 'login_saved_account']
     elementId: str = ''
     value: str = ''
     url: str = ''
@@ -44,6 +46,7 @@ class Execute(BaseModel):
     documents: list[dict] = Field(default_factory=list)
     notes: str = ''
     allowMutation: bool = False
+    initialEntry: bool = False
     setup: dict | None = None
     password: str | None = None
     navigationHints: list[dict] = Field(default_factory=list, max_length=20)
@@ -168,7 +171,12 @@ def pending(cases, code, state='ERROR'):
               'EXECUTION_NO_PROGRESS':'동일한 대상·조작을 반복하여 추가 실행을 차단했습니다. 계획과 대상 화면을 확인하세요.',
               'EXECUTION_BROWSER_BUSY':'화면 수집 또는 다른 시험이 브라우저를 사용 중입니다. 작업 종료 후 이어서 진행하세요.',
               'EXECUTION_MODEL_OR_CASE_TIMEOUT':'계획 작성 또는 TC 수행 시간 한도를 초과했습니다.',
+              'EXECUTION_INITIAL_ENTRY_NOT_READY':'지정한 최초 URL로 복구하지 못해 시험을 시작하지 않았습니다. 요청 주소와 실제 도착 주소를 확인하세요.',
+              'EXECUTION_INITIAL_RECOVERY_TIMEOUT':'최초 URL 복구 판단 응답을 받지 못해 시험을 시작하지 않았습니다.',
               'EXECUTION_INPUT_CONTEXT_REQUIRED':'파일·추가 입력이 필요한 동작입니다. 현재 입력 공급 기능을 확인하세요.',
+              'EXECUTION_LOGIN_REQUIRES_SAVED_ACCOUNT':'정상 로그인 TC에서 계정 입력 없는 제출을 차단했습니다. 저장 계정 로그인 동작이 필요합니다.',
+              'EXECUTION_LOGIN_REPEAT_BLOCKED':'이미 로그인 제출을 시도하여 반복 로그인을 차단했습니다. 첫 결과를 검토하세요.',
+              'EXECUTION_LOGIN_ACTION_NOT_ALLOWED':'이 TC 또는 접속 설정에서는 저장 계정 로그인 동작을 사용할 수 없습니다.',
               'EXECUTION_PLAN_LIMIT':'탐색·수행 횟수 한도 안에 시험 절차를 완료하지 못했습니다.',
               'EXECUTION_ACTION_FAILED_OR_BLOCKED':'관찰된 요소 조작에 실패했거나 허용 범위 밖 요청이 차단됐습니다.'}
     return [{'caseId': tc['id'], 'executionStatus': state, 'judgmentStatus': 'NOT_EXECUTED', 'result': None, 'reasonCode':code if code.startswith('EXECUTION_') else 'EXECUTION_PREREQUISITE_REQUIRED', 'reason': messages.get(code,code), 'evidenceIds': []} for tc in cases]
@@ -179,6 +187,9 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
     management = os.getenv('MANAGEMENT_SERVICE_URL', 'http://test-management-service:8082').rstrip('/')
     session = None; evidence = []; plans = []; traces = []
     missing = prerequisites(request.cases[0])
+    positive_login=request.cases[0].get('ruleId')=='LOGIN-04'
+    if positive_login and (not request.password or not (request.setup or {}).get('automation',{}).get('username') or (request.setup or {}).get('loginMethod')!='FORM_AUTO'):
+        return {'items':pending(request.cases,'정상 로그인 시험에 사용할 저장된 일반 로그인 계정이 필요합니다.','NEEDS_CONTEXT'),'evidence':[],'plans':[]}
     if missing:
         return {'items': pending(request.cases, '사전 입력 필요: ' + '; '.join(missing), 'NEEDS_CONTEXT'), 'evidence': [], 'plans': []}
     deadline=time.monotonic()+900
@@ -200,12 +211,29 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
         try:
             await active()
             await progress('CONNECTING')
-            response = await client.post(crawler + '/api/v1/tc-browser/open', json={'targetUrl': request.targetUrl, 'setup': request.setup, 'password': request.password, 'allowMutation': request.allowMutation,**({'runId':request.runId,'attempt':request.attempt} if check_active else {})})
+            response = await client.post(crawler + '/api/v1/tc-browser/open', json={'targetUrl': request.targetUrl, 'setup': request.setup, 'password': request.password, 'allowMutation': request.allowMutation,'initialEntry':request.initialEntry,'testRuleId':request.cases[0].get('ruleId'),**({'runId':request.runId,'attempt':request.attempt} if check_active else {})})
             if response.status_code == 422:
                 code = response.json().get('code', '')
                 if code in {'EXECUTION_SCREEN_NOT_READY','EXECUTION_TLS_UNTRUSTED', 'EXECUTION_LOGIN_UNSUPPORTED', 'EXECUTION_PASSWORD_REQUIRED', 'EXECUTION_TARGET_UNREACHABLE', 'EXECUTION_OPEN_FAILED'}:
                     raise RuntimeError(code)
             response.raise_for_status(); opened = response.json(); session = opened['sessionId']; observation = opened['observation']
+            if request.initialEntry and not observation.get('entryState',{}).get('initialScreenReady',observation.get('entryState',{}).get('atInitialUrl')):
+                evidence.append({'id':'initial-entry','kind':'BROWSER_OBSERVATION',**observation})
+                await progress('INITIALIZING')
+                try:
+                    recovery=await asyncio.wait_for(plan_initial_entry(observation.get('entryState',{})),timeout=60)
+                except (TimeoutError,httpx.TimeoutException):
+                    raise RuntimeError('EXECUTION_INITIAL_RECOVERY_TIMEOUT')
+                plans.append({'planner':'QWEN_INITIAL_ENTRY','action':recovery,'caseId':request.cases[0]['id'],'initializationOnly':True})
+                if recovery!='RESET_SESSION':raise RuntimeError('EXECUTION_INITIAL_ENTRY_NOT_READY')
+                await active()
+                restored=await client.post(f'{crawler}/api/v1/tc-browser/{session}/step',json={'actions':[{'action':'reset_session'}]})
+                restored.raise_for_status();reset=restored.json()
+                evidence.append({'id':'initial-reset','kind':'BROWSER_ACTIONS','records':reset.get('records',[])})
+                observation=reset['observation']
+                evidence.append({'id':'restored-entry','kind':'BROWSER_OBSERVATION',**observation})
+                if not observation.get('entryState',{}).get('initialScreenReady',observation.get('entryState',{}).get('atInitialUrl')) or any(r.get('status')=='ERROR' for r in reset.get('records',[])):
+                    raise RuntimeError('EXECUTION_INITIAL_ENTRY_NOT_READY')
             tc=request.cases[0]
             execution_profile=profile(tc)
             effective_hints=request.navigationHints
@@ -224,7 +252,16 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
                 remaining=deadline-time.monotonic()
                 if remaining<=0:raise RuntimeError('EXECUTION_CASE_TIMEOUT')
                 origin='QWEN'
-                if execution_profile=='READ_ONLY_VIEW' and target_observed(observation,terms):
+                if positive_login:
+                    attempted=login_attempt(evidence)
+                    if attempted:
+                        origin='CODE_LOGIN_FINISH'
+                        plan=Plan(actions=[],decision='FINISH',phase='TEST',missingInputs=[],explanation='저장 계정의 입력·제출 결과를 판정합니다. 로그인은 반복하지 않습니다.',conditions=[Condition(requirementQuote=r,method='SEMANTIC',expected=r) for r in requirements(tc)])
+                    else:
+                        origin='QWEN_SAVED_LOGIN'
+                        choice=await asyncio.wait_for(plan_saved_login(observation.get('authentication',{})),timeout=min(60,remaining))
+                        plan=Plan(actions=[Action(action='login_saved_account')] if choice=='LOGIN_SAVED_ACCOUNT' else [],decision='EXECUTE' if choice=='LOGIN_SAVED_ACCOUNT' else 'NEEDS_INPUT',phase='TEST',missingInputs=[] if choice=='LOGIN_SAVED_ACCOUNT' else ['저장된 시험 계정과 로그인 화면 확인'],explanation='저장된 시험 계정을 참조해 아이디·비밀번호를 입력하고 한 번 로그인합니다.')
+                elif execution_profile=='READ_ONLY_VIEW' and target_observed(observation,terms):
                     evidence.append({'id':f'read-check-{round_number}','kind':'READ_ONLY_CHECK','caseId':tc['id'],'observationId':entry['id'],'targetTerms':terms,'profile':execution_profile})
                     plan=Plan(actions=[],decision='FINISH',phase='TEST',missingInputs=[],explanation='관찰된 대상 화면의 본문·경로를 확인했습니다. 기대 조건은 Jev가 판정합니다.',conditions=[Condition(requirementQuote=r,method='SEMANTIC' if semantic_requirement(r) else 'TEXT_PRESENT',expected=r) for r in requirements(tc)])
                     origin='CODE_READ_CHECK'
@@ -244,6 +281,7 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
                             if 'name' in element:element['name']=element['name'][:100]
                             if 'options' in element:element['options']=element['options'][:10]
                         compact_observation={'url':observation.get('url'),'headings':observation.get('headings',[])[:10],
+                            'entryState':observation.get('entryState',{}),
                             'text':(observation.get('mainText') or observation.get('text',''))[:3000],
                             'elements':elements,'elementsTruncated':len(original_elements)>len(elements)}
                         history=planner_history(evidence)[-4:]
@@ -264,14 +302,14 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
                         plans[-1]['rejectedReason']='동일한 대상·조작 반복을 실행 전에 차단했습니다.'
                         traces[-1]['rejectedReason']=plans[-1]['rejectedReason'];await progress('ACTING',round_number+1)
                         return {'items':pending(request.cases,'EXECUTION_NO_PROGRESS','NEEDS_CONTEXT'),'evidence':evidence,'plans':plans}
-                    await progress('ACTING', round_number+1)
+                    await progress('AUTHENTICATING' if any(a.action=='login_saved_account' for a in plan.actions) else 'ACTING', round_number+1)
                     response = await client.post(f'{crawler}/api/v1/tc-browser/{session}/step', json={'actions': [a.model_dump() for a in plan.actions]})
                     response.raise_for_status(); step = response.json()
                     for record in step['records']:
                         record['isNavigation']=navigation_record(record, plan.phase)
                     evidence.append({'id': f'actions-{round_number}', 'kind': 'BROWSER_ACTIONS', 'records': step['records'], 'downloads': step.get('downloads', []), 'dialogs': step.get('dialogs', [])})
                     observation = step['observation']
-                    traces[-1]['records']=[{k:r.get(k) for k in ('action','elementId','targetName','status','isNavigation','errorCode')} for r in step['records']]
+                    traces[-1]['records']=[{k:r.get(k) for k in ('action','elementId','targetName','status','isNavigation','errorCode','authenticationSteps','authenticationOutcome','authenticationError')} for r in step['records']]
                     await progress('ACTING',round_number+1)
                     errors = [r.get('errorCode') for r in step['records'] if r.get('status') == 'ERROR']
                     if errors or step.get('blockedRequests') or step.get('needsDialogInput'):
@@ -279,7 +317,8 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
                             for old in evidence:old.pop('screenshot',None)
                         evidence.append({'id':f'failure-{round_number}','kind':'BROWSER_OBSERVATION',**observation})
                         context_required = 'EXECUTION_INPUT_CONTEXT_REQUIRED' in errors or step.get('needsDialogInput')
-                        failure_code='EXECUTION_INPUT_CONTEXT_REQUIRED' if context_required else 'EXECUTION_SCREEN_NOT_READY' if 'EXECUTION_SCREEN_NOT_READY' in errors else 'EXECUTION_ACTION_FAILED_OR_BLOCKED'
+                        authentication_error=next((code for code in errors if code in {'EXECUTION_LOGIN_REQUIRES_SAVED_ACCOUNT','EXECUTION_LOGIN_REPEAT_BLOCKED','EXECUTION_LOGIN_ACTION_NOT_ALLOWED'}),None)
+                        failure_code=authentication_error or ('EXECUTION_INPUT_CONTEXT_REQUIRED' if context_required else 'EXECUTION_SCREEN_NOT_READY' if 'EXECUTION_SCREEN_NOT_READY' in errors else 'EXECUTION_ACTION_FAILED_OR_BLOCKED')
                         return {'items': pending(request.cases, failure_code, 'NEEDS_CONTEXT' if context_required else 'ERROR'), 'evidence': evidence, 'plans': plans}
                 if plan.decision == 'FINISH' and performed_test(evidence,tc):
                     if observation.get('screenshot'):
@@ -348,6 +387,8 @@ async def execute_feature(request, planner=plan_with_qwen, judge=judge_with_jev,
         for key in combined:combined[key].extend(result[key])
         if any(item.get('reason')=='EXECUTION_CANCELED' for item in result['items']):
             combined['items'].extend(pending(request.cases[index+1:],'EXECUTION_CANCELED'));break
+    if request.initialEntry and (combined['evidence'] or any(item.get('executionStatus')=='ERROR' for item in combined['items'])):
+        combined['initialEntryVerified']=any(e.get('entryState',{}).get('initialScreenReady',e.get('entryState',{}).get('atInitialUrl')) and e.get('entryState',{}).get('initialEntryRequired') for e in combined['evidence'])
     return combined
 
 @router.post('/feature')

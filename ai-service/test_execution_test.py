@@ -116,4 +116,39 @@ class ExecutionTest(unittest.IsolatedAsyncioTestCase):
         result=await execute_feature(request,planner,check_active=False)
         self.assertEqual('NOT_EXECUTED',result['items'][0]['judgmentStatus']);self.assertEqual([],result['evidence'])
 
+    async def test_initial_entry_redirect_is_recovered_before_any_test_plan(self):
+        calls=[];payloads=[]
+        def observation(matched):return {'text':'로그인' if matched else 'Dashboard','elements':[], 'entryState':{'atInitialUrl':matched,'initialEntryRequired':True,'requestedUrl':'http://fixture.local','actualUrl':'http://fixture.local' if matched else 'http://fixture.local/dashboard'}}
+        def transport(req):
+            calls.append(req.url.path)
+            if req.url.path.endswith('/open'):
+                self.assertTrue(json.loads(req.content)['initialEntry']);return httpx.Response(200,json={'sessionId':'s','observation':observation(False)})
+            if req.url.path.endswith('/step'):
+                self.assertEqual([{'action':'reset_session'}],json.loads(req.content)['actions'])
+                return httpx.Response(200,json={'records':[{'action':'reset_session','status':'COMPLETED','isNavigation':True,'initializationOnly':True}],'observation':observation(True)})
+            return httpx.Response(200,json={})
+        async def planner(payload):
+            payloads.append(payload);self.assertTrue(payload['observation']['entryState']['atInitialUrl'])
+            return Plan(actions=[],decision='NEEDS_INPUT',missingInputs=['시험값'],explanation='초기 화면 확인')
+        with patch('test_execution.plan_initial_entry',return_value='RESET_SESSION'):
+            result=await execute_feature(self.request().model_copy(update={'initialEntry':True}),planner,transport=httpx.MockTransport(transport),check_active=False)
+        self.assertTrue(result['initialEntryVerified']);self.assertEqual(1,len(payloads));self.assertIsNone(result['items'][0]['result'])
+        self.assertEqual('QWEN_INITIAL_ENTRY',result['plans'][0]['planner'])
+
+    async def test_persistent_initial_redirect_never_runs_test_or_grants_pass(self):
+        def transport(req):
+            observation={'text':'Dashboard','elements':[],'entryState':{'atInitialUrl':False,'initialEntryRequired':True}}
+            return httpx.Response(200,json={'sessionId':'s','observation':observation,'records':[]})
+        async def planner(_):self.fail('Initial URL mismatch must block TC execution')
+        with patch('test_execution.plan_initial_entry',return_value='RESET_SESSION'):
+            result=await execute_feature(self.request().model_copy(update={'initialEntry':True}),planner,transport=httpx.MockTransport(transport),check_active=False)
+        self.assertFalse(result['initialEntryVerified']);self.assertEqual('EXECUTION_INITIAL_ENTRY_NOT_READY',result['items'][0]['reasonCode']);self.assertIsNone(result['items'][0]['result'])
+
+    async def test_verified_login_redirect_does_not_trigger_recovery(self):
+        def transport(req):return httpx.Response(200,json={'sessionId':'s','observation':{'text':'로그인','elements':[],'entryState':{'atInitialUrl':False,'initialScreenReady':True,'initialEntryRequired':True,'redirectDisposition':'LOGIN_ENTRY_REDIRECT'}}})
+        async def planner(_):return Plan(actions=[],decision='NEEDS_INPUT',missingInputs=['시험값'],explanation='로그인 초기 화면 확인')
+        with patch('test_execution.plan_initial_entry') as recovery:
+            result=await execute_feature(self.request().model_copy(update={'initialEntry':True}),planner,transport=httpx.MockTransport(transport),check_active=False)
+        recovery.assert_not_called();self.assertTrue(result['initialEntryVerified']);self.assertIsNone(result['items'][0]['result'])
+
 if __name__=='__main__':unittest.main()

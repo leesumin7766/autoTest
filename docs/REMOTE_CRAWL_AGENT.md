@@ -73,3 +73,10 @@ V18은 `playwright_crawl_pages.navigation` JSONB에 원본 관찰을 보존한�
 저장소 루트에서 `./scripts/package-crawl-agent.ps1`을 실행하면 `frontend/public/downloads/autotest-crawl-agent.zip`을 생성한다. 설정 파일·키·node_modules·테스트 문서는 포함하지 않는다. 프런트엔드 개발 서버 또는 배포 빌드에서 `/downloads/autotest-crawl-agent.zip`으로 다운로드한다. 패키징은 `npm run build` 이전에 수행한다.
 
 검증: `./gradlew.bat :test-management-service:test :test-management-service:bootJar :api-gateway:bootJar`, `npm run build`(frontend), `npm run test:agent`(crawler-service, Chromium 설치 환경). 실제 `.205` 설치·대상 URL 로그인은 해당 PC와 제품 계정이 준비된 뒤 확인해야 한다. 로컬 fixture 성공을 실제 제품 접속 성공으로 보고하지 않는다.
+# 한국어 우선 수집
+
+새 수집은 브라우저 언어를 `ko-KR`로 시작합니다. 인증 후 본 탐색 전에 명확한 한국어 언어 선택 버튼을 한 번 확인하며, 화면 UI에서 전환을 확인한 경우에만 한국어 확인 상태를 기록합니다. 계정 설정이나 임의의 localStorage 키를 직접 변경하지 않습니다. 전환할 수 없는 제품은 현재 언어로 수집하며 완료 결과에 한국어 미확인을 표시합니다.
+
+기존 언어 버튼 탐색 제외 규칙, 인증·인증서 예외·네트워크 범위 제한은 유지합니다. 기존 수집을 이어갈 때는 기록된 언어를 유지하며, 기록이 없는 과거 수집은 새 한국어 정책을 적용하지 않습니다. 한국어 우선 정책을 적용하려면 새 수집을 시작하세요. 기존 기록과 화면 언어가 충돌하면 새 수집 필요 사유를 남기고 기존 화면을 보존합니다.
+
+원격 실행기는 새 ZIP을 내려받아 업데이트해야 `language.js`를 포함한 동일한 처리를 사용할 수 있습니다. 로그인 전 화면은 한국어 브라우저 설정으로 접근하되, 제품의 UI 전환은 인증 후 준비 단계에서 수행합니다.

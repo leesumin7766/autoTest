@@ -1,5 +1,6 @@
 // Public service messages; checked against TestManagementErrorCode by verify-api-errors.mjs.
 export const serviceErrorMessages: Record<string, string> = {
+  "TC_LOGIN_URL_INVALID": "저장된 기본 접속 주소 또는 로그인 주소를 선택해 주세요.",
   "AGENT_ACTION_INVALID": "지원하지 않는 실행기 요청입니다.",
   "AGENT_NAME_INVALID": "실행 PC 이름을 입력해 주세요.",
   "APPROVAL_REQUIRED": "TC 생성 승인이 필요합니다.",

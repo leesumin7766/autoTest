@@ -3,6 +3,49 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const { open, step, sessions, safeUrl } = require('./tc-execution');
 
+test('first entry bypasses setup login; later sessions keep automatic authentication',async()=>{
+ let posts=0;
+ const server=http.createServer((req,res)=>{
+  res.setHeader('Content-Type','text/html; charset=utf-8');
+  if(req.method==='POST'){posts++;res.writeHead(302,{Location:'/dashboard'});return res.end()}
+  if(req.url==='/dashboard')return res.end('<nav><a href="/logout">로그아웃</a></nav><h1>Dashboard</h1>');
+  res.end('<h1>로그인</h1><a href="/dashboard">대시보드</a><form action="/login" method="post"><input name="username"><input name="password" type="password"><button>로그인</button></form>');
+ });
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const target=`http://127.0.0.1:${server.address().port}/`;
+ const setup={loginMethod:'FORM_AUTO',automation:{username:'fixture',successUrl:target+'dashboard'}};const ids=[];
+ try{
+  const initial=await open({targetUrl:target,setup,password:'fixture-secret',initialEntry:true});ids.push(initial.sessionId);
+  assert.equal(posts,0);assert.equal(initial.observation.entryState.atInitialUrl,true);assert.equal(initial.observation.entryState.authenticationState,'LOGIN_FORM_OBSERVED');
+  const later=await open({targetUrl:target,setup,password:'fixture-secret'});ids.push(later.sessionId);assert.equal(posts,1);assert.equal(later.observation.entryState.authenticationState,'AUTHENTICATED_BY_SETUP');
+  const s=sessions.get(initial.sessionId);const button=initial.observation.elements.find(el=>el.tag==='a');
+  const moved=await step(s,[{action:'click',elementId:button.id}]);assert.equal(moved.records[0].status,'COMPLETED');assert.ok(moved.observation.url.endsWith('/dashboard'));
+ }finally{for(const id of ids){await sessions.get(id)?.browser.close();sessions.delete(id)}await new Promise(r=>server.close(r))}
+});
+
+test('unexpected initial redirect blocks ordinary actions and allows only one fresh-session recovery',async()=>{
+ const server=http.createServer((req,res)=>{if(req.url==='/'){res.writeHead(302,{Location:'/dashboard'});return res.end()}res.setHeader('Content-Type','text/html');res.end('<h1>Dashboard</h1><button>Save</button>')});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));let opened;
+ try{
+  opened=await open({targetUrl:`http://127.0.0.1:${server.address().port}/`,initialEntry:true,allowMutation:true});const s=sessions.get(opened.sessionId);
+  assert.equal(opened.observation.entryState.atInitialUrl,false);
+  let result=await step(s,[{action:'click',elementId:opened.observation.elements[0].id}]);assert.equal(result.records[0].errorCode,'EXECUTION_INITIAL_ENTRY_NOT_READY');
+  result=await step(s,[{action:'reset_session'}]);assert.equal(result.records[0].initializationOnly,true);assert.equal(result.observation.entryState.sessionResets,1);assert.equal(result.observation.entryState.atInitialUrl,false);
+  result=await step(s,[{action:'reset_session'}]);assert.equal(result.records[0].errorCode,'EXECUTION_INITIAL_ENTRY_NOT_READY');
+ }finally{if(opened){await sessions.get(opened.sessionId)?.browser.close();sessions.delete(opened.sessionId)}await new Promise(r=>server.close(r))}
+});
+
+test('same-origin login-entry redirect is accepted without authenticating or hiding the URL difference',async()=>{
+ let posts=0;const server=http.createServer((req,res)=>{
+  if(req.method==='POST')posts++;
+  if(req.url==='/'){res.writeHead(302,{Location:'/login'});return res.end()}
+  res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<h1>로그인</h1><input name="username"><input type="password"><button>로그인</button>');
+ });await new Promise(r=>server.listen(0,'127.0.0.1',r));let opened;
+ try{
+  opened=await open({targetUrl:`http://127.0.0.1:${server.address().port}/`,initialEntry:true,setup:{loginMethod:'FORM_AUTO',automation:{}}});
+  assert.equal(opened.observation.entryState.atInitialUrl,false);assert.equal(opened.observation.entryState.initialScreenReady,true);assert.equal(opened.observation.entryState.redirectDisposition,'LOGIN_ENTRY_REDIRECT');assert.equal(posts,0);
+ }finally{if(opened){await sessions.get(opened.sessionId)?.browser.close();sessions.delete(opened.sessionId)}await new Promise(r=>server.close(r))}
+});
+
 test('custom dropdown options and context-menu actions are observable test controls',async()=>{
   const server=http.createServer((req,res)=>{res.setHeader('Content-Type','text/html');res.end('<p id="state">All</p><button onclick="document.querySelector(\'#choices\').hidden=false">All Statuses</button><div id="choices" role="listbox" hidden><div role="option" onclick="document.querySelector(\'#state\').textContent=\'Active\';document.querySelector(\'#choices\').hidden=true">Active</div></div><div role="menu"><div role="menuitem">Filter</div></div>')});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));let opened;

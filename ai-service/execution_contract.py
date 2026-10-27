@@ -3,6 +3,7 @@ import re
 import difflib
 from execution_evidence import Condition, semantic_requirement
 from execution_profiles import verified_read_check
+from login_execution import login_submitted
 
 
 def requirements(tc):
@@ -52,6 +53,7 @@ def navigation_record(record, phase):
 
 
 def performed_test(evidence, tc=None):
+    if tc and tc.get('ruleId')=='LOGIN-04':return login_submitted(evidence)
     return bool(tc and verified_read_check(tc,evidence)) or any(item.get('downloads') for item in evidence) or any(record.get('status') == 'COMPLETED' and record.get('action') != 'wait'
                and not record.get('isNavigation', False)
                for item in evidence if item.get('kind') == 'BROWSER_ACTIONS'

@@ -64,7 +64,18 @@ public class FunctionalMenuValidator {
             }
             for(JsonNode key:keys) if(!allowedKeys.contains(key.asText())) invalid("MENU_MATCH_EVIDENCE_INVALID","연결한 메뉴의 원문 근거가 필요합니다.");
             boolean webFirst="web-first-v1".equals(snapshot.path("webStructure").path("version").asText());
-            boolean placed=!webFirst;boolean manual=false;
+            MenuPlacementRecovery.Match recovered=null;
+            if(webFirst&&originals==null&&document&&requestedKeys.isEmpty()) {
+                recovered=MenuPlacementRecovery.find(path,verified,snapshot,sources).orElse(null);
+                if(recovered!=null) {
+                    var menu=recovered.menu();keys.add(menu.path("menuKey").asText());
+                    String text=menu.path("text").asText();
+                    boolean alreadyAttached=false;for(var ref:verified)if(ref.path("sourceId").asText().equals(menu.path("id").asText()))alreadyAttached=true;
+                    if(!alreadyAttached)verified.add(mapper.createObjectNode().put("sourceId",menu.path("id").asText()).put("quote",text.substring(0,Math.min(240,text.length()))));
+                    screen=true;
+                }
+            }
+            boolean placed=!webFirst;boolean manual=false,authenticationRoute=false;
             if(webFirst){
                 JsonNode deepest=mapper.createArrayNode();List<JsonNode> anchors=new ArrayList<>();
                 for(JsonNode key:keys)for(JsonNode source:sources.values())if(source.path("menuKey").asText().equals(key.asText())&&!source.path("webPath").isEmpty())anchors.add(source.path("webPath"));
@@ -75,6 +86,10 @@ public class FunctionalMenuValidator {
                 else if(originals!=null && document && raw.path("included").asBoolean(false)){
                     for(JsonNode node:snapshot.path("webStructure").path("nodes"))if(node.path("path").equals(path)&&path.size()<=3){placed=true;manual=true;break;}
                 }
+                if(!placed&&document&&AuthenticationTcContext.loginFeature(raw)&&snapshot.path("authentication").path("required").asBoolean()
+                        &&!snapshot.path("authentication").path("loginUrl").asText().isBlank()&&path.size()==1&&"로그인 화면".equals(path.get(0).asText())) {
+                    placed=true;authenticationRoute=true;
+                }
                 if(!placed){path=mapper.createArrayNode();keys.removeAll();}
             }
             ObjectNode row=mapper.createObjectNode().put("rowId",id).put("functionName",name).put("menuDescription",description)
@@ -82,12 +97,27 @@ public class FunctionalMenuValidator {
                     .put("verificationStatus",incomplete?"INCOMPLETE":document&&screen&&!keys.isEmpty()?"MATCH_PROPOSED":document?"DOCUMENT_ONLY":"SCREEN_OBSERVED");
             row.put("evidenceStatus","VALID").put("connectionStatus",keys.isEmpty()?"NOT_LINKED":"PROPOSED");
             if(webFirst)row.put("rowType",document?"FUNCTION":"MENU_OBSERVATION").put("placementStatus",!placed?"UNASSIGNED":manual?"MANUAL_PLACEMENT":"WEB_ANCHORED");
+            if(authenticationRoute)row.put("placementStatus","AUTHENTICATION_ROUTE").put("featureType","로그인").put("targetUrl",snapshot.path("authentication").path("loginUrl").asText());
+            if(webFirst&&document) {
+                // Preserve the import proposal even when placement is rejected; never erase the only diagnostic input.
+                var review=row.putObject("placementReview");
+                JsonNode prior=originals==null?raw:basis;
+                review.set("proposedMenuPath",prior.path("placementReview").has("proposedMenuPath")?prior.path("placementReview").path("proposedMenuPath").deepCopy():raw.path("menuPath").deepCopy());
+                if(recovered!=null) {
+                    review.put("method","EXACT_PATH_DOCUMENT_REFERENCE").put("menuSourceId",recovered.menu().path("id").asText())
+                        .put("documentSourceId",recovered.documentSourceId()).put("reason","수집 경로와 정확히 일치하고 선택한 문서 인용에서 같은 메뉴명이 확인되어 메뉴 근거를 복원했습니다. 의미적 연결은 검토 전입니다.");
+                } else if(originals!=null&&basis.path("menuPath").equals(path)&&basis.has("placementReview")) {
+                    row.set("placementReview",basis.path("placementReview").deepCopy());
+                } else review.put("method",manual?"USER_PLACEMENT":placed?"SELECTED_MENU_REFERENCE":"NEEDS_PLACEMENT")
+                    .put("reason",placed?"연결된 메뉴 근거 또는 사용자 배치입니다. 의미적 연결은 검토 전입니다.":"관찰 경로 일치·문서 메뉴명·단일 후보·근거 개수 조건을 모두 확인할 수 없어 자동 배치하지 않았습니다.");
+            }
             row.set("menuPath",path.deepCopy());row.set("evidence",verified);row.set("matchedMenuKeys",keys.deepCopy());
             JsonNode notes=raw.path("reviewNotes");
             ArrayNode cleanNotes=mapper.createArrayNode();
             if(notes.isArray()) for(JsonNode note:notes) { if(cleanNotes.size()>=8 || note.asText().length()>500) invalid("MENU_NOTES_INVALID","검토 메모는 500자 이내, 최대 8개입니다."); cleanNotes.add(note.asText()); }
             if(disconnected){if(cleanNotes.size()>=8)cleanNotes.remove(7);cleanNotes.add("화면 근거를 확인하지 못한 메뉴 연결을 해제했습니다. 문서 기준으로 검토하세요.");}
             if(automatic){if(cleanNotes.size()>=8)cleanNotes.remove(7);cleanNotes.add("프로그램이 제공된 메뉴 근거를 첨부했습니다. 의미적 연결 확인은 검토 전입니다.");}
+            if(recovered!=null){if(cleanNotes.size()>=8)cleanNotes.remove(7);cleanNotes.add(row.path("placementReview").path("reason").asText());}
             if(webFirst&&!placed){if(cleanNotes.size()>=8)cleanNotes.remove(7);cleanNotes.add("웹 메뉴에서 위치를 확인하지 못해 메뉴트리에서 제외했습니다. 별도 배치 검토가 필요합니다.");}
             row.set("reviewNotes",cleanNotes);result.add(row);
         }

@@ -1,4 +1,5 @@
 import { apiFetch as fetch } from './apiFetch'
+import { ExecutorStatus } from './ExecutorStatus'
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import './workspace.css'
@@ -290,7 +291,7 @@ function App() {
           <span className="wordmark-mark">A</span>
           <span>autotest<span className="wordmark-dot">.</span></span>
         </a>
-        <div className="topbar-label">시험 작업 공간</div>
+        <ExecutorStatus memberId={memberId} />
         <span className="system-state"><span /> {validationLabel}</span>
       </header>
 

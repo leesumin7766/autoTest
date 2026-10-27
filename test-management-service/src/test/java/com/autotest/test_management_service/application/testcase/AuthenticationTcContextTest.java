@@ -7,6 +7,25 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AuthenticationTcContextTest {
     final ObjectMapper mapper=new ObjectMapper();
+    @Test void savedLoginConfigurationAddsOneLoginGroupAtBaseOrDedicatedUrlWithoutSecrets() {
+        for(String dedicated:new String[]{"","https://example.com/sign-in"}) {
+            var context=mapper.createObjectNode().put("required",false);context.putArray("evidence");
+            var setup=mapper.createObjectNode().put("targetUrl","https://example.com/").put("loginMethod","FORM_AUTO").put("password","secret");
+            setup.putObject("automation").put("loginUrl",dedicated).put("username","private-user");
+            AuthenticationTcContext.applySetup(context,setup,false);
+            assertTrue(context.path("required").asBoolean());assertFalse(context.path("verifiedCrawlAuthentication").asBoolean());
+            assertFalse(context.toString().contains("secret"));assertFalse(context.toString().contains("private-user"));
+            var prepared=AuthenticationTcContext.prepare(mapper,"제품",features(),context);
+            String expected=dedicated.isBlank()?"https://example.com/":dedicated;
+            assertEquals(expected,prepared.get(1).path("targetUrl").asText());
+            assertEquals(2,AuthenticationTcContext.prepare(mapper,"제품",prepared,context).size());
+            var source=mapper.createObjectNode();source.set("authentication",context);
+            var output=new MenuTcGenerator(mapper).generate("제품",prepared,source);
+            assertEquals(27,java.util.stream.StreamSupport.stream(output.path("testCases").spliterator(),false).filter(tc->"로그인".equals(tc.path("featureType").asText())).count());
+            assertEquals(expected,output.path("testCases").get(0).path("executionPlan").path("targetUrl").asText());
+        }
+        var none=mapper.createObjectNode().put("required",false);AuthenticationTcContext.applySetup(none,mapper.createObjectNode().put("targetUrl","https://example.com/").put("loginMethod","NONE"),false);assertFalse(none.path("required").asBoolean());
+    }
     ObjectNode snapshot(String text) {
         var s=mapper.createObjectNode();s.putArray("evidence").addObject().put("id","doc:manual").put("kind","DOCUMENT").put("text",text);return s;
     }

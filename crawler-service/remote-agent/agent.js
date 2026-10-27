@@ -30,7 +30,8 @@ async function runJob(config, job, dependencies = {}) {
     await event({ event: 'complete', stopReason: result.stopReason, result });
   } catch (error) {
     const locations = (error.stack || '').split('\n').slice(1).map(line => line.match(/(?:walker|navigation|screen|agent|index)\.js:\d+:\d+/)?.[0]).filter(Boolean);
-    console.warn('Crawl execution failed', /^[A-Za-z]+Error$/.test(error.name || '') ? error.name : 'Error', locations.join(','));
+    const category=/context.*destroy|cannot find context|frame.*detach|while navigating/i.test(error.message||'')?'SCREEN_CONTEXT_CHANGED':safeErrors.has(error.message)?error.message:'UNCLASSIFIED';
+    console.warn('Crawl execution failed',category, /^[A-Za-z]+Error$/.test(error.name || '') ? error.name : 'Error', locations.join(','));
     if (error.message !== 'CRAWL_LEASE_LOST')
       await event({ event: 'failed', errorCode: safeErrors.has(error.message) ? error.message : 'CRAWL_FAILED' }).catch(() => {});
   } finally {
@@ -51,7 +52,7 @@ async function main() {
     try {
       await request(config, 'heartbeat');
       if (!reported) { console.log('관리 서버 연결 완료 · 작업 대기'); reported = true; }
-      const job = await request(config, 'claim', {capabilities:['crawl-resume-v1','crawl-progress-v1']});
+      const job = await request(config, 'claim', {capabilities:['crawl-resume-v1','crawl-progress-v1','crawl-targeted-retry-v1']});
       if (job.jobId) { console.log('화면 수집 시작'); await runJob(config, job); console.log('작업 종료 · 다음 작업 대기'); }
     } catch { if (reported) console.log('서버 연결 확인 중 · 자동 재시도'); reported = false; }
     await new Promise(resolve => setTimeout(resolve, 5000));
