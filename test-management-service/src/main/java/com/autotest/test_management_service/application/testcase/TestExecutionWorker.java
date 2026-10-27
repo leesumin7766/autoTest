@@ -90,7 +90,7 @@ public class TestExecutionWorker {
                 if(setup!=null)payload.set("setup",mapper.valueToTree(setup));
                 if(password!=null)payload.put("password",password);
                 var cases=mapper.createArrayNode();for(var item:snapshot.path("items"))if(ids.contains(item.path("caseId").asText())&&"PENDING".equals(item.path("executionStatus").asText())){
-                    var tc=mapper.createObjectNode();for(String key:List.of("id","tcId","ruleId","scenario","inputs","expectedResult","scopeDescription","executionPlan","automationMode","templateVersion"))tc.set(key,item.path("tc").path(key));cases.add(tc);
+                    var tc=mapper.createObjectNode();for(String key:List.of("id","tcId","ruleId","scenario","inputs","expectedResult","scopeDescription","executionPlan","automationMode","templateVersion","evidence"))tc.set(key,item.path("tc").path(key));cases.add(tc);
                 }
                 for(var selectedCase:cases){
                 if(!active(run,attempt))return;

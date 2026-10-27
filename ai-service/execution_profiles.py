@@ -7,7 +7,12 @@ from urllib.parse import urlsplit, unquote
 
 def profile(tc):
     scope = tc.get('scopeDescription') or ''
-    readonly = tc.get('ruleId') == 'FEATURE-01' and bool(re.search(r'조회|열람|\bview\b|\blist\b', scope, re.I))
+    plan = tc.get('executionPlan') or {}
+    specified_read = (plan.get('specificationVersion') == 'execution-spec-v2-read'
+                      and plan.get('specification', {}).get('profile') == 'READ_ONLY_VIEW'
+                      and tc.get('ruleId') in {'FEATURE-01', 'CRUD-01', 'CRUD-08'}
+                      and plan.get('selection', {}).get('scopeOperation') == 'READ')
+    readonly = specified_read or (tc.get('ruleId') == 'FEATURE-01' and bool(re.search(r'조회|열람|\bview\b|\blist\b', scope, re.I)))
     interactive = re.search(r'검색|필터|업로드|다운로드|인쇄|내보내|선택|search|filter|edit|create|delete|upload|download|print|export', scope, re.I) or re.search(r'(등록|생성|수정|삭제|저장|변경|실행)(?:을|를)?\s*(?:하|할|하기|기능)',scope)
     return 'READ_ONLY_VIEW' if readonly and not interactive else 'INTERACTIVE'
 

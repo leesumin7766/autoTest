@@ -41,6 +41,12 @@ class ExecutionReadinessServiceTest {
             ai.set("{\"protocolVersion\":\"tc-execution-v2\",\"plannerAvailable\":true,\"judgeConfigured\":true}");
             var ready=new ExecutionReadinessService(new ObjectMapper(),url,url,"test-token");
             ready.requireReady();assertTrue(ready.status().path("readinessIssues").isEmpty());
+            var snapshot=new ObjectMapper().createObjectNode();
+            snapshot.putArray("items").addObject().put("executionStatus","PENDING").putObject("tc").putObject("executionPlan").put("specificationVersion",TcExecutionSpecification.VERSION);
+            assertThrows(ProductDescriptionException.class,()->ready.requireSpecifications(snapshot));
+            ai.set("{\"protocolVersion\":\"tc-execution-v2\",\"plannerAvailable\":true,\"judgeConfigured\":true,\"specificationVersions\":[\"execution-spec-v2-read\"]}");
+            var withSpec=new ExecutionReadinessService(new ObjectMapper(),url,url,"test-token");
+            assertDoesNotThrow(()->withSpec.requireSpecifications(snapshot));
         }finally{server.stop(0);}
     }
 }

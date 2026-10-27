@@ -71,6 +71,7 @@ final class TcTemplateBinding {
         for(String check:tc.path("expectedResult").asText().split("\n"))checks.addObject().put("requirementQuote",check).put("method","REQUIRES_BINDING")
             .put("status","UNRESOLVED").put("oracleSource","문서·제품 설정·시험 데이터 근거와 연결 필요");
         spec.putArray("evidence").add("대상 화면 본문").add("실제 조작 기록").add("조건별 실제값과 기대값");
+        TcExecutionSpecification.upgradeRead(mapper, tc, feature);
     }
     static String operation(String name) {
         int kinds=0;

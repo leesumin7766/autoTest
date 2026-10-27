@@ -25,6 +25,7 @@ public class TestExecutionService {
     private ProductDescriptionException error(HttpStatus status,String code,String message) {return new ProductDescriptionException(status,code,message);}
     private String prerequisite(JsonNode tc){
         if(tc.path("featureId").asText().startsWith("scope:"))return "공통·문서 시험: 별도 문서·환경·수동 수행 증거가 필요합니다.";
+        String specification=TcExecutionSpecification.preparationReason(tc);if(!specification.isEmpty())return specification;
         String scope=tc.path("scopeDescription").asText(),scenario=tc.path("scenario").asText();
         if((scope.matches("(?is).*(업로드|upload).*")&&"FEATURE-01".equals(tc.path("ruleId").asText()))||(scope.matches("(?is).*(업로드|upload|import|가져오|파일).*")&&scenario.matches("(?s).*(확장자|스크립트 파일|최대 개수|파일의.*크기).*")))return "사전 입력 필요: 시험용 파일과 기대 확장자·크기·개수. 현재 파일 공급 기능 미지원입니다.";
         return "";
@@ -62,7 +63,12 @@ public class TestExecutionService {
             ((ArrayNode)group.path("caseIds")).add(tc.path("id").asText());
             var item=items.addObject().put("caseId",tc.path("id").asText()).put("featureId",feature).put("executionStatus","PENDING").put("judgmentStatus","PENDING");
             item.set("tc",tc.deepCopy());item.putNull("result");item.putNull("actualResult");item.putNull("reason");item.putArray("evidence");
-            String missing=prerequisite(tc);if(!missing.isEmpty())item.put("executionStatus","NEEDS_CONTEXT").put("judgmentStatus","NOT_EXECUTED").put("reason",missing).put("reasonCode","EXECUTION_PREREQUISITE_REQUIRED");
+            String specificationReason=TcExecutionSpecification.preparationReason(tc);
+            String missing=prerequisite(tc);if(!missing.isEmpty()){
+                item.put("executionStatus","NEEDS_CONTEXT").put("judgmentStatus","NOT_EXECUTED").put("reason",missing)
+                    .put("reasonCode",specificationReason.isEmpty()?"EXECUTION_PREREQUISITE_REQUIRED":"EXECUTION_SPEC_NEEDS_CONTEXT");
+                if(!specificationReason.isEmpty())item.set("missingBindings",tc.path("executionPlan").path("specification").path("missingBindings").deepCopy());
+            }
         }
         snapshot.put("caseCount",items.size()).put("groupCount",groups.size());
         if(productVersion!=null&&productVersion.length()>120)throw error(HttpStatus.BAD_REQUEST,"EXECUTION_VERSION_INVALID","제품·패치 버전은 120자 이내입니다.");

@@ -15,6 +15,7 @@ from execution_profiles import profile, target_terms, target_observed, navigatio
 from execution_selection import preflight, select_with_qwen
 from initial_entry import plan_initial_entry
 from login_execution import plan_saved_login, login_attempt
+from execution_specification import prepare_read, VERSION as READ_SPEC_VERSION
 
 router = APIRouter(prefix='/api/v1/test-executions', dependencies=[Depends(require_internal_token)])
 
@@ -181,7 +182,7 @@ def pending(cases, code, state='ERROR'):
               'EXECUTION_ACTION_FAILED_OR_BLOCKED':'관찰된 요소 조작에 실패했거나 허용 범위 밖 요청이 차단됐습니다.'}
     return [{'caseId': tc['id'], 'executionStatus': state, 'judgmentStatus': 'NOT_EXECUTED', 'result': None, 'reasonCode':code if code.startswith('EXECUTION_') else 'EXECUTION_PREREQUISITE_REQUIRED', 'reason': messages.get(code,code), 'evidenceIds': []} for tc in cases]
 
-async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, transport=None, check_active=True):
+async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, transport=None, check_active=True, prepared_read=None):
     headers = {'X-Internal-Token': os.getenv('PRODUCT_DESCRIPTION_INTERNAL_TOKEN', '')}
     crawler = os.getenv('CRAWLER_SERVICE_URL', 'http://crawler-service:8006').rstrip('/')
     management = os.getenv('MANAGEMENT_SERVICE_URL', 'http://test-management-service:8082').rstrip('/')
@@ -192,7 +193,7 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
         return {'items':pending(request.cases,'정상 로그인 시험에 사용할 저장된 일반 로그인 계정이 필요합니다.','NEEDS_CONTEXT'),'evidence':[],'plans':[]}
     if missing:
         return {'items': pending(request.cases, '사전 입력 필요: ' + '; '.join(missing), 'NEEDS_CONTEXT'), 'evidence': [], 'plans': []}
-    deadline=time.monotonic()+900
+    deadline=time.monotonic()+(prepared_read.timeout_seconds if prepared_read else 900)
     visited={}
     feedback=''
     async with httpx.AsyncClient(timeout=60, headers=headers, transport=transport) as client:
@@ -211,7 +212,7 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
         try:
             await active()
             await progress('CONNECTING')
-            response = await client.post(crawler + '/api/v1/tc-browser/open', json={'targetUrl': request.targetUrl, 'setup': request.setup, 'password': request.password, 'allowMutation': request.allowMutation,'initialEntry':request.initialEntry,'testRuleId':request.cases[0].get('ruleId'),**({'runId':request.runId,'attempt':request.attempt} if check_active else {})})
+            response = await client.post(crawler + '/api/v1/tc-browser/open', json={'targetUrl': request.targetUrl, 'setup': request.setup, 'password': request.password, 'allowMutation':False if prepared_read else request.allowMutation,'initialEntry':request.initialEntry,'testRuleId':request.cases[0].get('ruleId'),**({'runId':request.runId,'attempt':request.attempt} if check_active else {})})
             if response.status_code == 422:
                 code = response.json().get('code', '')
                 if code in {'EXECUTION_SCREEN_NOT_READY','EXECUTION_TLS_UNTRUSTED', 'EXECUTION_LOGIN_UNSUPPORTED', 'EXECUTION_PASSWORD_REQUIRED', 'EXECUTION_TARGET_UNREACHABLE', 'EXECUTION_OPEN_FAILED'}:
@@ -252,7 +253,19 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
                 remaining=deadline-time.monotonic()
                 if remaining<=0:raise RuntimeError('EXECUTION_CASE_TIMEOUT')
                 origin='QWEN'
-                if positive_login:
+                if prepared_read:
+                    origin='CODE_EXECUTION_SPEC'
+                    if prepared_read.reached(observation):
+                        evidence.append({'id':f'read-check-{round_number}','kind':'READ_ONLY_CHECK','caseId':tc['id'],'observationId':entry['id'],'targetTerms':[prepared_read.target['heading']],'profile':'READ_ONLY_VIEW','specificationVersion':READ_SPEC_VERSION})
+                        plan=Plan(actions=[],decision='FINISH',phase='TEST',missingInputs=[],explanation='실행 명세의 조회 대상과 연결된 기대 조건을 확인합니다.',conditions=prepared_read.conditions)
+                    else:
+                        nav=None if navigation_attempted else prepared_read.navigation_action(observation)
+                        if nav:
+                            navigation_attempted=True
+                            plan=Plan(actions=[nav],decision='EXECUTE',phase='NAVIGATE',missingInputs=[],explanation='실행 명세와 수집 근거에 연결된 메뉴로 이동합니다.')
+                        else:
+                            plan=Plan(actions=[],decision='NEEDS_INPUT',phase='NAVIGATE',missingInputs=['명세의 조회 대상 화면에 도달하지 못했습니다. 수집한 메뉴·주소·화면 제목 연결을 검토하세요.'],explanation='조회 명세의 경로를 임의로 추측하지 않고 중지합니다.')
+                elif positive_login:
                     attempted=login_attempt(evidence)
                     if attempted:
                         origin='CODE_LOGIN_FINISH'
@@ -324,7 +337,7 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
                     if observation.get('screenshot'):
                         for old in evidence: old.pop('screenshot', None)
                     evidence.append({'id': 'final', 'kind': 'BROWSER_OBSERVATION', **observation})
-                    conditions = compiled_conditions(request.cases[0],plan.conditions)
+                    conditions = prepared_read.conditions if prepared_read else compiled_conditions(request.cases[0],plan.conditions)
                     if any(c.method == 'VALUE_AFTER_RELOAD' for c in conditions):
                         await progress('RECHECK', round_number+1)
                         await active()
@@ -372,12 +385,19 @@ async def execute_feature(request, planner=plan_with_qwen, judge=judge_with_jev,
     combined={'items':[],'evidence':[],'plans':[]}
     for index,tc in enumerate(request.cases):
         isolated=request.model_copy(update={'cases':[tc]})
-        result=await preflight(tc, selector)
+        prepared_read, missing_bindings = prepare_read(tc, request.featurePath, request.navigationHints, request.targetUrl)
+        result=None
+        if missing_bindings:
+            items=pending([tc], 'EXECUTION_SPEC_NEEDS_CONTEXT', 'NEEDS_CONTEXT')
+            items[0].update(reason='실행 명세 준비 필요: ' + ' / '.join(dict.fromkeys(i['message'] for i in missing_bindings)),missingBindings=missing_bindings,evidenceIds=['specification-validation'])
+            result={'items':items,'evidence':[{'id':'specification-validation','kind':'EXECUTION_SPEC_VALIDATION','issues':missing_bindings}], 'plans':[]}
+        else:
+            result=await preflight(tc, selector)
         if result is None:
             if tc.get('automationMode') == 'ADDITIONAL_EVIDENCE':
                 result={'items':pending([tc],'브라우저 관찰만으로 검증할 수 없는 항목입니다. 추가 도구·내부 증거 또는 수동 검토가 필요합니다.','NEEDS_CONTEXT'),'evidence':[],'plans':[]}
             else:
-                result=await _execute_case(isolated,planner,judge,transport,check_active)
+                result=await _execute_case(isolated,planner,judge,transport,check_active,prepared_read)
         prefix=f'case-{index+1}:'
         for evidence in result['evidence']:evidence['id']=prefix+evidence['id'];evidence['caseId']=tc['id']
         for item in result['items']:
@@ -387,7 +407,7 @@ async def execute_feature(request, planner=plan_with_qwen, judge=judge_with_jev,
         for key in combined:combined[key].extend(result[key])
         if any(item.get('reason')=='EXECUTION_CANCELED' for item in result['items']):
             combined['items'].extend(pending(request.cases[index+1:],'EXECUTION_CANCELED'));break
-    if request.initialEntry and (combined['evidence'] or any(item.get('executionStatus')=='ERROR' for item in combined['items'])):
+    if request.initialEntry and (any(e.get('kind')=='BROWSER_OBSERVATION' for e in combined['evidence']) or any(item.get('executionStatus')=='ERROR' for item in combined['items'])):
         combined['initialEntryVerified']=any(e.get('entryState',{}).get('initialScreenReady',e.get('entryState',{}).get('atInitialUrl')) and e.get('entryState',{}).get('initialEntryRequired') for e in combined['evidence'])
     return combined
 
@@ -406,4 +426,4 @@ async def capabilities():
             available = any(item.get('name') == model or item.get('model') == model for item in response.json().get('models',[]))
     except (httpx.HTTPError,ValueError):
         pass
-    return {'protocolVersion':'tc-execution-v2','planner': 'ollama', 'model': model, 'plannerAvailable':available, 'judge': 'jev', 'judgeConfigured': bool(os.getenv('TYPESAFE_API_KEY')), 'externalLlm': False}
+    return {'protocolVersion':'tc-execution-v2','specificationVersions':['execution-spec-v1',READ_SPEC_VERSION],'planner': 'ollama', 'model': model, 'plannerAvailable':available, 'judge': 'jev', 'judgeConfigured': bool(os.getenv('TYPESAFE_API_KEY')), 'externalLlm': False}

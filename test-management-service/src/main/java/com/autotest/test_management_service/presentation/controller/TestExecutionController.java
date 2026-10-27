@@ -30,7 +30,7 @@ public class TestExecutionController {
             if(setup.stale()||!setup.targetUrl().equals(current.path("run").path("snapshot").path("targetUrl").asText()))throw new ProductDescriptionException(HttpStatus.CONFLICT,"EXECUTION_LOGIN_SETUP_MISMATCH","시험 대상 URL과 화면 수집에 저장한 접속 설정이 다릅니다. 화면 수집 탭에서 설정을 확인하세요.");
             if(!Set.of("NONE","FORM_AUTO","BASIC_AUTH").contains(setup.loginMethod()))throw new ProductDescriptionException(HttpStatus.CONFLICT,"EXECUTION_LOGIN_UNSUPPORTED","이 로그인 방식은 자동 시험을 지원하지 않습니다. 자동 로그인 설정을 확인하세요.");
         }
-        readiness.requireReady();return ok(service.transition(submission,member,run,false));}
+        readiness.requireReady();readiness.requireSpecifications(current.path("run").path("snapshot"));return ok(service.transition(submission,member,run,false));}
     @PostMapping("/{run}/cancel") public ResponseEntity<?> cancel(@PathVariable UUID submission,@RequestHeader("X-Member-Id") long member,@PathVariable UUID run){return ok(service.transition(submission,member,run,true));}
 
 }

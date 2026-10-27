@@ -33,6 +33,7 @@ public class ExecutionReadinessService {
         boolean browserReady=browserApi&&b.path("browserAvailable").asBoolean();
         boolean model=aiReady&&p.path("plannerAvailable").asBoolean();boolean judge=aiReady&&p.path("judgeConfigured").asBoolean();
         var result=mapper.createObjectNode().put("executorConnected",aiReady&&browserReady&&model).put("judgeConnected",judge).put("planner",p.path("model").asText("qwen3:4b")).put("judge","Jev").put("readinessCheckedAt",Instant.now().toString());
+        result.set("executionSpecificationVersions",p.path("specificationVersions").isArray()?p.path("specificationVersions").deepCopy():mapper.createArrayNode());
         var issues=result.putArray("readinessIssues");
         result.put("executorBusy",b.path("busy").asBoolean()).put("browserConnected",browserReady);
         if(!aiReady)issues.addObject().put("code","EXECUTION_AI_API_UNAVAILABLE").put("message","AI 서버의 시험 실행 API가 없거나 버전이 다릅니다. 현재 작업 버전으로 AI 서비스를 반영해야 합니다.");
@@ -43,4 +44,13 @@ public class ExecutionReadinessService {
         cached=result;checked=System.currentTimeMillis();return result.deepCopy();
     }
     public void requireReady(){var value=status();if(value.path("executorBusy").asBoolean())throw new ProductDescriptionException(HttpStatus.CONFLICT,"EXECUTION_BROWSER_BUSY","화면 수집 또는 다른 시험이 브라우저를 사용 중입니다. 해당 작업 종료 후 시작하세요.");if(!value.path("executorConnected").asBoolean()||!value.path("judgeConnected").asBoolean())throw new ProductDescriptionException(HttpStatus.SERVICE_UNAVAILABLE,"EXECUTION_NOT_READY","실행기·모델·판정 서비스가 준비되지 않았습니다. 시험 실행 화면의 연결 상태를 확인하세요.");}
+    public void requireSpecifications(JsonNode snapshot){
+        var supported=status().path("executionSpecificationVersions");
+        for(var item:snapshot.path("items")){
+            String version=item.path("tc").path("executionPlan").path("specificationVersion").asText();
+            if(!"PENDING".equals(item.path("executionStatus").asText())||version.isBlank()||"execution-spec-v1".equals(version))continue;
+            boolean found=false;for(var value:supported)if(version.equals(value.asText()))found=true;
+            if(!found)throw new ProductDescriptionException(HttpStatus.SERVICE_UNAVAILABLE,"EXECUTION_SPEC_VERSION_UNSUPPORTED","실행기가 이 TC의 실행 명세를 지원하지 않습니다. 실행 서비스를 최신 버전으로 반영해 주세요.");
+        }
+    }
 }
