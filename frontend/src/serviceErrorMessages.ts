@@ -141,6 +141,7 @@ export const serviceErrorMessages: Record<string, string> = {
   "TC_PROMPT_PREVIEW_FAILED": "처리 서비스에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
   "DOCUMENT_STORAGE_UNAVAILABLE": "문서를 보관하지 못했습니다. 잠시 후 다시 업로드해 주세요.",
   "EXECUTION_NOT_READY": "시험 실행에 필요한 연결을 확인하지 못했습니다. 연결 테스트 후 다시 시도해 주세요.",
+  "EXECUTION_SPEC_VERSION_UNSUPPORTED": "실행기가 이 TC의 실행 명세를 지원하지 않습니다. 실행 서비스를 최신 버전으로 반영해 주세요.",
   "INTERNAL_AUTH_NOT_CONFIGURED": "처리 서비스에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
   "PLAYWRIGHT_CREDENTIAL_STORAGE_UNAVAILABLE": "로그인 정보를 안전하게 보관하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   "PRODUCT_DESCRIPTION_DISABLED": "현재 제품 설명 생성 기능을 사용할 수 없습니다.",

@@ -133,7 +133,13 @@ class MenuTcIntegrationTest {
         String run=execution.path("run").path("runId").asText();
         var snapshot=execution.path("run").path("snapshot");assertEquals(77,snapshot.path("items").size());
         assertEquals(4,snapshot.path("groups").size());
-        for(var item:snapshot.path("items")){assertTrue(item.path("result").isNull());assertEquals(item.path("tc").path("featureId").asText().startsWith("scope:")?"NEEDS_CONTEXT":"PENDING",item.path("executionStatus").asText());assertTrue(item.path("evidence").isEmpty());}
+        for(var item:snapshot.path("items")){
+            assertTrue(item.path("result").isNull());
+            boolean needsSpec=TcExecutionSpecification.VERSION.equals(item.path("tc").path("executionPlan").path("specificationVersion").asText());
+            assertEquals(item.path("tc").path("featureId").asText().startsWith("scope:")||needsSpec?"NEEDS_CONTEXT":"PENDING",item.path("executionStatus").asText());
+            if(needsSpec){assertEquals("EXECUTION_SPEC_NEEDS_CONTEXT",item.path("reasonCode").asText());assertFalse(item.path("missingBindings").isEmpty());}
+            assertTrue(item.path("evidence").isEmpty());
+        }
         mvc.perform(get(executionBase).param("run",run).header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.snapshot.caseCount").value(77));
         mvc.perform(get(executionBase).param("run",run).header("X-Member-Id",member+1)).andExpect(status().isForbidden());
         org.mockito.Mockito.doThrow(new com.autotest.test_management_service.application.productdescription.ProductDescriptionException(
@@ -198,7 +204,9 @@ class MenuTcIntegrationTest {
         var worker=new TestExecutionWorker(jdbc,mapper,executions,setups,cipher,"http://127.0.0.1:"+fakeAi.getAddress().getPort(),"test-token");
         try {
             // Only one function TC: common/manual groups stay outside this worker transport test.
-            String caseId=snapshot.path("items").get(0).path("caseId").asText();
+            String caseId=null;
+            for(var item:snapshot.path("items"))if("PENDING".equals(item.path("executionStatus").asText())&&!item.path("featureId").asText().startsWith("scope:")){caseId=item.path("caseId").asText();break;}
+            assertNotNull(caseId); // Unbound read recipes are deliberately excluded from this transport/storage check.
             var workerRun=executions.prepare(submission,member,UUID.fromString(set),"https://example.com","",List.of(caseId),false).path("run");
             UUID workerRunId=UUID.fromString(workerRun.path("runId").asText());executions.transition(submission,member,workerRunId,false);
             // Keep the competing prepared history, but no other queued work.
