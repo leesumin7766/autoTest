@@ -32,7 +32,7 @@ public class ExecutionReadinessService {
         boolean browserApi="tc-browser-v2".equals(b.path("protocolVersion").asText());
         boolean browserReady=browserApi&&b.path("browserAvailable").asBoolean();
         boolean model=aiReady&&p.path("plannerAvailable").asBoolean();boolean judge=aiReady&&p.path("judgeConfigured").asBoolean();
-        var result=mapper.createObjectNode().put("executorConnected",aiReady&&browserReady&&model).put("judgeConnected",judge).put("planner",p.path("model").asText("qwen3:4b")).put("judge","Jev").put("readinessCheckedAt",Instant.now().toString());
+        var result=mapper.createObjectNode().put("executorConnected",aiReady&&browserReady&&model).put("judgeConnected",judge).put("planner",p.path("model").asText("qwen3.8:27b")).put("judge","Jev").put("readinessCheckedAt",Instant.now().toString());
         result.set("executionSpecificationVersions",p.path("specificationVersions").isArray()?p.path("specificationVersions").deepCopy():mapper.createArrayNode());
         var issues=result.putArray("readinessIssues");
         result.put("executorBusy",b.path("busy").asBoolean()).put("browserConnected",browserReady);

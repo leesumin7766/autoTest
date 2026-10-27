@@ -115,7 +115,7 @@ async def plan_with_qwen(payload):
         schema['$defs']['Condition']['properties']['expected']['enum'] = [expected, *sorted(values-{expected})[:199]]
     async with httpx.AsyncClient(timeout=httpx.Timeout(600, connect=5)) as client:
         response = await client.post(os.getenv('OLLAMA_BASE_URL', 'http://ollama:11434').rstrip('/') + '/api/chat', json={
-            'model': os.getenv('EXECUTION_QWEN_MODEL', 'qwen3:8b'), 'stream': False, 'think': False,
+            'model': os.getenv('EXECUTION_QWEN_MODEL', 'qwen3.8:27b'), 'stream': False, 'think': False,
             'format': schema, 'options': {'temperature': 0, 'num_ctx': 8192, 'num_predict': 1000},
             'messages': [{'role': 'system', 'content': INSTRUCTIONS}, {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}]})
         response.raise_for_status()
@@ -422,7 +422,7 @@ async def feature(request: Execute):
 
 @router.get('/capabilities')
 async def capabilities():
-    model = os.getenv('EXECUTION_QWEN_MODEL', 'qwen3:8b')
+    model = os.getenv('EXECUTION_QWEN_MODEL', 'qwen3.8:27b')
     available = False
     try:
         async with httpx.AsyncClient(timeout=3) as client:

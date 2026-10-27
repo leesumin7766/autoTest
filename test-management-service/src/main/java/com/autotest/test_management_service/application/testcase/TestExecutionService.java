@@ -88,7 +88,7 @@ public class TestExecutionService {
         return status(submission,member,run);
     }
     public ObjectNode status(UUID submission,long member,UUID selected) {
-        owner(submission,member,false);var result=mapper.createObjectNode();result.put("executorConnected",false).put("judgeConnected",false).put("planner","qwen3:4b").put("judge","Jev");
+        owner(submission,member,false);var result=mapper.createObjectNode();result.put("executorConnected",false).put("judgeConnected",false).put("planner","qwen3.8:27b").put("judge","Jev");
         var history=jdbc.query("SELECT run_id,status,created_at FROM test_execution_runs WHERE submission_id=? AND member_id=? ORDER BY created_at DESC,run_id DESC LIMIT 50",(rs,n)->mapper.createObjectNode().put("runId",rs.getString(1)).put("status",rs.getString(2)).put("createdAt",rs.getTimestamp(3).toInstant().toString()),submission,member);
         result.set("history",mapper.valueToTree(history));if(selected==null&&!history.isEmpty())selected=UUID.fromString(history.getFirst().path("runId").asText());
         if(selected==null){result.putNull("run");return result;}
