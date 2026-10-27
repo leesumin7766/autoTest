@@ -10,6 +10,18 @@ class EvidenceTest(unittest.TestCase):
         self.assertIn('저장 실패',history[0]['records'][0]['observedChanges'])
         self.assertLess(len(str(history)),1000)
         self.assertIn('저장 실패',source[0]['records'][0]['text'])
+    def test_numbered_expectations_remain_two_complete_conditions(self):
+        from execution_contract import requirements, compiled_conditions
+        text='1. 로그인 후 대시보드가 표시된다.\n2. 권한 밖 화면 접근이 차단된다.'
+        tc={'expectedResult':text}
+        expected=['1. 로그인 후 대시보드가 표시된다.','2. 권한 밖 화면 접근이 차단된다.']
+        self.assertEqual(expected,requirements(tc))
+        conditions=compiled_conditions(tc,[])
+        self.assertEqual(expected,[c.requirementQuote for c in conditions])
+        self.assertTrue(assess(tc,conditions,[])['completeRequirementCoverage'])
+        # A missing permission check must still prevent a positive verdict.
+        self.assertIsNone(self.verdict(tc,conditions,self.evidence('대시보드'))['result'])
+
     def test_positive_literal_cannot_be_compiled_as_absence(self):
         from execution_contract import compiled_conditions
         condition=Condition(requirementQuote='성공',method='TEXT_ABSENT',expected='성공')
