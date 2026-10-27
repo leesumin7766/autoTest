@@ -5,6 +5,8 @@ const { login } = require('./remote-agent/engine');
 const mutation = /delete|remove|destroy|reset|purchase|payment|execute|terminate|kill|save|submit|upload|create|삭제|초기화|결제|실행|종료|저장|등록|추가|업로드|적용|승인/i;
 const sessions = new Map();
 const failure = code => Object.assign(new Error(code), { code });
+function redact(value,s){const secret=s.openInput?.password;if(typeof value==='string')return secret?value.replaceAll(secret,'[REDACTED]'):value;if(Array.isArray(value))return value.map(v=>redact(v,s));if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,k==='screenshot'?v:redact(v,s)]));return value;}
+function sameEntry(actual,expected){const a=new URL(actual),b=new URL(expected);return a.origin===b.origin&&a.pathname.replace(/\/$/,'')===b.pathname.replace(/\/$/,'')&&a.search===b.search&&a.hash===b.hash;}
 function publicUrl(value){try{const url=new URL(value);for(const key of [...url.searchParams.keys()])if(/token|password|secret|session|authorization|api.?key|code/i.test(key))url.searchParams.set(key,'REDACTED');return url.href}catch{return ''}}
 async function ready(s){
   const deadline=Date.now()+Math.min(60000,Math.max(1000,(s.loadTimeout||15)*1000));
@@ -37,12 +39,22 @@ async function observe(s) {
   }
   const observation={...parts[0],text:parts.map((part,index)=>index?`\n[frame ${index}]\n${part.text}`:part.text).join('').slice(0,16000),elements:parts.flatMap(part=>part.elements),supportedFrameCount:parts.length-1};
   observation.url=publicUrl(observation.url);
+  const atInitialUrl=sameEntry(s.page.url(),s.openInput.targetUrl);
+  const loginEntry=s.openInput.setup?.loginMethod==='FORM_AUTO'&&new URL(s.page.url()).origin===new URL(s.openInput.targetUrl).origin
+    &&observation.elements.some(el=>el.type==='password')&&observation.elements.some(el=>el.tag==='input'&&['','text','email'].includes(el.type))
+    &&observation.elements.some(el=>(el.tag==='button'||el.type==='submit')&&/로그인|log\s?in|sign\s?in|접속/i.test(el.name));
+  observation.entryState={requestedUrl:publicUrl(s.openInput.targetUrl),actualUrl:observation.url,atInitialUrl,initialScreenReady:atInitialUrl||loginEntry,redirectDisposition:atInitialUrl?'NONE':loginEntry?'LOGIN_ENTRY_REDIRECT':'UNEXPECTED_REDIRECT',initialEntryRequired:s.openInput.initialEntry===true,
+    sessionMode:s.openInput.initialEntry?'FRESH_ANONYMOUS':'SETUP',authenticationState:s.authenticatedBySetup?'AUTHENTICATED_BY_SETUP':observation.elements.some(el=>el.type==='password')?'LOGIN_FORM_OBSERVED':'UNKNOWN',sessionResets:s.entryResetCount};
+  if(s.authenticatedByTest)observation.entryState.authenticationState='AUTHENTICATED_BY_TEST';
+  observation.authentication={savedAccountAvailable:!!(s.openInput.password&&s.openInput.setup?.automation?.username),dedicatedLoginAllowed:s.positiveLogin,loginAttempted:s.loginAttempted,outcome:s.loginOutcome||'NOT_ATTEMPTED'};
   for(const el of observation.elements)if(el.href&&publicUrl(el.href)!==el.href)el.href='';
   s.observation = observation;
   let screenshot = null;
-  const png = await s.page.screenshot({ fullPage: false }).catch(() => null);
+  const masks=[s.page.locator('input,textarea,[contenteditable="true"]')];
+  if(s.openInput.password)masks.push(s.page.getByText(s.openInput.password,{exact:false}));
+  const png = await s.page.screenshot({ fullPage: false,mask:masks }).catch(() => null);
   if (png && png.length < 750000) screenshot = png.toString('base64');
-  return { ...observation, screenshot };
+  return redact({ ...observation, screenshot },s);
 }
 function safeUrl(value, origins) {
   const url = new URL(value);
@@ -55,17 +67,25 @@ async function open(input) {
   const browser = await chromium.launch({ headless: true });
   try {
     const setup = input.setup || { loginMethod: 'NONE', automation: {} };
+    const positiveLogin=input.testRuleId==='LOGIN-04';
+    const anonymous=input.initialEntry===true||positiveLogin;
     if (!['NONE', 'FORM_AUTO', 'BASIC_AUTH'].includes(setup.loginMethod)) throw failure('EXECUTION_LOGIN_UNSUPPORTED');
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true,
       ignoreHTTPSErrors: setup.automation?.ignoreHTTPSErrors === true,
-      ...(setup.loginMethod === 'BASIC_AUTH' ? { httpCredentials: { username: setup.automation.username, password: input.password } } : {}) });
+      ...(!anonymous && setup.loginMethod === 'BASIC_AUTH' ? { httpCredentials: { username: setup.automation.username, password: input.password } } : {}) });
     const page = await context.newPage(); page.setDefaultTimeout(8000);
-    const s = { browser, context, page, origins, effects: new Set(), pendingRequests:new Set(),loadTimeout:setup.automation?.pageLoadTimeoutSeconds||15,allowMutation: input.allowMutation === true, observation: null, busy: false, downloads: [], dialogs: [], touched: Date.now(), authenticating: setup.loginMethod === 'FORM_AUTO', blockedRequests: 0 };
+    const s = { browser, context, page, origins, effects: new Set(), pendingRequests:new Set(),loadTimeout:setup.automation?.pageLoadTimeoutSeconds||15,allowMutation: input.allowMutation === true, observation: null, busy: false, downloads: [], dialogs: [], touched: Date.now(), authenticating: !input.initialEntry && setup.loginMethod === 'FORM_AUTO', blockedRequests: 0 };
+    s.openInput=input;s.entryResetCount=input.entryResetCount||0;s.entryGateOpen=false;s.authenticatedBySetup=false;s.positiveLogin=positiveLogin;s.loginAttempted=false;
+    s.authenticating=!anonymous&&setup.loginMethod==='FORM_AUTO';
     page.on('request',request=>{if(['document','xhr','fetch'].includes(request.resourceType()))s.pendingRequests.add(request)});
     page.on('requestfinished',request=>s.pendingRequests.delete(request));page.on('requestfailed',request=>s.pendingRequests.delete(request));
     await context.route('**/*', route => {
       try {
         safeUrl(route.request().url(), origins);
+        if(s.dedicatedAuthentication&&!['GET','HEAD','OPTIONS'].includes(route.request().method())){
+          const u=new URL(route.request().url());
+          if(u.origin!==s.authenticationOrigin||!(s.authPosts.has(u.pathname)||/\/(login|signin|sign-in|authenticate|authentication|session|token)(\/|$)/i.test(u.pathname))){s.blockedRequests++;return route.abort();}
+        }
         if (!s.authenticating && !s.allowMutation && !['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())) { s.blockedRequests++; return route.abort(); }
         return route.continue();
       } catch { return route.abort(); }
@@ -82,15 +102,17 @@ async function open(input) {
         entry.status='COMPLETED';
       }catch{entry.status='FAILED';}})();
     });
-    if (setup.loginMethod === 'FORM_AUTO') {
+    if (!anonymous && setup.loginMethod === 'FORM_AUTO') {
       if (!input.password) throw failure('EXECUTION_PASSWORD_REQUIRED');
       await login(page, { targetUrl: input.targetUrl, automation: setup.automation, password: input.password }, new Set());
+      s.authenticatedBySetup=true;
     } else await page.goto(input.targetUrl, { waitUntil: 'domcontentloaded', timeout: 25000 });
     s.authenticating = false;
     s.runId=input.runId;s.attempt=input.attempt;
     if (page.url() === 'about:blank') throw failure('EXECUTION_TARGET_UNREACHABLE');
     await ready(s);
     const observation = await observe(s);
+    s.entryGateOpen=input.initialEntry===true&&!observation.entryState.initialScreenReady;
     const sessionId = randomUUID(); sessions.set(sessionId, s);
     return { sessionId, observation };
   } catch (error) {
@@ -105,8 +127,38 @@ async function step(s, actions) {
   for (const action of actions) {
     const record = { action: action.action, elementId: action.elementId || null, status: 'COMPLETED' };
     try {
+      if(s.entryGateOpen&&action.action!=='reset_session')throw failure('EXECUTION_INITIAL_ENTRY_NOT_READY');
       record.beforeText=(await s.page.locator('body').innerText()).slice(0,5000);
-      if (action.action === 'reload') await s.page.reload({waitUntil:'domcontentloaded',timeout:20000});
+      if(action.action==='reset_session'){
+        if(!s.entryGateOpen||s.entryResetCount>=1)throw failure('EXECUTION_INITIAL_ENTRY_NOT_READY');
+        const previousBrowser=s.browser;
+        const replacement=await open({...s.openInput,initialEntry:true,entryResetCount:s.entryResetCount+1});
+        const fresh=sessions.get(replacement.sessionId);sessions.delete(replacement.sessionId);const wasBusy=s.busy;Object.assign(s,fresh);s.busy=wasBusy;
+        await previousBrowser.close();record.isNavigation=true;record.initializationOnly=true;
+      }
+      else if(action.action==='login_saved_account'){
+        if(!s.positiveLogin||s.openInput.setup?.loginMethod!=='FORM_AUTO')throw failure('EXECUTION_LOGIN_ACTION_NOT_ALLOWED');
+        if(s.loginAttempted)throw failure('EXECUTION_LOGIN_REPEAT_BLOCKED');
+        if(!s.openInput.password||!s.openInput.setup?.automation?.username)throw failure('EXECUTION_INPUT_CONTEXT_REQUIRED');
+        s.loginAttempted=true;record.targetName='저장된 시험 계정으로 로그인';record.credentialRef='SAVED_TEST_ACCOUNT';record.authenticationSteps=[];record.isNavigation=false;
+        s.authPosts=new Set();s.authenticationOrigin=new URL(s.openInput.setup.automation.loginUrl||s.openInput.targetUrl).origin;s.dedicatedAuthentication=true;s.authenticating=true;
+        try{
+          const verifyLoginOrigin=async page=>{
+            const origin=new URL(page.url()).origin;
+            const forms=await page.locator('input[type="password"]').evaluateAll(inputs=>inputs.map(el=>el.form?.action||location.href));
+            if(origin!==s.authenticationOrigin||!s.origins.has(origin)||forms.some(url=>new URL(url).origin!==origin))throw failure('EXECUTION_SCOPE_BLOCKED');
+            for(const url of forms)s.authPosts.add(new URL(url).pathname);
+          };
+          await login(s.page,{targetUrl:s.openInput.targetUrl,automation:s.openInput.setup.automation,password:s.openInput.password},s.authPosts,verifyLoginOrigin,phase=>record.authenticationSteps.push(phase),verifyLoginOrigin);
+          s.authenticatedByTest=true;s.loginOutcome='AUTHENTICATED';
+        }catch(error){
+          s.loginOutcome='UNCONFIRMED';
+          if(!record.authenticationSteps.includes('SUBMITTED'))throw failure(error.code||'EXECUTION_LOGIN_ACTION_FAILED');
+          record.authenticationError=['LOGIN_FAILED','LOGIN_NOT_CONFIRMED'].includes(error.message)?error.message:'EXECUTION_LOGIN_ACTION_FAILED';
+        }finally{s.authenticating=false;s.dedicatedAuthentication=false;}
+        record.authenticationOutcome=s.loginOutcome;
+      }
+      else if (action.action === 'reload') await s.page.reload({waitUntil:'domcontentloaded',timeout:20000});
       else if (action.action === 'wait') await s.page.waitForTimeout(Math.min(2000, Math.max(0, Number(action.milliseconds) || 500)));
       else if (action.action === 'goto') {
         record.isNavigation=true;
@@ -117,6 +169,7 @@ async function step(s, actions) {
       } else {
         const el = s.observation.elements.find(x => x.id === action.elementId);
         if (!el || !/^\d+$/.test(el.id)) throw failure('EXECUTION_ELEMENT_UNKNOWN');
+        if(s.positiveLogin&&action.action==='click'&&/로그인|log\s?in|sign\s?in|접속/i.test(el.name))throw failure('EXECUTION_LOGIN_REQUIRES_SAVED_ACCOUNT');
         record.isNavigation=action.action==='click'&&el.navigation===true;
         record.targetName=el.name;record.targetContext=el.context;record.frameIndex=el.frameIndex;record.value=action.action==='fill'||action.action==='select'?String(action.value||''):undefined;
         if (el.type === 'password' || el.type === 'file') throw failure('EXECUTION_INPUT_CONTEXT_REQUIRED');
@@ -141,10 +194,10 @@ async function step(s, actions) {
   }
   s.touched = Date.now();
   await Promise.all(s.downloads.map(d=>d.promise));
-  return { records, downloads: s.downloads.map(({promise,...value})=>value), dialogs: s.dialogs, blockedRequests: s.blockedRequests, needsDialogInput: s.dialogs.some(d=>d.type==='confirm'||d.type==='prompt'), observation: await observe(s) };
+  return redact({ records, downloads: s.downloads.map(({promise,...value})=>value), dialogs: s.dialogs, blockedRequests: s.blockedRequests, needsDialogInput: s.dialogs.some(d=>d.type==='confirm'||d.type==='prompt'), observation: await observe(s) },s);
 }
 function register(app, auth, reserve, release, isBusy=()=>false) {
-  app.get('/api/v1/tc-browser/capabilities',auth,(_req,res)=>res.json({protocolVersion:'tc-browser-v2',busy:isBusy(),browserAvailable:require('node:fs').existsSync(chromium.executablePath()),actions:['click','fill','select','goto','wait','reload']}));
+  app.get('/api/v1/tc-browser/capabilities',auth,(_req,res)=>res.json({protocolVersion:'tc-browser-v2',busy:isBusy(),browserAvailable:require('node:fs').existsSync(chromium.executablePath()),actions:['click','fill','select','goto','wait','reload','login_saved_account']}));
   app.post('/api/v1/tc-browser/open', auth, async (req, res) => {
     if (!reserve()) return res.status(429).json({ code: 'EXECUTION_BROWSER_BUSY' });
     try { res.json(await open(req.body)); } catch (error) { release(); res.status(422).json({ code: error.code || 'EXECUTION_OPEN_FAILED' }); }

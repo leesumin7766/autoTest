@@ -4,6 +4,7 @@ import java.net.URI;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -31,7 +32,7 @@ public class RemoteCrawlService {
     private final LocalCrawlDispatcher local;
     private static final Set<String> FAILURES=Set.of("LOGIN_FAILED","LOGIN_CONFIRMATION_REQUIRED","LOGIN_METHOD_UNSUPPORTED",
             "TARGET_UNREACHABLE","CERTIFICATE_ERROR","CRAWL_FAILED","AGENT_DISCONNECTED","CAPTURE_TOO_LARGE",
-            "LOGIN_NOT_CONFIRMED","LOCAL_RUNNER_UNAVAILABLE","CONNECTION_SCOPE_BLOCKED","PAGE_LOAD_TIMEOUT");
+            "LOGIN_NOT_CONFIRMED","LOCAL_RUNNER_UNAVAILABLE","CONNECTION_SCOPE_BLOCKED","PAGE_LOAD_TIMEOUT","CRAWL_LANGUAGE_RESTART_REQUIRED");
     public RemoteCrawlService(JdbcTemplate jdbc,ObjectMapper mapper,PlaywrightSetupService setups,
             PlaywrightCredentialCipher cipher,SubmissionRepository submissions,PlatformTransactionManager manager,LocalCrawlDispatcher local) {
         this.jdbc=jdbc; this.mapper=mapper; this.setups=setups; this.cipher=cipher; this.submissions=submissions;
@@ -91,7 +92,16 @@ public class RemoteCrawlService {
     public ObjectNode resume(UUID submission,long member,UUID job,UUID agent,String mode){
         return start(submission,member,agent,mode,"CRAWL",null,job);
     }
+    public ObjectNode retry(UUID submission,long member,UUID job,UUID agent,String mode,java.util.List<String> keys,String scope){
+        if(keys==null||keys.isEmpty()||keys.size()>500||keys.stream().anyMatch(k->k==null||k.isBlank())||!Set.of("SELF","SUBTREE").contains(scope==null?"":scope))
+            throw error(HttpStatus.BAD_REQUEST,"CRAWL_REQUEST_INVALID","재수집할 메뉴와 범위를 선택해 주세요.");
+        var selection=mapper.createObjectNode().put("scope",scope);selection.set("keys",mapper.valueToTree(keys));
+        return start(submission,member,agent,mode,"CRAWL",null,job,selection);
+    }
     private ObjectNode start(UUID submission,long member,UUID agentId,String executionMode,String purpose,PlaywrightSetupService.SetupRequest draft,UUID resume) {
+        return start(submission,member,agentId,executionMode,purpose,draft,resume,null);
+    }
+    private ObjectNode start(UUID submission,long member,UUID agentId,String executionMode,String purpose,PlaywrightSetupService.SetupRequest draft,UUID resume,JsonNode selection) {
         if(!Set.of("LOCAL","REMOTE").contains(executionMode) || !Set.of("CONNECTION","LOGIN","CRAWL").contains(purpose))
             throw error(HttpStatus.BAD_REQUEST,"CRAWL_REQUEST_INVALID","실행 위치와 테스트 유형을 확인해 주세요.");
         recover(); owner(submission,member);
@@ -125,6 +135,17 @@ public class RemoteCrawlService {
                     if(old.path("count").asInt()>=500||old.path("bytes").asLong()>=64L*1024*1024)throw error(HttpStatus.CONFLICT,"CRAWL_RESUME_LIMIT","보존할 화면이 작업 저장 한도에 도달했습니다. 수집 범위를 나눠 새 수집을 시작하세요.");
                     ((ObjectNode)snapshot.path("automation")).put("maxPages",Math.min(500,old.path("count").asInt()+snapshot.path("automation").path("maxPages").asInt(100)));
                     continuation=mapper.createObjectNode().put("resumedFrom",resume.toString()).put("elapsedMs",elapsed(old)).put("segmentStartedAt",Instant.now().toString()).put("preservedCount",old.path("count").asInt());
+                    continuation.set("skipped",old.path("crawlResult").path("skipped").isArray()?old.path("crawlResult").path("skipped").deepCopy():mapper.createArrayNode());
+                    if(selection!=null){
+                        var targets=mapper.createArrayNode();var wanted=new HashSet<String>();selection.path("keys").forEach(k->wanted.add(k.asText()));
+                        for(var item:old.path("crawlResult").path("skipped"))if(wanted.remove(item.path("menuKey").asText())){
+                            if(!item.path("path").isArray()||item.path("path").isEmpty())throw error(HttpStatus.BAD_REQUEST,"CRAWL_REQUEST_INVALID","경로 정보가 없는 항목은 전체 이어서 수집을 이용해 주세요.");
+                            var target=targets.addObject().put("menuKey",item.path("menuKey").asText());target.set("path",item.path("path").deepCopy());
+                        }
+                        if(!wanted.isEmpty())throw error(HttpStatus.BAD_REQUEST,"CRAWL_REQUEST_INVALID","원본 수집의 미완료 항목만 선택할 수 있습니다.");
+                        var retry=snapshot.putObject("retrySelection").put("scope",selection.path("scope").asText());retry.set("targets",targets);
+                        continuation.set("retrySelection",retry.deepCopy());
+                    }
                 }
                 jdbc.update("""
                         INSERT INTO playwright_crawl_jobs(job_id,submission_id,member_id,agent_id,status,setup_snapshot,password_ciphertext,document_digest,created_at,execution_mode,purpose)
@@ -216,12 +237,18 @@ public class RemoteCrawlService {
         return claim(agent,false);
     }
     public ObjectNode claim(UUID agent,boolean supportsResume) {
+        return claim(agent,supportsResume,false);
+    }
+    public ObjectNode claim(UUID agent,boolean supportsResume,boolean supportsRetry) {
         seen(agent); recover();
         return tx.execute(status->{
             var rows=jdbc.query("SELECT job_id,submission_id,member_id,document_digest,setup_snapshot::text,password_ciphertext,purpose FROM playwright_crawl_jobs WHERE agent_id=? AND status='QUEUED' ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED",
                     (rs,n)->new Pending(rs.getObject(1,UUID.class),rs.getObject(2,UUID.class),rs.getLong(3),rs.getString(4).trim(),rs.getString(5),rs.getString(6),rs.getString(7)),agent);
             if(rows.isEmpty()) return mapper.createObjectNode();
             var pending=rows.getFirst();
+            if(parse(pending.snapshot()).has("retrySelection")&&!supportsRetry){
+                jdbc.update("UPDATE playwright_crawl_jobs SET status='FAILED',error_code='AGENT_UPDATE_REQUIRED',password_ciphertext=NULL,updated_at=now() WHERE job_id=?",pending.id());return mapper.createObjectNode();
+            }
             if(!supportsResume&&jdbc.queryForObject("SELECT page_count FROM playwright_crawl_jobs WHERE job_id=?",Integer.class,pending.id())>0){
                 jdbc.update("UPDATE playwright_crawl_jobs SET status='FAILED',error_code='AGENT_UPDATE_REQUIRED',password_ciphertext=NULL,updated_at=now() WHERE job_id=?",pending.id());return mapper.createObjectNode();
             }
@@ -244,6 +271,8 @@ public class RemoteCrawlService {
                 var resume=payload.putObject("resume");var pages=resume.putArray("pages");
                 jdbc.query("SELECT page_index,screen_state::text,nav_transition::text FROM playwright_crawl_pages WHERE job_id=? ORDER BY page_index",rs->{var page=pages.addObject().put("pageIndex",rs.getInt(1));page.set("screenState",parse(rs.getString(2)));page.set("transition",parse(rs.getString(3)));},job.id());
                 resume.put("pageCount",pages.size());resume.put("bytes",jdbc.queryForObject("SELECT screenshot_bytes FROM playwright_crawl_jobs WHERE job_id=?",Long.class,job.id()));
+                var previous=jdbc.queryForObject("SELECT crawl_result::text FROM playwright_crawl_jobs WHERE job_id=?",String.class,job.id());
+                if(previous!=null)resume.set("skipped",parse(previous).path("skipped"));
             }
             jdbc.update("UPDATE playwright_crawl_jobs SET status='RUNNING',claim_token=?,lease_expires_at=now()+interval '45 seconds',updated_at=now() WHERE job_id=?",token,job.id());
             return payload;
@@ -284,6 +313,13 @@ public class RemoteCrawlService {
                         && summary.path("navigationFailureCount").asInt()==0 && summary.path("noChangeCount").asInt()==0 && summary.path("unresolvedCount").asInt()==0 ? "COMPLETE" : "INCOMPLETE");
                 var skipped=body.path("result").path("skipped");
                 if(skipped.isArray() && skipped.size()<=500 && json(skipped).length()<200_000) summary.set("skipped",skipped);
+                var language=body.path("result").path("collectionLanguage");
+                if(Set.of("KOREAN_CONFIRMED","UNCONFIRMED","LEGACY_RESUME","RESUME_PRESERVED").contains(language.path("status").asText())) {
+                    var clean=summary.putObject("collectionLanguage").put("requested","ko").put("status",language.path("status").asText());
+                    clean.put("detected",Set.of("ko","en").contains(language.path("detected").asText())?language.path("detected").asText():"unknown");
+                    clean.put("browserLocale",Set.of("ko-KR","en-US").contains(language.path("browserLocale").asText())?language.path("browserLocale").asText():"default");
+                    clean.put("switched",language.path("switched").asBoolean());
+                }
                 jdbc.update("UPDATE playwright_crawl_jobs SET status=?,error_code=?,stop_reason=?,crawl_result=COALESCE(crawl_result,'{}'::jsonb)||?::jsonb,password_ciphertext=NULL,updated_at=now() WHERE job_id=?",
                         active.count()>0?"COMPLETED":"FAILED",active.count()>0?null:"NO_PAGES_CAPTURED",reason,json(summary),job);
                 }
@@ -292,7 +328,7 @@ public class RemoteCrawlService {
                 jdbc.update("UPDATE playwright_crawl_jobs SET status='FAILED',error_code=?,password_ciphertext=NULL,updated_at=now() WHERE job_id=?",FAILURES.contains(code)?code:"CRAWL_FAILED",job);
             } else if(!"heartbeat".equals(event)) throw error(HttpStatus.BAD_REQUEST,"CRAWL_EVENT_INVALID","지원하지 않는 수집 이벤트입니다.");
             var incoming=body.path("progress");
-            if(incoming.isObject()&&Set.of("CONNECTING","LOGIN","DISCOVERING","NAVIGATING","LOADING","CAPTURING").contains(incoming.path("stage").asText())){
+            if(incoming.isObject()&&Set.of("CONNECTING","LOGIN","LANGUAGE","DISCOVERING","NAVIGATING","LOADING","CAPTURING").contains(incoming.path("stage").asText())){
                 var progress=mapper.createObjectNode().put("stage",incoming.path("stage").asText()).put("current",incoming.path("current").asText().substring(0,Math.min(500,incoming.path("current").asText().length()))).put("remaining",Math.max(0,Math.min(5000,incoming.path("remaining").asInt())));
                 jdbc.update("UPDATE playwright_crawl_jobs SET crawl_result=COALESCE(crawl_result,'{}'::jsonb)||jsonb_build_object('progress',?::jsonb) WHERE job_id=? AND status='RUNNING'",json(progress),job);
             }

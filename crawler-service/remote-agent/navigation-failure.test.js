@@ -3,6 +3,25 @@ const assert=require('node:assert/strict');
 const http=require('node:http');
 const {crawl}=require('./walker');
 
+for(const failures of [1,2])test(`language inspection context loss retries once and isolates repeated failure (${failures})`,{timeout:45000},async()=>{
+ const {chromium}=require('playwright');const {inspectLanguage}=require('./language');
+ const server=http.createServer((req,res)=>{res.setHeader('Content-Type','text/html; charset=utf-8');res.end(req.url==='/'?'<h1>시작 화면</h1><nav><a href="/unstable">전환 화면</a><a href="/good">정상 메뉴</a></nav>':`<h1>화면 ${req.url}</h1>`)});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const pages=[];let injected=0;
+ const browserType={launch:async options=>{
+  const browser=await chromium.launch(options),newContext=browser.newContext.bind(browser);
+  browser.newContext=async options=>{const context=await newContext(options),newPage=context.newPage.bind(context);
+   context.newPage=async()=>{const page=await newPage(),evaluate=page.evaluate.bind(page);
+    page.evaluate=async(fn,...args)=>{if(fn===inspectLanguage&&page.url().endsWith('/unstable')&&injected<failures){injected++;throw Error('Execution context was destroyed, most likely because of a navigation')}
+     return evaluate(fn,...args)};return page};return context};return browser;
+ }};
+ try{
+  const result=await crawl({targetUrl:`http://127.0.0.1:${server.address().port}/`,loginMethod:'NONE',automation:{allowedOrigins:[],includePaths:[],excludePaths:[],maxPages:10,maxDepth:2,maxDurationSeconds:35,pageLoadTimeoutSeconds:3,viewportWidth:900,viewportHeight:700}},{browserType,onPage:async page=>pages.push(page)});
+  assert.equal(injected,failures);assert.equal(result.stopReason,'DONE');assert.ok(pages.some(page=>page.url.endsWith('/good')));
+  if(failures===1){assert.ok(pages.some(page=>page.url.endsWith('/unstable')));assert.equal(result.navigationFailureCount,0)}
+  else{assert.equal(result.navigationFailureCount,1);assert.equal(result.skipped[0].reason,'SCREEN_CONTEXT_CHANGED');assert.equal(result.skipped[0].stage,'LANGUAGE');assert.equal(result.coverageStatus,'INCOMPLETE')}
+ }finally{await new Promise(resolve=>server.close(resolve))}
+});
+
 test('a non-HTTP error destination is recorded without aborting other menus',{timeout:45000},async()=>{
  const server=http.createServer((req,res)=>{
   res.setHeader('Content-Type','text/html; charset=utf-8');

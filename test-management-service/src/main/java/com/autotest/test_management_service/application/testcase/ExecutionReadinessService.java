@@ -34,7 +34,7 @@ public class ExecutionReadinessService {
         boolean model=aiReady&&p.path("plannerAvailable").asBoolean();boolean judge=aiReady&&p.path("judgeConfigured").asBoolean();
         var result=mapper.createObjectNode().put("executorConnected",aiReady&&browserReady&&model).put("judgeConnected",judge).put("planner",p.path("model").asText("qwen3:4b")).put("judge","Jev").put("readinessCheckedAt",Instant.now().toString());
         var issues=result.putArray("readinessIssues");
-        result.put("executorBusy",b.path("busy").asBoolean());
+        result.put("executorBusy",b.path("busy").asBoolean()).put("browserConnected",browserReady);
         if(!aiReady)issues.addObject().put("code","EXECUTION_AI_API_UNAVAILABLE").put("message","AI 서버의 시험 실행 API가 없거나 버전이 다릅니다. 현재 작업 버전으로 AI 서비스를 반영해야 합니다.");
         else if(!model)issues.addObject().put("code","EXECUTION_MODEL_UNAVAILABLE").put("message","로컬 Qwen 모델을 사용할 수 없습니다. Ollama 연결과 설치 모델을 확인하세요.");
         if(!browserApi)issues.addObject().put("code","EXECUTION_BROWSER_API_UNAVAILABLE").put("message","Playwright 실행 API가 없거나 버전이 다릅니다. 크롤러 서비스를 현재 버전으로 반영해야 합니다.");

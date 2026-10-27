@@ -4,12 +4,13 @@ import { classifyTcFeature } from './tcClassification'
 
 // Refresh persisted sources on tab entry while retaining local review state.
 
+type Authentication = {required:boolean;targetUrl?:string;loginUrl?:string;failedAttemptLimit?:number;policyNote?:string;loginConfigured?:boolean;verifiedCrawlAuthentication?:boolean}
 type FeatureType = '로그인' | '주요기능' | '부가기능' | 'CRUD'
 type MenuRow = { rowId: string; included: boolean; rowType?: string; functionName: string; menuPath: string[]; menuDescription: string; featureType?: FeatureType }
-type Menu = { jobId: string; productName: string; status: string; revision: number; stale: boolean; generationMode: string; output?: { rows: MenuRow[]; completionStatus?: string } }
+type Menu = { authentication?:Authentication; jobId: string; productName: string; status: string; revision: number; stale: boolean; generationMode: string; output?: { rows: MenuRow[]; completionStatus?: string } }
 type MenuView = { job: Menu | null; history: { jobId: string; productName: string; status: string }[] }
 type Tc = { id: string; tcId: string; featureId: string; featurePath: string[]; featureType: string; qualityCharacteristic: string; subCharacteristic: string; scenario: string; inputs: string; expectedResult: string; result: null; scopeDescription: string; ruleId: string; evidence: unknown[]; defectExample: { summary: string; severity: string; content: string }; executionPlan: { targetUrl: string; steps: string[]; applicability: string; requiredContext: string[] } }
-type Output = { productName: string; featureCount: number; caseCount: number; templateVersion: string; testCases: Tc[]; summary: Record<string, number>; source?: {authentication?: {required:boolean;failedAttemptLimit?:number;policyNote?:string}} }
+type Output = { productName: string; featureCount: number; caseCount: number; templateVersion: string; testCases: Tc[]; summary: Record<string, number>; source?: {authentication?: Authentication} }
 type SetView = { set: { setId: string; stale: boolean; menuJobId: string; menuRevision: number; output: Output } | null; history: { setId: string; createdAt: string; menuRevision: number }[] }
 const featureTypes: FeatureType[] = ['로그인', '주요기능', '부가기능', 'CRUD']
 const statusLabels: Record<string, string> = { APPROVED: '승인 완료', DRAFT: '초안', GENERATING: '생성 중', FAILED: '실패', CANCELED: '중단' }
@@ -17,6 +18,7 @@ const statusLabels: Record<string, string> = { APPROVED: '승인 완료', DRAFT:
 export function MenuTcPanel({ submissionId, memberId, active = true, onGenerated }: { submissionId: string; memberId: string; active?: boolean; onGenerated?: (setId: string) => void }) {
   const [menuView, setMenuView] = useState<MenuView>({ job: null, history: [] })
   const [selectedMenu, setSelectedMenu] = useState('')
+  const [loginUrl,setLoginUrl] = useState('')
   const [types, setTypes] = useState<Record<string, FeatureType>>({})
   const [view, setView] = useState<SetView>({ set: null, history: [] })
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState('')
@@ -63,7 +65,11 @@ export function MenuTcPanel({ submissionId, memberId, active = true, onGenerated
   const typeFor = (row: MenuRow): FeatureType => classifyTcFeature(row.functionName, types[row.rowId], row.featureType)
   const loginCount = features.filter(row => typeFor(row) === '로그인').length
   const crudCount = features.filter(row => typeFor(row) === 'CRUD').length
-  const expectedCount = loginCount * 27 + crudCount * 16 + (features.length - loginCount - crudCount) * 9 + 68
+  const authentication = menu?.authentication
+  const loginUrls = [...new Set([authentication?.targetUrl,authentication?.loginUrl].filter((url):url is string=>!!url))]
+  const selectedLoginUrl = loginUrls.includes(loginUrl)?loginUrl:authentication?.loginUrl || authentication?.targetUrl || ''
+  const automaticLogin = !!authentication?.required && loginCount===0
+  const expectedCount = loginCount * 27 + crudCount * 16 + (features.length - loginCount - crudCount) * 9 + 68 + (automaticLogin?27:0)
   const ready = (!selectedMenu || selectedMenu === menu?.jobId) && menu?.status === 'APPROVED' && !menu.stale && menu.generationMode !== 'MOCK' && menu.output?.completionStatus !== 'PARTIAL' && features.length > 0
   const output = view.set?.output
   const filtered = useMemo(() => (output?.testCases || []).filter(tc => `${tc.tcId} ${tc.featurePath.join(' ')} ${tc.scenario} ${tc.qualityCharacteristic}`.toLowerCase().includes(search.toLowerCase())), [output, search])
@@ -105,12 +111,13 @@ export function MenuTcPanel({ submissionId, memberId, active = true, onGenerated
       <p>사용자 선택과 원본 기능구분을 우선합니다. 구분이 없으면 로그인을 먼저 확인하고, 5depth 기능명의 마지막 단어가 조회·생성·삭제·등록·수정이면 CRUD, 나머지는 주요기능으로 제안합니다. CRUD는 기능당 16개 시험을 생성합니다.</p>
       <div className="tc-feature-list">{features.map(row => <label key={row.rowId}><span>{[...row.menuPath, row.functionName].join(' / ')}<small>{row.menuDescription}</small></span><select aria-label={`${row.functionName} 기능구분`} value={typeFor(row)} disabled={busy || loading} onChange={event => setTypes(current => ({ ...current, [row.rowId]: event.target.value as FeatureType }))}>{featureTypes.map(type => <option key={type}>{type}</option>)}</select></label>)}</div>
     </details>}
+    {authentication?.required&&<div className="tc-field"><p>로그인 필요 설정·문서 근거에 따라 로그인 TC 27개를 포함합니다. 메뉴 배치 여부와 별개이며 로그인 성공 판정을 의미하지 않습니다.</p>{loginUrls.length>0&&<label>로그인 화면 주소<select aria-label="로그인 화면 주소" value={selectedLoginUrl} disabled={busy||loading} onChange={event=>setLoginUrl(event.target.value)}>{loginUrls.map(url=><option key={url} value={url}>{url===authentication.targetUrl?'기본 URL':'설정된 로그인 URL'} · {url}</option>)}</select></label>}<small>주소를 변경했다면 TC 초안을 다시 생성해 적용하세요.</small></div>}
     <div className="tc-generate-toolbar"><span>{features.length ? `${features.length}개 기능 · 예상 ${expectedCount.toLocaleString()}개 TC + 인증 보완 가능` : '메뉴트리 선택 필요'}</span><button className="primary-button" disabled={!ready || !tcAvailable || busy || loading} onClick={() => void action(async () => {
       const featureTypes = Object.fromEntries(features.map(row => [row.rowId, typeFor(row)]))
-      const next: SetView = await request(base, { method: 'POST', body: JSON.stringify({ menuJobId: menu!.jobId, featureTypes }) }); setView(next); if(next.set)onGenerated?.(next.set.setId); setSearch(''); setPage(0); setDetail(null)
+      const next: SetView = await request(base, { method: 'POST', body: JSON.stringify({ menuJobId: menu!.jobId, featureTypes, loginUrl:authentication?.required?selectedLoginUrl:undefined }) }); setView(next); if(next.set)onGenerated?.(next.set.setId); setSearch(''); setPage(0); setDetail(null)
     })}>{busy ? '처리 중…' : 'TC 초안 생성'}</button></div>
     {output && <>
-      {output.source?.authentication?.required&&<p className="functional-menu-warning">로그인 TC를 먼저 배치했습니다. {output.source.authentication.policyNote} 잠금 시험은 전용 계정과 복구 절차를 준비하세요.</p>}
+      {output.source?.authentication?.required&&<p className="functional-menu-warning">로그인 TC를 먼저 배치했습니다. 로그인 화면: {output.source.authentication.loginUrl || '주소 확인 필요'}. {output.source.authentication.policyNote} 잠금 시험은 전용 계정과 복구 절차를 준비하세요.</p>}
       <div className="response-heading"><h3>{output.productName} · TC 초안</h3><span className="workspace-badge badge-success">{output.caseCount.toLocaleString()}개 생성 · 시험 미실행</span></div>
       {view.set?.stale && <p className="functional-menu-warning">원본 메뉴트리나 문서가 변경되었습니다. 이 결과는 이전 초안이며 새 승인본으로 다시 생성해야 합니다.</p>}
       <div className="tc-output-toolbar">

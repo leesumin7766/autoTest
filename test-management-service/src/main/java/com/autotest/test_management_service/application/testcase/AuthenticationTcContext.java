@@ -8,14 +8,27 @@ import java.util.regex.Pattern;
 /** Authentication is a product capability, independent of sidebar placement. */
 public final class AuthenticationTcContext {
     private AuthenticationTcContext() {}
+    public static boolean loginFeature(JsonNode row) {
+        return "로그인".equals(row.path("featureType").asText()) || row.path("functionName").asText().strip().matches("(?i).*?(로그인|login)(?:\\s*기능)?$");
+    }
+    public static void applySetup(ObjectNode result,JsonNode setup,boolean verified) {
+        String target=setup.path("targetUrl").asText();
+        if(target.isBlank())return;
+        result.put("targetUrl",target);
+        String method=setup.path("loginMethod").asText("NONE");
+        if(!"NONE".equals(method)) {
+            result.put("required",true).put("loginConfigured",true).put("verifiedCrawlAuthentication",verified&&Set.of("FORM_AUTO","BASIC_AUTH").contains(method));
+            String login=setup.path("automation").path("loginUrl").asText();
+            result.put("loginUrl",login.isBlank()?target:login).put("loginMethod",method);
+        }
+    }
     public static ObjectNode detect(ObjectMapper mapper, JsonNode snapshot, JsonNode rows) {
         var result=mapper.createObjectNode().put("required",false);
         var evidence=result.putArray("evidence");
         Set<Integer> limits=new TreeSet<>();
         var limit=Pattern.compile("(?:비밀번호|패스워드|로그인|인증)[^。.!?\\n]{0,70}?(\\d{1,3})\\s*회[^。.!?\\n]{0,50}?(?:잠금|잠기|제한|차단)");
         for(var row:rows) {
-            String name=row.path("functionName").asText().toLowerCase(Locale.ROOT);
-            if(name.matches(".*(로그인|login).*")&&!name.matches(".*(기록|이력|조회|history|audit).*")) {
+            if(loginFeature(row)) {
                 result.put("required",true);
                 if(row.path("evidence").isArray()) row.path("evidence").forEach(evidence::add);
             }
@@ -48,11 +61,14 @@ public final class AuthenticationTcContext {
     public static ArrayNode prepare(ObjectMapper mapper, String product, JsonNode input, JsonNode context) {
         ArrayNode rows=input.deepCopy();
         boolean login=false;
-        var generator=new MenuTcGenerator(mapper);
-        for(var row:rows)if("로그인".equals(generator.classify(row)))login=true;
+        for(var row:rows)if(loginFeature(row)) {
+            login=true;
+            ((ObjectNode)row).put("featureType","로그인").put("targetUrl",context.path("loginUrl").asText(context.path("targetUrl").asText()));
+        }
         if(context.path("required").asBoolean()&&!login) {
             var row=rows.addObject().put("featureId","authentication:login").put("functionName","로그인").put("description","계정 정보로 로그인하는 기능").put("featureType","로그인");
-            row.putArray("featurePath").add(product).add("로그인");
+            row.putArray("featurePath").add(product).add("로그인 화면").add("로그인");
+            row.put("targetUrl",context.path("loginUrl").asText(context.path("targetUrl").asText()));
             row.set("evidence",context.path("evidence").deepCopy());row.putArray("matchedMenuKeys");
         }
         return rows;

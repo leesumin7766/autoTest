@@ -80,6 +80,7 @@ public class TestExecutionWorker {
             }
             if(snapshot.has("setupVersion")&&!snapshot.path("setupVersion").asText().equals(setups.configurationVersion(submission,member)))throw new IllegalStateException("EXECUTION_LOGIN_SETUP_CHANGED");
             var results=snapshot.putArray("groupResults");
+            boolean firstEntry=true;
             for(var group:snapshot.path("groups")) {
                 if(!active(run,attempt))return;
                 if("COMMON".equals(group.path("kind").asText())){pendingGroup(snapshot,group,"공통·문서 시험은 별도 실행 방식이 필요합니다.");save(run,attempt,snapshot,"RUNNING");continue;}
@@ -93,6 +94,7 @@ public class TestExecutionWorker {
                 }
                 for(var selectedCase:cases){
                 if(!active(run,attempt))return;
+                payload.put("initialEntry",firstEntry);
                 payload.set("cases",mapper.createArrayNode().add(selectedCase));
                 var hints=mapper.createArrayNode();
                 JsonNode original=null;
@@ -152,6 +154,10 @@ public class TestExecutionWorker {
                 var result=results.addObject().put("featureId",group.path("featureId").asText()).put("caseId",selectedCase.path("id").asText());
                 result.put("evidenceUrl","/api/submissions/"+submission+"/executions/"+run+"/evidence?caseId="+selectedCase.path("id").asText()).put("evidenceCount",answer.path("evidence").size()).put("planCount",answer.path("plans").size());result.putArray("evidence");result.putArray("plans");
                 save(run,attempt,snapshot,"RUNNING");
+                if(firstEntry&&answer.has("initialEntryVerified")){
+                    if(!answer.path("initialEntryVerified").asBoolean())throw new IllegalStateException("EXECUTION_INITIAL_ENTRY_NOT_READY");
+                    firstEntry=false;snapshot.put("initialEntryVerified",true);
+                }
                 }
             }
             boolean partial=false;for(var item:snapshot.path("items"))if(item.path("result").isNull())partial=true;

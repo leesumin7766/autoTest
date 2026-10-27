@@ -13,7 +13,7 @@ public class TestExecutionInternalController {
     @PostMapping("/api/internal/test-executions/{run}/progress")
     public ResponseEntity<?> progress(@PathVariable UUID run,@RequestBody Progress body,@RequestHeader("X-Internal-Token") String supplied){
         if(token.isBlank()||!java.security.MessageDigest.isEqual(token.getBytes(StandardCharsets.UTF_8),supplied.getBytes(StandardCharsets.UTF_8)))return ResponseEntity.status(403).build();
-        if(body.stage()==null||!Set.of("CONNECTING","PLANNING","ACTING","RECHECK","JUDGING").contains(body.stage())||body.round()<0||body.round()>12)return ResponseEntity.badRequest().build();
+        if(body.stage()==null||!Set.of("INITIALIZING","AUTHENTICATING","CONNECTING","PLANNING","ACTING","RECHECK","JUDGING").contains(body.stage())||body.round()<0||body.round()>12)return ResponseEntity.badRequest().build();
         if(body.trace()!=null&&(!body.trace().isArray()||body.trace().size()>12||body.trace().toString().length()>80000))return ResponseEntity.badRequest().build();
         var progress=new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("stage",body.stage()).put("round",body.round());
         if(body.caseId()!=null)progress.put("caseId",body.caseId());

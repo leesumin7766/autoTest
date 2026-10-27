@@ -4,6 +4,7 @@ import re
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from execution_profiles import verified_read_check
+from login_execution import login_submitted, login_authenticated
 
 class Condition(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -55,7 +56,8 @@ def assess(tc, conditions, evidence):
                     ids = [e['id'] for e in evidence if e.get('downloads')]
         results.append({'conditionId': f'C{i+1}', **c, 'grounded': grounded and (value_grounded or method == 'SEMANTIC'), 'outcome': outcome, 'evidenceIds': ids})
     return {'conditions': results, 'completeRequirementCoverage': bool(expected.strip()) and bool(results) and all(coverage),
-            'performed': verified_read_check(tc,evidence) or any(r.get('status') == 'COMPLETED' and r.get('action') != 'wait' and not r.get('isNavigation',False) for r in actions) or bool(downloads),
+            'performed': login_submitted(evidence) if tc.get('ruleId')=='LOGIN-04' else verified_read_check(tc,evidence) or any(r.get('status') == 'COMPLETED' and r.get('action') != 'wait' and not r.get('isNavigation',False) for r in actions) or bool(downloads),
+            'authenticatedLogin':login_authenticated(evidence) if tc.get('ruleId')=='LOGIN-04' else False,
             'actionError': any(r.get('status') == 'ERROR' for r in actions),
             'requiresPersistence': bool(re.search(r'재조회|반영|실제.*저장|저장된|삭제된|저장.*데이터|데이터.*저장', tc.get('scenario') or '')) or (tc.get('ruleId') == 'FEATURE-01' and bool(re.search(r'저장|등록|삭제|수정|생성|편집|적용|업로드', tc.get('scopeDescription') or ''))),
             'hasPersistenceEvidence': any(c['method'] == 'VALUE_AFTER_RELOAD' and c['outcome'] == 'PASS' for c in results)}
@@ -65,6 +67,7 @@ def gate(tc, proposed, assessment, answers, index, threshold):
     coverage = answers.get(f'coverage_{index}', {})
     reasons = []
     if proposed.get('result') == 'P':
+        if tc.get('ruleId')=='LOGIN-04' and not assessment.get('authenticatedLogin'):reasons.append('저장된 시험 계정의 입력·제출·인증 성공 증거 없음')
         if not assessment['performed']: reasons.append('TC 동작 수행 증거 없음')
         if assessment['actionError']: reasons.append('미해결 조작 오류')
         if not assessment['completeRequirementCoverage']: reasons.append('기대 조건 전체에 대한 근거 미확보')

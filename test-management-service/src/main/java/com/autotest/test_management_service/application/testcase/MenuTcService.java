@@ -37,7 +37,7 @@ public class MenuTcService {
             if(!row.path("included").asBoolean() || "MENU_OBSERVATION".equals(row.path("rowType").asText()))continue;
             String id=row.path("rowId").asText(); allowed.add(id);
             var feature=features.addObject().put("featureId",id).put("functionName",row.path("functionName").asText())
-                .put("description",row.path("menuDescription").asText()).put("targetUrl",menu.path("targetUrl").asText());
+                .put("description",row.path("menuDescription").asText()).put("targetUrl",row.path("targetUrl").asText(menu.path("targetUrl").asText()));
             var path=feature.putArray("featurePath").add(menu.path("productName").asText());
             row.path("menuPath").forEach(path::add); path.add(row.path("functionName").asText());
             if(overrides.containsKey(id))feature.put("featureType",overrides.get(id));
@@ -61,14 +61,26 @@ public class MenuTcService {
     }
     @Transactional
     public ObjectNode create(UUID submission,long member,UUID menuJob,Map<String,String> overrides) {
+        return create(submission,member,menuJob,overrides,null);
+    }
+    @Transactional
+    public ObjectNode create(UUID submission,long member,UUID menuJob,Map<String,String> overrides,String loginUrl) {
         owner(submission,member,true); setups.get(submission,member);
         JsonNode menu=source(submission,member,menuJob);
         var source=mapper.createObjectNode().put("kind","APPROVED_MENU").put("submissionId",submission.toString())
             .put("menuJobId",menu.path("jobId").asText()).put("menuRevision",menu.path("revision").asInt())
             .put("crawlJobId",menu.path("crawlJobId").asText()).put("targetUrl",menu.path("targetUrl").asText());
-        JsonNode authentication=menus.authentication(submission,member,menuJob);
+        ObjectNode authentication=(ObjectNode)menus.authentication(submission,member,menuJob);
+        String target=menu.path("targetUrl").asText();if(target.isBlank())target=authentication.path("targetUrl").asText();source.put("targetUrl",target);
+        if(loginUrl!=null&&!loginUrl.isBlank()) {
+            if(!authentication.path("required").asBoolean()||!(loginUrl.equals(authentication.path("targetUrl").asText())||loginUrl.equals(authentication.path("loginUrl").asText())))
+                throw MenuTcGenerator.invalid("TC_LOGIN_URL_INVALID","저장된 기본 접속 주소 또는 로그인 주소를 선택해 주세요.");
+            authentication.put("loginUrl",loginUrl);
+        }
+        if(authentication.path("required").asBoolean()&&!authentication.hasNonNull("loginUrl"))authentication.put("loginUrl",target);
         source.set("authentication",authentication);
         var prepared=AuthenticationTcContext.prepare(mapper,menu.path("productName").asText(),features(menu,overrides),authentication);
+        for(var feature:prepared)if(feature.path("targetUrl").asText().isBlank())((ObjectNode)feature).put("targetUrl",target);
         ObjectNode output=generator.generate(menu.path("productName").asText(),prepared,source);
         UUID set=UUID.randomUUID();
         jdbc.update("INSERT INTO menu_tc_sets(set_id,submission_id,member_id,menu_job_id,menu_revision,input_digest,template_version,output) VALUES(?,?,?,?,?,?,?,?::jsonb) ON CONFLICT(submission_id,input_digest) DO NOTHING",

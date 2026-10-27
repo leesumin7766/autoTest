@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 /** Public messages only. Exception details belong in server logs. */
 public enum TestManagementErrorCode implements BaseErrorCode {
     // 400
+    TC_LOGIN_URL_INVALID("저장된 기본 접속 주소 또는 로그인 주소를 선택해 주세요.", HttpStatus.BAD_REQUEST),
     AGENT_ACTION_INVALID("지원하지 않는 실행기 요청입니다.", HttpStatus.BAD_REQUEST),
     AGENT_NAME_INVALID("실행 PC 이름을 입력해 주세요.", HttpStatus.BAD_REQUEST),
     APPROVAL_REQUIRED("TC 생성 승인이 필요합니다.", HttpStatus.BAD_REQUEST),

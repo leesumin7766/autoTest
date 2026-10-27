@@ -11,10 +11,10 @@ import org.springframework.web.bind.annotation.*;
 public class MenuTcController {
     private final MenuTcService service;
     public MenuTcController(MenuTcService service) { this.service=service; }
-    public record Generate(UUID menuJobId,Map<String,String> featureTypes) {}
+    public record Generate(UUID menuJobId,Map<String,String> featureTypes,String loginUrl) {}
     private ResponseEntity<?> ok(Object body){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body);}
     @GetMapping public ResponseEntity<?> status(@PathVariable UUID submission,@RequestHeader("X-Member-Id") long member,@RequestParam(required=false) UUID set){return ok(service.status(submission,member,set));}
-    @PostMapping public ResponseEntity<?> generate(@PathVariable UUID submission,@RequestHeader("X-Member-Id") long member,@RequestBody Generate body){return ok(service.create(submission,member,body.menuJobId(),body.featureTypes()==null?Map.of():body.featureTypes()));}
+    @PostMapping public ResponseEntity<?> generate(@PathVariable UUID submission,@RequestHeader("X-Member-Id") long member,@RequestBody Generate body){return ok(service.create(submission,member,body.menuJobId(),body.featureTypes()==null?Map.of():body.featureTypes(),body.loginUrl()));}
     @GetMapping("/{set}/download") public ResponseEntity<byte[]> download(@PathVariable UUID submission,@RequestHeader("X-Member-Id") long member,@PathVariable UUID set){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("Content-Disposition","attachment; filename=test-cases.xlsx").contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).body(service.download(submission,member,set));}
 
 }

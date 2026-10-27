@@ -21,6 +21,8 @@ public class RemoteCrawlController {
     @org.springframework.beans.factory.annotation.Value("${product-description.internal-token:}")
     private String internalToken;
     public record AgentRequest(String name) { }
+    public record RetryRequest(UUID agentId,String executionMode,java.util.List<String> menuKeys,String scope) { }
+    private boolean hasCapability(JsonNode body,String capability){return body.path("capabilities").isArray()&&java.util.stream.StreamSupport.stream(body.path("capabilities").spliterator(),false).anyMatch(value->capability.equals(value.asText()));}
     public record StartRequest(UUID agentId,String executionMode,String purpose,
             com.autotest.test_management_service.application.crawler.PlaywrightSetupService.SetupRequest draft) { }
     private <T> ResponseEntity<T> response(T value) { return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL,"no-store").body(value); }
@@ -43,7 +45,7 @@ public class RemoteCrawlController {
         var session=wire.open(agent,action,timestamp,nonce,raw);
         Object result=switch(action) {
             case "heartbeat" -> { service.seen(agent); yield Map.of("accepted",true); }
-            case "claim" -> service.claim(agent,session.body().path("capabilities").isArray()&&java.util.stream.StreamSupport.stream(session.body().path("capabilities").spliterator(),false).anyMatch(value->"crawl-resume-v1".equals(value.asText())));
+            case "claim" -> service.claim(agent,hasCapability(session.body(),"crawl-resume-v1"),hasCapability(session.body(),"crawl-targeted-retry-v1"));
             case "event" -> service.worker(agent,session.body());
             default -> throw new ProductDescriptionException(HttpStatus.BAD_REQUEST,"AGENT_ACTION_INVALID","지원하지 않는 실행기 요청입니다.");
         };
@@ -60,6 +62,8 @@ public class RemoteCrawlController {
     }
     @PostMapping("/api/submissions/{submission}/playwright-crawls/{job}/resume")
     public ResponseEntity<?> resume(@PathVariable UUID submission,@PathVariable UUID job,@RequestHeader("X-Member-Id") long member,@RequestBody StartRequest request){return response(service.resume(submission,member,job,request.agentId(),request.executionMode()==null?"LOCAL":request.executionMode()));}
+    @PostMapping("/api/submissions/{submission}/playwright-crawls/{job}/retry")
+    public ResponseEntity<?> retry(@PathVariable UUID submission,@PathVariable UUID job,@RequestHeader("X-Member-Id") long member,@RequestBody RetryRequest request){return response(service.retry(submission,member,job,request.agentId(),request.executionMode()==null?"LOCAL":request.executionMode(),request.menuKeys(),request.scope()));}
     @PostMapping("/api/internal/playwright-crawls/events")
     public ResponseEntity<?> localEvent(@RequestHeader("X-Internal-Token") String token,@RequestBody JsonNode body) {
         if(internalToken.isBlank() || !java.security.MessageDigest.isEqual(internalToken.getBytes(java.nio.charset.StandardCharsets.UTF_8),token.getBytes(java.nio.charset.StandardCharsets.UTF_8)))

@@ -37,7 +37,7 @@ async function visible(locator) {
 }
 function failure(code) { return new Error(code); }
 
-async function login(page, job, authPosts, beforeCredentials) {
+async function login(page, job, authPosts, beforeCredentials, onAction = () => {}, beforePassword) {
   const options = job.automation;
   await page.goto(options.loginUrl || job.targetUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
   const loginPageUrl = page.url();
@@ -52,6 +52,7 @@ async function login(page, job, authPosts, beforeCredentials) {
   if (formAction) authPosts.add(new URL(formAction).pathname);
   if (beforeCredentials) await beforeCredentials(page);
   await username.fill(options.username);
+  onAction('USERNAME_FILLED');
   let password = await visible(options.passwordSelector ? page.locator(options.passwordSelector) : page.locator('input[type="password"]'));
   if (!password) {
     const next = await visible(page.getByRole('button', { name: /^(다음|계속|next|continue)$/i }));
@@ -61,10 +62,14 @@ async function login(page, job, authPosts, beforeCredentials) {
     password = await visible(page.locator(options.passwordSelector || 'input[type="password"]'));
   }
   if (!password) throw failure('LOGIN_FAILED');
+  if(beforePassword)await beforePassword(page);
   await password.fill(job.password);
+  onAction('PASSWORD_FILLED');
   const submit = await visible(options.submitSelector ? page.locator(options.submitSelector)
     : page.getByRole('button', { name: /로그인|log\s?in|sign\s?in|접속/i }));
+  onAction('SUBMIT_ATTEMPTED');
   if (submit) await submit.click(); else await password.press('Enter');
+  onAction('SUBMITTED');
   try {
     if (options.successUrl) {
       const expected = new URL(options.successUrl);
@@ -84,6 +89,7 @@ async function login(page, job, authPosts, beforeCredentials) {
     }
     if (await visible(page.locator(options.passwordSelector || 'input[type="password"]'))) throw failure('LOGIN_FAILED');
   } catch (error) { throw failure(error.message === 'LOGIN_NOT_CONFIRMED' ? 'LOGIN_NOT_CONFIRMED' : 'LOGIN_FAILED'); }
+  onAction('AUTHENTICATED');
 }
 
 async function crawl(job, dependencies) { return require('./walker').crawl(job, dependencies); }

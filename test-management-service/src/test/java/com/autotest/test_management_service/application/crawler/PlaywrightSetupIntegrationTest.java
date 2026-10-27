@@ -223,7 +223,10 @@ class PlaywrightSetupIntegrationTest {
                 .andExpect(status().isForbidden());
         var complete=mapper.createObjectNode().put("jobId",jobId.toString()).put("claimToken",job.path("claimToken").asText())
                 .put("event","complete").put("stopReason","PAGE_LIMIT");
+        complete.putObject("result").putObject("collectionLanguage").put("status","KOREAN_CONFIRMED").put("detected","ko").put("browserLocale","ko-KR").put("switched",true).put("unexpected","private");
         channel(agent,"event",complete,200);
+        var recordedLanguage=remote.status(id,8101).path("job").path("crawlResult").path("collectionLanguage");
+        assertEquals("ko",recordedLanguage.path("detected").asText());assertFalse(recordedLanguage.has("unexpected"));
         assertEquals("COMPLETED",remote.status(id,8101).path("job").path("status").asText());
         assertNull(jdbc.queryForObject("SELECT password_ciphertext FROM playwright_crawl_jobs WHERE job_id=?",String.class,jobId));
         channel(agent,"event",page,409);
@@ -241,6 +244,8 @@ class PlaywrightSetupIntegrationTest {
         var heartbeat=mapper.createObjectNode().put("event","heartbeat").put("jobId",continuation.path("jobId").asText()).put("claimToken",continuation.path("claimToken").asText());
         heartbeat.putObject("progress").put("stage","LOADING").put("current","작업 → 목록").put("remaining",3);channel(agent,"event",heartbeat,200);
         assertEquals("LOADING",remote.status(id,8101).path("job").path("crawlResult").path("progress").path("stage").asText());
+        heartbeat.withObject("progress").put("stage","LANGUAGE").put("current","한국어 우선 설정 확인");channel(agent,"event",heartbeat,200);
+        assertEquals("LANGUAGE",remote.status(id,8101).path("job").path("crawlResult").path("progress").path("stage").asText());
         page.put("jobId",continuation.path("jobId").asText()).put("claimToken",continuation.path("claimToken").asText()).put("pageIndex",1);channel(agent,"event",page,200);
         assertEquals(2,remote.status(id,8101).path("job").path("pageCount").asInt());
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM playwright_crawl_pages WHERE job_id=?",Integer.class,jobId));
@@ -250,6 +255,21 @@ class PlaywrightSetupIntegrationTest {
         remote.resume(id,8101,jobId,agent.agent().agentId(),"REMOTE");
         assertFalse(channel(agent,"claim",mapper.createObjectNode(),200).has("jobId"));
         assertEquals("AGENT_UPDATE_REQUIRED",remote.status(id,8101).path("job").path("errorCode").asText());
+        // Targeted retry accepts server-recorded failures only and requires a capable agent.
+        var skipped=mapper.createArrayNode();var missed=skipped.addObject().put("menuKey","retry-menu").put("stage","CAPTURING").put("reason","CAPTURE_TIMEOUT");missed.putArray("path").add("관리").add("목록");
+        jdbc.update("UPDATE playwright_crawl_jobs SET crawl_result=crawl_result||jsonb_build_object('skipped',?::jsonb) WHERE job_id=?",skipped.toString(),jobId);
+        String retryEndpoint="/api/submissions/"+id+"/playwright-crawls/"+jobId+"/retry";
+        var retryRequest=mapper.createObjectNode().put("executionMode","REMOTE").put("agentId",agent.agent().agentId().toString()).put("scope","SELF");retryRequest.putArray("menuKeys").add("unknown");
+        mvc.perform(post(retryEndpoint).header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(retryRequest.toString())).andExpect(status().isBadRequest());
+        retryRequest.putArray("menuKeys").add("retry-menu");
+        mvc.perform(post(retryEndpoint).header("X-Member-Id",8102).contentType(MediaType.APPLICATION_JSON).content(retryRequest.toString())).andExpect(status().isForbidden());
+        mvc.perform(post(retryEndpoint).header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(retryRequest.toString())).andExpect(status().isOk());
+        assertFalse(channel(agent,"claim",capabilities,200).has("jobId"));
+        mvc.perform(post(retryEndpoint).header("X-Member-Id",8101).contentType(MediaType.APPLICATION_JSON).content(retryRequest.toString())).andExpect(status().isOk());
+        capabilities.withArray("capabilities").add("crawl-targeted-retry-v1");
+        var targeted=channel(agent,"claim",capabilities,200);
+        assertEquals("SELF",targeted.path("retrySelection").path("scope").asText());assertEquals("retry-menu",targeted.path("retrySelection").path("targets").get(0).path("menuKey").asText());
+        assertEquals(1,targeted.path("resume").path("pageCount").asInt());assertEquals(1,targeted.path("resume").path("skipped").size());
     }
     @Test void workerCannotReplayRequestsUseOtherAgentOrFinishCanceledJob() throws Exception {
         saveCrawlSetup(); var agent=onlineAgent();remote.start(id,8101,agent.agent().agentId());
