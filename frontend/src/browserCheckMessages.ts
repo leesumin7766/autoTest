@@ -11,6 +11,7 @@ const errorMessages: Record<string, string> = {
   NO_PAGES_CAPTURED: '설정한 범위에서 수집할 화면을 찾지 못했습니다.',
   CAPTURE_TOO_LARGE: '스크린샷이 화면별 저장 한도를 초과했습니다.',
   CRAWL_FAILED: '화면 수집을 완료하지 못했습니다. 로그인 설정과 실행기를 확인해 주세요.',
+  CRAWL_LANGUAGE_RESTART_REQUIRED: '이전 수집과 화면 언어가 달라 이어서 수집하지 않았습니다. 기존 화면은 보존됩니다. 새 수집을 시작해 주세요.',
   LOGIN_NOT_CONFIRMED: '로그인 성공을 확실히 확인하지 못했습니다. 고급 설정에서 성공 URL 또는 확인 요소를 지정해 주세요.',
   LOCAL_RUNNER_UNAVAILABLE: '현재 서버의 Playwright 실행기에 연결할 수 없습니다.',
   CONNECTION_SCOPE_BLOCKED: '다른 사이트로 이동하거나 허용 범위를 벗어났습니다. 고급 설정의 허용 사이트를 확인해 주세요.',
