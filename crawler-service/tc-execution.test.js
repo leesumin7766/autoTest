@@ -3,7 +3,33 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const { open, step, sessions, safeUrl } = require('./tc-execution');
 
-test('first entry bypasses setup login; later sessions keep automatic authentication',async()=>{
+test('execution browser uses the same Korean locale as screen collection',async()=>{
+ const server=http.createServer((req,res)=>{res.setHeader('Content-Type','text/html; charset=utf-8');res.end(`<main><h1>${req.headers['accept-language']?.startsWith('ko-KR')?'대시보드':'Dashboard'}</h1><p>실행 현황</p></main>`)});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));let opened;
+ try{opened=await open({targetUrl:`http://127.0.0.1:${server.address().port}`});
+  assert.deepEqual(opened.observation.headings,['대시보드']);
+  assert.equal(await sessions.get(opened.sessionId).page.evaluate(()=>navigator.language),'ko-KR');
+ }finally{if(opened){await sessions.get(opened.sessionId)?.browser.close();sessions.delete(opened.sessionId)}await new Promise(resolve=>server.close(resolve))}
+});
+
+test('visible child links mark a sidebar group as expanded without aria-expanded',async()=>{
+ const server=http.createServer((_,res)=>{res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<aside><div><button>설정 관리</button><div><a href="/users">사용자 관리</a><a href="/notifications">알림</a></div></div></aside><main><h1>대시보드</h1></main>')});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));let opened;
+ try{opened=await open({targetUrl:`http://127.0.0.1:${server.address().port}`});
+  assert.equal(opened.observation.elements.find(el=>el.name==='설정 관리').expanded,true);
+ }finally{if(opened){await sessions.get(opened.sessionId)?.browser.close();sessions.delete(opened.sessionId)}await new Promise(resolve=>server.close(resolve))}
+});
+
+test('visible table headers and rows are available for a read-only search check',async()=>{
+ const server=http.createServer((_,res)=>{res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<main><h1>작업</h1><table><thead><tr><th>선택</th><th>이름</th></tr></thead><tbody><tr><td></td><td>Alpha Job</td></tr><tr><td></td><td>Beta Job</td></tr></tbody></table></main>')});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));let opened;
+ try{opened=await open({targetUrl:`http://127.0.0.1:${server.address().port}`});
+  assert.deepEqual(opened.observation.tables[0].headers,['선택','이름']);
+  assert.deepEqual(opened.observation.tables[0].rows.map(row=>row[1]),['Alpha Job','Beta Job']);
+ }finally{if(opened){await sessions.get(opened.sessionId)?.browser.close();sessions.delete(opened.sessionId)}await new Promise(resolve=>server.close(resolve))}
+});
+
+test('ordinary first TC authenticates with saved setup; login TC starts anonymously',async()=>{
  let posts=0;
  const server=http.createServer((req,res)=>{
   res.setHeader('Content-Type','text/html; charset=utf-8');
@@ -15,10 +41,11 @@ test('first entry bypasses setup login; later sessions keep automatic authentica
  const setup={loginMethod:'FORM_AUTO',automation:{username:'fixture',successUrl:target+'dashboard'}};const ids=[];
  try{
   const initial=await open({targetUrl:target,setup,password:'fixture-secret',initialEntry:true});ids.push(initial.sessionId);
-  assert.equal(posts,0);assert.equal(initial.observation.entryState.atInitialUrl,true);assert.equal(initial.observation.entryState.authenticationState,'LOGIN_FORM_OBSERVED');
-  const later=await open({targetUrl:target,setup,password:'fixture-secret'});ids.push(later.sessionId);assert.equal(posts,1);assert.equal(later.observation.entryState.authenticationState,'AUTHENTICATED_BY_SETUP');
-  const s=sessions.get(initial.sessionId);const button=initial.observation.elements.find(el=>el.tag==='a');
-  const moved=await step(s,[{action:'click',elementId:button.id}]);assert.equal(moved.records[0].status,'COMPLETED');assert.ok(moved.observation.url.endsWith('/dashboard'));
+  assert.equal(posts,1);assert.equal(initial.observation.entryState.initialScreenReady,true);assert.equal(initial.observation.entryState.authenticationState,'AUTHENTICATED_BY_SETUP');
+  assert.equal(initial.observation.entryState.redirectDisposition,'AUTHENTICATED_DESTINATION');
+  const loginCase=await open({targetUrl:target,setup,password:'fixture-secret',initialEntry:true,testRuleId:'LOGIN-04'});ids.push(loginCase.sessionId);
+  assert.equal(posts,1);assert.equal(loginCase.observation.entryState.authenticationState,'LOGIN_FORM_OBSERVED');
+  const later=await open({targetUrl:target,setup,password:'fixture-secret'});ids.push(later.sessionId);assert.equal(posts,2);assert.equal(later.observation.entryState.authenticationState,'AUTHENTICATED_BY_SETUP');
  }finally{for(const id of ids){await sessions.get(id)?.browser.close();sessions.delete(id)}await new Promise(r=>server.close(r))}
 });
 
@@ -41,7 +68,7 @@ test('same-origin login-entry redirect is accepted without authenticating or hid
   res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<h1>로그인</h1><input name="username"><input type="password"><button>로그인</button>');
  });await new Promise(r=>server.listen(0,'127.0.0.1',r));let opened;
  try{
-  opened=await open({targetUrl:`http://127.0.0.1:${server.address().port}/`,initialEntry:true,setup:{loginMethod:'FORM_AUTO',automation:{}}});
+  opened=await open({targetUrl:`http://127.0.0.1:${server.address().port}/`,initialEntry:true,testRuleId:'LOGIN-04',setup:{loginMethod:'FORM_AUTO',automation:{}}});
   assert.equal(opened.observation.entryState.atInitialUrl,false);assert.equal(opened.observation.entryState.initialScreenReady,true);assert.equal(opened.observation.entryState.redirectDisposition,'LOGIN_ENTRY_REDIRECT');assert.equal(posts,0);
  }finally{if(opened){await sessions.get(opened.sessionId)?.browser.close();sessions.delete(opened.sessionId)}await new Promise(r=>server.close(r))}
 });

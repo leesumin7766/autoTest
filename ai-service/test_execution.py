@@ -11,11 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from product_description.api import require_internal_token
 from execution_evidence import Condition, assess, gate, semantic_requirement
 from execution_contract import compiled_conditions, prerequisites, navigation_record, performed_test, requirements, planner_history
-from execution_profiles import profile, target_terms, target_observed, navigation_plan, loop_key, public_trace, single_action_done, literal_assertion
+from execution_profiles import profile, target_terms, target_observed, captured_screen_observed, navigation_plan, loop_key, public_trace, single_action_done, literal_assertion
 from execution_selection import preflight, select_with_qwen
 from initial_entry import plan_initial_entry
 from login_execution import plan_saved_login, login_attempt
 from execution_specification import prepare_read, VERSION as READ_SPEC_VERSION
+from read_search import prepare_search, search_result, visible_names
 
 router = APIRouter(prefix='/api/v1/test-executions', dependencies=[Depends(require_internal_token)])
 
@@ -244,7 +245,8 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
             if not effective_hints and len(request.featurePath)>=3:
                 effective_hints=[{'path':request.featurePath[1:-1],'label':request.featurePath[-2],'source':'APPROVED_MENU_AND_LIVE_DOM'}]
             terms=target_terms(request.featurePath,effective_hints)
-            navigation_attempted=False
+            navigation_attempted=set()
+            search_binding=None; search_waited=False; search_verdict=None
             for round_number in range(12):
                 shot = observation.pop('screenshot', None)
                 entry = {'id': f'observation-{round_number}', 'kind': 'BROWSER_OBSERVATION', **observation}
@@ -277,18 +279,53 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
                         origin='QWEN_SAVED_LOGIN'
                         choice=await asyncio.wait_for(plan_saved_login(observation.get('authentication',{})),timeout=min(300,remaining))
                         plan=Plan(actions=[Action(action='login_saved_account')] if choice=='LOGIN_SAVED_ACCOUNT' else [],decision='EXECUTE' if choice=='LOGIN_SAVED_ACCOUNT' else 'NEEDS_INPUT',phase='TEST',missingInputs=[] if choice=='LOGIN_SAVED_ACCOUNT' else ['저장된 시험 계정과 로그인 화면 확인'],explanation='저장된 시험 계정을 참조해 아이디·비밀번호를 입력하고 한 번 로그인합니다.')
-                elif execution_profile=='READ_ONLY_VIEW' and target_observed(observation,terms):
-                    evidence.append({'id':f'read-check-{round_number}','kind':'READ_ONLY_CHECK','caseId':tc['id'],'observationId':entry['id'],'targetTerms':terms,'profile':execution_profile})
+                elif tc.get('ruleId')=='CRUD-SEARCH-01':
+                    origin='CODE_READ_SEARCH'
+                    if not effective_hints or not captured_screen_observed(observation,effective_hints):
+                        nav=navigation_plan(observation,effective_hints,navigation_attempted)
+                        if nav:
+                            navigation_attempted.add(next((el.get('name') for el in observation.get('elements',[]) if el.get('id')==nav['elementId']),''))
+                            plan=Plan(actions=[Action(**nav)],decision='EXECUTE',phase='NAVIGATE',missingInputs=[],explanation='수집 근거에 연결된 검색 화면으로 이동합니다.')
+                        else:
+                            plan=Plan(actions=[],decision='NEEDS_INPUT',phase='NAVIGATE',missingInputs=['수집한 메뉴와 현재 검색 화면의 주소·제목을 연결할 수 없습니다.'],explanation='임의 화면에서 검색 시험을 수행하지 않습니다.')
+                    elif search_binding is None:
+                        search_binding=prepare_search(observation)
+                        if search_binding:
+                            evidence.append({'id':'search-baseline','kind':'READ_SEARCH_BASELINE','caseId':tc['id'],'observationId':entry['id'],'query':search_binding['query'],'beforeNames':search_binding['beforeNames']})
+                            plan=Plan(actions=[Action(action='fill',elementId=search_binding['inputId'],value=search_binding['query'])],decision='EXECUTE',phase='TEST',missingInputs=[],explanation='현재 목록에 표시된 항목명으로 검색합니다.')
+                        else:
+                            plan=Plan(actions=[],decision='NEEDS_INPUT',phase='TEST',missingInputs=['서로 다른 이름의 목록 행 2개와 단일 검색 입력을 확인할 수 없습니다.'],explanation='현재 화면만으로 안전한 검색 기준을 만들 수 없습니다.')
+                    elif not search_waited:
+                        search_waited=True
+                        plan=Plan(actions=[Action(action='wait',milliseconds=1800)],decision='EXECUTE',phase='TEST',missingInputs=[],explanation='검색 결과가 화면에 반영될 시간을 기다립니다.')
+                    else:
+                        search_verdict=search_result(search_binding,observation)
+                        if search_verdict:
+                            evidence.append({'id':'search-comparison','kind':'READ_SEARCH_COMPARISON','caseId':tc['id'],'observationId':entry['id'],'beforeNames':search_binding['beforeNames'],'afterNames':visible_names(observation)})
+                            plan=Plan(actions=[],decision='FINISH',phase='TEST',missingInputs=[],explanation='검색 전후의 실제 목록 행을 비교했습니다.',conditions=[Condition(requirementQuote=r,method='SEMANTIC',expected=r) for r in requirements(tc)])
+                        else:
+                            plan=Plan(actions=[],decision='NEEDS_INPUT',phase='TEST',missingInputs=['검색 후 원래 항목과 목록 변화를 충분히 확인할 수 없습니다.'],explanation='불확실한 화면 변화로 결함이나 통과를 추정하지 않습니다.')
+                elif execution_profile=='READ_ONLY_VIEW' and (captured_screen_observed(observation,effective_hints) if tc.get('ruleId')=='CRUD-VIEW-01' and effective_hints else target_observed(observation,terms)):
+                    check={'id':f'read-check-{round_number}','kind':'READ_ONLY_CHECK','caseId':tc['id'],'observationId':entry['id'],'targetTerms':terms,'profile':execution_profile}
+                    if tc.get('ruleId')=='CRUD-VIEW-01' and effective_hints:check['targetHint']=effective_hints[0]
+                    evidence.append(check)
                     plan=Plan(actions=[],decision='FINISH',phase='TEST',missingInputs=[],explanation='관찰된 대상 화면의 본문·경로를 확인했습니다. 기대 조건은 Jev가 판정합니다.',conditions=[Condition(requirementQuote=r,method='SEMANTIC' if semantic_requirement(r) else 'TEXT_PRESENT',expected=r) for r in requirements(tc)])
                     origin='CODE_READ_CHECK'
                 elif single_action_done(tc,evidence):
                     origin='CODE_SINGLE_STEP'
                     plan=Plan(actions=[],decision='FINISH',phase='TEST',missingInputs=[],explanation='TC에 명시된 단일 버튼 조작을 수행했습니다. 같은 버튼을 반복하지 않고 첫 결과를 판정합니다.',conditions=[Condition(requirementQuote=r,method='SEMANTIC' if semantic_requirement(r) else 'TEXT_PRESENT',expected=r) for r in requirements(tc)])
                 else:
-                    nav=None if navigation_attempted or target_observed(observation,terms) else navigation_plan(observation,effective_hints)
+                    nav=None if target_observed(observation,terms) and tc.get('ruleId')!='CRUD-VIEW-01' else navigation_plan(observation,effective_hints,navigation_attempted)
                     if nav:
-                        navigation_attempted=True;origin='CODE_NAVIGATION'
+                        navigation_attempted.add(next((element.get('name') for element in observation.get('elements',[]) if element.get('id')==nav['elementId']),''));origin='CODE_NAVIGATION'
                         plan=Plan(actions=[nav],decision='EXECUTE',phase='NAVIGATE',missingInputs=[],explanation='수집 시 확인한 메뉴와 현재 관찰 요소를 대조해 대상 화면으로 이동합니다.')
+                    elif tc.get('ruleId')=='CRUD-VIEW-01':
+                        path=effective_hints[0].get('path',[]) if effective_hints else []
+                        visible={element.get('name') for element in observation.get('elements',[])}
+                        open_parent=any(element.get('expanded') and element.get('name') in path[:-1] for element in observation.get('elements',[]))
+                        missing='현재 계정의 펼쳐진 메뉴에서 수집 당시 대상 항목을 찾지 못했습니다. 권한·제품 버전·메뉴 구성을 확인하세요.' if open_parent and path and path[-1] not in visible else '수집된 메뉴 URL 또는 선택 탭과 실제 조회 화면의 제목·본문이 일치하지 않습니다.'
+                        plan=Plan(actions=[],decision='NEEDS_INPUT',phase='NAVIGATE',missingInputs=[missing],explanation='조회 화면 표시 기준을 확인할 수 없어 사용자 검토로 남깁니다.')
+                        origin='CODE_READ_VIEW_UNVERIFIED'
                     else:
                         original_elements=observation.get('elements',[])
                         elements=[{k:el[k] for k in ('id','frameIndex','tag','role','type','navigation','name','href','context','options') if el.get(k) not in (None,'',[])} for el in original_elements[:50]]
@@ -351,6 +388,27 @@ async def _execute_case(request, planner=plan_with_qwen, judge=judge_with_jev, t
                         if any(r.get('status')=='ERROR' for r in checked['records']):raise RuntimeError('EXECUTION_RECHECK_FAILED')
                         evidence.append({'id':'recheck','kind':'PERSISTENCE_RECHECK',**checked['observation']})
                     assessments = [assess(tc, conditions, evidence) for tc in request.cases]
+                    if tc.get('ruleId')=='CRUD-SEARCH-01' and search_verdict:
+                        assessment=assessments[0]
+                        for condition in assessment['conditions']:
+                            condition.update(outcome='PASS' if search_verdict=='P' else 'FAIL',evaluatedBy='CODE_READ_SEARCH',evidenceIds=['search-baseline','search-comparison'])
+                        return {'items':[{'caseId':tc['id'],'executionStatus':'COMPLETED','judgmentStatus':'COMPLETED',
+                            'result':search_verdict,'judgedBy':'CODE_READ_SEARCH','confidence':1.0,
+                            'reason':'검색 전후의 실제 목록 행과 검색에 사용한 항목을 비교했습니다.',
+                            'evidenceIds':[e['id'] for e in evidence],'conditionAssessments':assessment['conditions'],
+                            'requirementCoverageComplete':assessment['completeRequirementCoverage'],'defectCandidate':search_verdict=='F'}],
+                            'evidence':evidence,'plans':plans}
+                    if tc.get('ruleId') == 'CRUD-VIEW-01':
+                        assessment=assessments[0]
+                        verdict=literal_assertion(tc,assessment,evidence,request.featurePath)
+                        if verdict:
+                            for condition in assessment['conditions']:
+                                condition.update(outcome='PASS',evaluatedBy='CODE_READ_VIEW',evidenceIds=[entry['id'],'final'])
+                            return {'items':[{'caseId':tc['id'],'executionStatus':'COMPLETED','judgmentStatus':'COMPLETED',
+                                'result':verdict,'judgedBy':'CODE_READ_VIEW','confidence':1.0,'reason':'연결된 조회 화면의 제목과 기본 본문을 실제 브라우저에서 확인했습니다. 데이터 값의 정확성은 별도 TC입니다.',
+                                'evidenceIds':[e['id'] for e in evidence], 'conditionAssessments':assessment['conditions'],
+                                'requirementCoverageComplete':assessment['completeRequirementCoverage'],'defectCandidate':False}],
+                                'evidence':evidence,'plans':plans}
                     judged_cases=[{**tc,'conditionAssessments':a['conditions']} for tc,a in zip(request.cases,assessments)]
                     # No image payload or generated plan sent to Jev, only real observations and actions.
                     await progress('JUDGING', round_number+1)

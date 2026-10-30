@@ -38,6 +38,11 @@ def compiled_conditions(tc, proposed):
 
 
 def prerequisites(tc):
+    if (tc.get('ruleId') in {'CRUD-01', 'CRUD-08'}
+            and (tc.get('executionPlan') or {}).get('selection', {}).get('scopeOperation') == 'READ'
+            and '비교할 기대 데이터' in (tc.get('inputs') or '')
+            and '기준 시점의 기대 데이터' in (tc.get('expectedResult') or '')):
+        return ['조회 조건·대상 식별값과 기준 시점의 기대 값·건수 미제공. 화면 표시 검사는 별도 TC로 진행하세요.']
     unsupported_auth = {
         'LOGIN-03': '비밀번호 마스킹 시험용 문자열 입력·관찰 동작',
         'LOGIN-05': '잘못된 계정 시험 전용 입력 참조와 인증 제출 동작',

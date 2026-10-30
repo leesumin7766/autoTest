@@ -1,6 +1,7 @@
 import { apiFetch as fetch } from './apiFetch'
 import { ExecutorStatus } from './ExecutorStatus'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { SavedWorkspaces, type SavedWorkspace } from './SavedWorkspaces'
 import './App.css'
 import './workspace.css'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
@@ -80,8 +81,13 @@ function App() {
   const [visited, setVisited] = useState<Set<string>>(() => new Set(['documents']))
   const navigate = (next: string) => { setPage(next); setVisited(current => new Set([...current, next])) }
   const [productId, setProductId] = useState('1')
-  const [memberId, setMemberId] = useState('1')
+  const [memberId, setMemberId] = useState(()=>{try{const saved=localStorage.getItem('autotest:last-member:v1');return saved&&/^[1-9]\d*$/.test(saved)?saved:'1'}catch{return '1'}})
   const [submissionId, setSubmissionId] = useState('')
+  const [lookupId,setLookupId]=useState('')
+  const [workspace,setWorkspace]=useState<SavedWorkspace|null>(null)
+  const [workspaceName,setWorkspaceName]=useState('새 시험 작업')
+  const [restoring,setRestoring]=useState(false)
+  const restoreRequest=useRef<AbortController|null>(null)
   const [generatedTc, setGeneratedTc] = useState<{ context: string; setId: string } | null>(null)
   const [fileSelectionGeneration, setFileSelectionGeneration] = useState(0)
   const [files, setFiles] = useState<Partial<Record<Role, File>>>({})
@@ -145,6 +151,7 @@ function App() {
       })
     } else {
       form.append('productId', productId)
+      form.append('workspaceName',workspaceName.trim())
       response = await fetch('/api/submissions', {
         method: 'POST',
         headers: { 'X-Member-Id': memberId },
@@ -159,9 +166,15 @@ function App() {
     if ('submissionId' in payload) {
       const createdSubmissionId = payload.submissionId
       setSubmissionId(createdSubmissionId)
+      setLookupId(createdSubmissionId)
       updateAiDelivery(payload.aiDelivery)
       const result = payload.documents.find((document) => document.role === role)
       if (result) updateDocument(result)
+      try { localStorage.setItem(`autotest:active-workspace:v1:${memberId}`,createdSubmissionId) } catch { /* Server data remains available from the list. */ }
+      try {
+        const metadata=await fetch(`/api/submissions/${createdSubmissionId}/workspace`,{headers:{'X-Member-Id':memberId}})
+        setWorkspace(await metadata.json())
+      } catch { setNotice('자료는 저장됐습니다. 저장 작업 목록을 새로 불러와 작업 정보를 확인하세요.') }
       return createdSubmissionId
     }
 
@@ -171,8 +184,8 @@ function App() {
   }
 
   const uploadRoles = async (selectedRoles: Role[]) => {
-    if (!productId.trim() || !memberId.trim()) {
-      setNotice('제품 ID와 회원 ID를 입력해 주세요.')
+    if (!productId.trim() || !memberId.trim() || !workspaceName.trim()) {
+      setNotice('시험 작업 이름과 제품 ID·회원 ID를 입력해 주세요.')
       return
     }
     setBusy(true)
@@ -218,14 +231,17 @@ function App() {
     void uploadRoles(rolesToUpload)
   }
 
-  const loadSubmission = async () => {
-    if (!submissionId.trim()) return
-    setBusy(true)
-    setNotice('')
+  const restoreWorkspace = useCallback(async (id: string) => {
+    if(!/^[a-z0-9-]{1,80}$/i.test(id))throw new Error('올바른 작업 ID를 입력해 주세요.')
+    restoreRequest.current?.abort()
+    const controller=new AbortController();restoreRequest.current=controller
+    setBusy(true);setRestoring(true);setNotice('')
     try {
-      const response = await fetch(`/api/submissions/${submissionId.trim()}`)
-      if (!response.ok) throw new Error(response.status === 404 ? '문서 세트를 찾을 수 없습니다.' : '조회에 실패했습니다.')
+      const metadata=await fetch(`/api/submissions/${id}/workspace`,{headers:{'X-Member-Id':memberId},signal:controller.signal})
+      const saved=await metadata.json() as SavedWorkspace
+      const response = await fetch(`/api/submissions/${id}`,{headers:{'X-Member-Id':memberId},signal:controller.signal})
       const result = await response.json() as SubmissionResponse
+      if(controller.signal.aborted)return
       const nextDocuments: Partial<Record<Role, DocumentResult>> = {}
       const nextStates: Partial<Record<Role, UploadState>> = {}
       const nextErrors: Partial<Record<Role, string>> = {}
@@ -237,13 +253,49 @@ function App() {
       setDocuments(nextDocuments)
       setStates(nextStates)
       setErrors(nextErrors)
+      setFiles({});setFileSelectionGeneration(generation=>generation+1);setGeneratedTc(null)
       setSubmissionId(result.submissionId)
+      setLookupId(result.submissionId)
       updateAiDelivery(result.aiDelivery)
+      setWorkspace(saved);setWorkspaceName(saved.name);setProductId(String(saved.productId))
+      const nextPage=workflowPages.some(item=>item.id===saved.lastPage)?saved.lastPage:'documents'
+      setPage(nextPage);setVisited(new Set(['documents',nextPage]))
+      try{localStorage.setItem(`autotest:active-workspace:v1:${memberId}`,id)}catch{ /* List still restores server data. */ }
+      setNotice(`‘${saved.name}’ 작업을 불러왔습니다. 각 단계의 저장 이력을 이어서 사용할 수 있습니다.`)
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : '조회에 실패했습니다.')
+      if(!controller.signal.aborted)setNotice(error instanceof Error ? error.message : '작업을 불러오지 못했습니다.')
+      throw error
     } finally {
-      setBusy(false)
+      if(restoreRequest.current===controller){setBusy(false);setRestoring(false)}
     }
+  },[memberId])
+
+  // Remember only the ID locally; documents, artifacts and names remain server-side.
+  useEffect(()=>{
+    try{if(/^[1-9]\d*$/.test(memberId))localStorage.setItem('autotest:last-member:v1',memberId)}catch{ /* Optional convenience, not authentication. */ }
+    restoreRequest.current?.abort();setSubmissionId('');setLookupId('');setWorkspace(null);setWorkspaceName('새 시험 작업')
+    setDocuments({});setStates({});setErrors({});setFiles({});setGeneratedTc(null);setNotice('')
+    setAiDelivery({status:'NOT_READY',attempts:0,lastError:null,deliveredAt:null,updatedAt:null,retryable:false,preflight:null})
+    setPage('documents');setVisited(new Set(['documents']));setBusy(false);setRestoring(false)
+    let id='';try{id=localStorage.getItem(`autotest:active-workspace:v1:${memberId}`)||''}catch{ /* Optional convenience. */ }
+    if(id)void restoreWorkspace(id).catch(()=>{})
+    return()=>restoreRequest.current?.abort()
+  },[memberId,restoreWorkspace])
+
+  useEffect(()=>{
+    if(!workspace||workspace.id!==submissionId||restoring)return
+    const controller=new AbortController()
+    const timer=setTimeout(()=>{void fetch(`/api/submissions/${submissionId}/workspace`,{method:'PATCH',headers:{'X-Member-Id':memberId,'Content-Type':'application/json'},body:JSON.stringify({lastPage:page}),signal:controller.signal})
+      .catch(error=>{if(!controller.signal.aborted)setNotice(`현재 화면 위치를 저장하지 못했습니다. 산출물은 보존됩니다. ${error.message}`)})},350)
+    return()=>{clearTimeout(timer);controller.abort()}
+  },[page,submissionId,memberId,workspace?.id,restoring])
+
+  const renameWorkspace=async()=>{
+    if(!workspace)return
+    setBusy(true)
+    try{const response=await fetch(`/api/submissions/${workspace.id}/workspace`,{method:'PATCH',headers:{'X-Member-Id':memberId,'Content-Type':'application/json'},body:JSON.stringify({name:workspaceName.trim()})});const saved=await response.json() as SavedWorkspace;setWorkspace(saved);setWorkspaceName(saved.name);setNotice('시험 작업 이름을 저장했습니다.')}
+    catch(error){setNotice(error instanceof Error?error.message:'작업 이름 저장 실패')}
+    finally{setBusy(false)}
   }
 
   const retryAiDelivery = async () => {
@@ -264,8 +316,12 @@ function App() {
   }
 
   const startNewSet = () => {
-    navigate('documents')
+    restoreRequest.current?.abort()
+    try{localStorage.removeItem(`autotest:active-workspace:v1:${memberId}`)}catch{ /* Optional convenience. */ }
+    setWorkspace(null);setWorkspaceName('새 시험 작업');setGeneratedTc(null)
+    setPage('documents');setVisited(new Set(['documents']))
     setSubmissionId('')
+    setLookupId('')
     setFileSelectionGeneration((generation) => generation + 1)
     setFiles({})
     setStates({})
@@ -305,6 +361,7 @@ function App() {
               {value === 'documents' && <span className="nav-count">{registeredCount}/3</span>}
             </button>)}
         </nav>
+        <SavedWorkspaces memberId={memberId} workspace={workspace} name={workspaceName} onNameChange={setWorkspaceName} onRename={renameWorkspace} onOpen={restoreWorkspace} busy={busy} />
         <details className="workspace-connection" open>
         <summary>문서 세트 · 연결 정보</summary>
       <section className="submission-meta" aria-label="제출 정보">
@@ -316,24 +373,20 @@ function App() {
           <span>회원 ID</span>
           <input value={memberId} onChange={(event) => setMemberId(event.target.value)} inputMode="numeric" />
         </label>
-        <div className="set-lookup">
-          <label>
-            <span>문서 세트 ID</span>
-            <input value={submissionId} onChange={(event) => setSubmissionId(event.target.value)} placeholder="업로드 후 자동 생성" />
-          </label>
-          <button className="quiet-button" type="button" onClick={loadSubmission} disabled={busy || !submissionId.trim()}>세트 조회</button>
-        </div>
+        <div className="set-lookup"><label><span>문서 세트 ID</span><input value={lookupId} onChange={event=>setLookupId(event.target.value)} placeholder="작업 ID로 직접 불러오기" /></label><button className="quiet-button" type="button" disabled={busy||!lookupId.trim()} onClick={()=>void restoreWorkspace(lookupId.trim()).catch(()=>{})}>세트 조회</button></div>
       </section>
         </details>
         <button className="quiet-button new-set-button" type="button" onClick={startNewSet} disabled={busy}>＋ 새 문서 세트</button>
         <p className="sidebar-help">기능리스트·매뉴얼 필수<br />시험합의서 선택</p>
       </aside>
       <main className="workspace-main">
-        <div className="workspace-document-tab"><span className="tab-marker" />{pageTitle}<span className="workspace-tab-caption">{submissionId ? '문서 세트 연결됨' : '새 문서 세트'}</span></div>
+        <div className="workspace-document-tab"><span className="tab-marker" />{pageTitle}<span className="workspace-tab-caption">{restoring?'저장 작업 불러오는 중…':workspace?workspace.name:submissionId?'문서 세트 연결됨':'새 시험 작업'}</span></div>
         <div className="workspace-page-heading"><div><p>시험 작업 / {pageTitle}</p><h1>{pageTitle}</h1></div>
           <span className={`workspace-badge ${validationReady ? 'badge-success' : validating ? 'badge-pending' : ''}`} role="status">{validating && <span className="spinner" aria-hidden="true" />}{validationLabel}</span>
         </div>
       <section className="document-section">
+      {restoring&&<p className="global-notice" role="status"><span className="spinner" /> 저장된 시험 작업과 자료를 복원하고 있습니다…</p>}
+      {notice && <p className="global-notice" role="alert">{notice}</p>}
       <div hidden={page !== 'documents'}>
         <div className="section-heading">
           <div>
@@ -454,7 +507,6 @@ function App() {
         <Tabs defaultValue="status">
           <TabsList aria-label="처리 결과 보기"><TabsTrigger value="status">진행 상태</TabsTrigger><TabsTrigger value="diagnostics">Jev 검증·진단</TabsTrigger></TabsList>
           <TabsContent value="status">
-        {notice && <p className="global-notice" role="alert">{notice}</p>}
         {submissionId && <p className="set-confirmation"><span /> 문서 세트 연결됨 <code>{submissionId}</code></p>}
         {submissionId && (
           <div className={`ai-delivery ai-delivery-${aiDelivery.status.toLowerCase()}`} role="status">

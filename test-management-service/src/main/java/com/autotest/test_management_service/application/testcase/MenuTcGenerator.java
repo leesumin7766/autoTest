@@ -14,6 +14,8 @@ import org.springframework.http.HttpStatus;
 @Component
 public class MenuTcGenerator {
     public static final String VERSION = "menu-tc-v3";
+    private static final String READ_VIEW_RULE = "CRUD-VIEW-01";
+    private static final String READ_SEARCH_RULE = "CRUD-SEARCH-01";
     private final ObjectMapper mapper;
     private final JsonNode bank;
     public MenuTcGenerator(ObjectMapper mapper) {
@@ -46,12 +48,12 @@ public class MenuTcGenerator {
         if (product == null || product.isBlank() || product.length() > 160) throw invalid("TC_PRODUCT_REQUIRED", "제품명이 필요합니다.");
         if (!features.isArray() || features.isEmpty() || features.size() > 2000) throw invalid("TC_FEATURES_INVALID", "기능은 1~2,000개여야 합니다.");
         var output = mapper.createObjectNode().put("schemaVersion", VERSION).put("templateVersion", VERSION)
-            .put("templateDigest", hash(bank.toString()+TcProcedureWriter.VERSION+TcExecutionSpecification.VERSION)).put("procedureVersion",TcProcedureWriter.VERSION)
+            .put("templateDigest", hash(bank.toString()+TcProcedureWriter.VERSION+TcExecutionSpecification.VERSION+READ_VIEW_RULE+"one-per-menu-v1"+READ_SEARCH_RULE)).put("procedureVersion",TcProcedureWriter.VERSION)
             .put("executionSpecificationVersion",TcExecutionSpecification.VERSION).put("generationMode", "TEMPLATE").put("productName", product)
             .put("status", "DRAFT").put("reviewRequired", true);
         output.set("source", source.deepCopy());
         var cases = output.putArray("testCases"); var normalized = output.putArray("features");
-        Set<String> ids = new HashSet<>(); int index = 0;
+        Set<String> ids = new HashSet<>(); Set<String> checkedReadMenus=new HashSet<>(), checkedSearchMenus=new HashSet<>(); int index = 0;
         var ordered=new ArrayList<JsonNode>();features.forEach(ordered::add);
         ordered.sort(Comparator.comparingInt(feature -> "로그인".equals(classify(feature)) ? 0 : 1));
         for (JsonNode feature : ordered) {
@@ -65,6 +67,15 @@ public class MenuTcGenerator {
             normalizedFeature.put("classificationSource", feature.path("featureType").asText().isBlank() ? "SUGGESTED" : "EXPLICIT");
             normalized.add(normalizedFeature);
             expand(cases, normalizedFeature, type.equals("로그인") ? "LOGIN" : type.equals("CRUD") ? "CRUD" : "FEATURE", ++index, type, source);
+            if (type.equals("CRUD") && TcTemplateBinding.operation(feature.path("functionName").asText()).equals("READ")
+                    && feature.path("matchedMenuKeys").isArray() && !feature.path("matchedMenuKeys").isEmpty()
+                    && checkedReadMenus.add(feature.path("matchedMenuKeys").get(0).asText()))
+                addReadViewCase(cases, normalizedFeature, index, source);
+            if (type.equals("CRUD") && TcTemplateBinding.operation(feature.path("functionName").asText()).equals("READ")
+                    && feature.path("menuDescription").asText(feature.path("description").asText()).matches("(?s).*(검색|필터|search|filter).*")
+                    && feature.path("matchedMenuKeys").isArray() && !feature.path("matchedMenuKeys").isEmpty()
+                    && checkedSearchMenus.add(feature.path("matchedMenuKeys").get(0).asText()))
+                addReadSearchCase(cases, normalizedFeature, index, source);
         }
         for (String group : List.of("COMMON", "PRODUCT_DOCUMENT", "USER_MANUAL")) {
             String title = switch (group) { case "COMMON" -> "공통"; case "PRODUCT_DOCUMENT" -> "제품설명서"; default -> "사용자취급설명서"; };
@@ -81,6 +92,67 @@ public class MenuTcGenerator {
         summary.put("commonCaseCount", 68);
         output.put("inputDigest", hash(VERSION + mapper.createObjectNode().put("product", product).set("features", normalized).toString() + source + output.path("templateDigest")));
         return output;
+    }
+    /** Supplemental screen-availability check; original 16 CRUD checks remain intact. */
+    private void addReadViewCase(ArrayNode cases, JsonNode feature, int groupIndex, JsonNode source) {
+        String scope=feature.path("featureId").asText();
+        String name=feature.path("functionName").asText();
+        String scenario=name+": 조회 화면이 열리고 기본 내용을 표시하는지 확인";
+        String inputs="저장된 시험 계정으로 접속하여 연결된 조회 메뉴를 연다. 시험 데이터의 정확성은 별도 조회 TC에서 확인한다.";
+        String expected="연결된 조회 화면의 제목과 기본 본문이 표시된다.";
+        var tc=cases.addObject().put("id",hash(source.toString()+":"+scope+":"+READ_VIEW_RULE))
+            .put("tcId","TC-%03d-017".formatted(groupIndex)).put("featureId",scope).put("featureType","CRUD")
+            .put("ruleId",READ_VIEW_RULE).put("templateVersion",VERSION).put("qualityCharacteristic","기능적합성")
+            .put("subCharacteristic","기능완전성").put("scenario",scenario).put("inputs",inputs)
+            .put("expectedResult",expected).put("scopeDescription",feature.path("description").asText())
+            .put("testType","PRODUCT_BEHAVIOR").put("reviewRequired",true).put("executionReadiness","READY")
+            .put("executionMode","BROWSER_CANDIDATE").put("automationMode","BROWSER_CANDIDATE");
+        tc.putNull("result");tc.set("featurePath",feature.path("featurePath").deepCopy());
+        tc.set("evidence",feature.path("evidence").deepCopy());tc.set("source",source.deepCopy());
+        tc.putObject("defectExample").put("summary",name+" 조회 화면 표시 실패")
+            .put("severity","M").put("content","연결된 조회 메뉴에서 화면 제목 또는 기본 본문이 표시되지 않음");
+        tc.putArray("reviewNotes").add("화면 접근·표시만 확인합니다. 조회 데이터의 값·건수 정확성은 기존 CRUD TC에서 별도로 판정합니다.");
+        var plan=tc.putObject("executionPlan").put("targetUrl",feature.path("targetUrl").asText(source.path("targetUrl").asText()))
+            .put("specificationVersion","execution-spec-v1").put("tcContentDigest",hash(scenario+inputs+expected))
+            .put("readinessReason","수집 메뉴와 실제 화면 제목·본문을 대조합니다.")
+            .put("applicability","수집 근거가 있는 조회 메뉴");
+        plan.set("menuKeys",feature.path("matchedMenuKeys").deepCopy());
+        plan.putArray("steps").add("저장된 계정으로 로그인한다.").add("연결된 조회 메뉴로 이동한다.").add("실제 화면 제목과 기본 본문을 확인한다.");
+        plan.putObject("selection").put("scopeOperation","READ").put("exclusionCandidate",false)
+            .put("status","DETERMINISTIC_VIEW_CHECK").put("reason","메뉴·화면 표시만 확인");
+        plan.putObject("specification").put("status","READY").put("profile","READ_ONLY_VIEW")
+            .put("timeoutSeconds",60);
+    }
+    /** Search behavior only: compare visible list rows before and after a read-only query. */
+    private void addReadSearchCase(ArrayNode cases, JsonNode feature, int groupIndex, JsonNode source) {
+        String scope=feature.path("featureId").asText(), name=feature.path("functionName").asText();
+        String scenario=name+": 현재 목록의 한 항목명을 검색하여 목록이 좁혀지는지 확인";
+        String inputs="조회 화면에 이름이 서로 다른 행이 2개 이상 있을 때 표시된 첫 항목명을 검색어로 사용한다. 저장·변경 동작은 수행하지 않는다.";
+        String expected="검색 후 표시된 목록의 항목 수가 줄어들고, 검색에 사용한 원래 항목이 남는다.";
+        var tc=cases.addObject().put("id",hash(source.toString()+":"+scope+":"+READ_SEARCH_RULE))
+            .put("tcId","TC-%03d-018".formatted(groupIndex)).put("featureId",scope).put("featureType","CRUD")
+            .put("ruleId",READ_SEARCH_RULE).put("templateVersion",VERSION).put("qualityCharacteristic","기능적합성")
+            .put("subCharacteristic","기능정확성").put("scenario",scenario).put("inputs",inputs)
+            .put("expectedResult",expected).put("scopeDescription",feature.path("description").asText())
+            .put("testType","PRODUCT_BEHAVIOR").put("reviewRequired",true).put("executionReadiness","READY")
+            .put("executionMode","BROWSER_CANDIDATE").put("automationMode","BROWSER_CANDIDATE");
+        tc.putNull("result");tc.set("featurePath",feature.path("featurePath").deepCopy());
+        tc.set("evidence",feature.path("evidence").deepCopy());tc.set("source",source.deepCopy());
+        tc.putObject("defectExample").put("summary",name+" 목록 검색 실패")
+            .put("severity","M").put("content","검색어 입력 후 목록 행이 검색어와 일치하도록 좁혀지지 않음");
+        tc.putArray("reviewNotes").add("화면에 이미 있는 두 항목으로 검색 동작만 확인합니다. 전체 데이터의 완전성·값 정확성은 기존 CRUD TC에서 별도 판정합니다.");
+        var plan=tc.putObject("executionPlan").put("targetUrl",feature.path("targetUrl").asText(source.path("targetUrl").asText()))
+            .put("specificationVersion","execution-spec-v1").put("tcContentDigest",hash(scenario+inputs+expected))
+            .put("readinessReason","수집 메뉴와 화면의 검색 입력·목록 행을 대조합니다.")
+            .put("applicability","검색 입력과 서로 다른 항목 2개 이상이 보이는 목록 화면");
+        plan.set("menuKeys",feature.path("matchedMenuKeys").deepCopy());
+        plan.putArray("steps").add("저장된 계정으로 로그인하고 연결된 조회 메뉴를 연다.")
+            .add("표시된 서로 다른 두 항목명과 검색 입력을 확인한다.")
+            .add("첫 항목명을 검색하고 목록 행의 이름을 다시 비교한다.");
+        plan.putObject("selection").put("scopeOperation","READ").put("exclusionCandidate",false)
+            .put("status","DETERMINISTIC_SEARCH_CHECK").put("reason","현재 화면의 목록 검색 동작만 확인");
+        plan.putObject("specification").put("status","READY").put("profile","READ_ONLY_SEARCH")
+            .put("timeoutSeconds",60);
     }
     private void expand(ArrayNode cases, JsonNode feature, String group, int groupIndex, String type, JsonNode source) {
         int local = 0;

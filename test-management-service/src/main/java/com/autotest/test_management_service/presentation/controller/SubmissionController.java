@@ -33,20 +33,24 @@ public class SubmissionController {
 
     private final SubmissionService submissionService;
     private final AiDocumentDeliveryService aiDocumentDeliveryService;
+    private final com.autotest.test_management_service.application.service.SubmissionWorkspaceService workspaces;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<SubmissionResponse> submit(
             @RequestPart("file") MultipartFile file,
             @RequestParam("productId") Long productId,
+            @RequestParam(value = "workspaceName", required = false) String workspaceName,
                 @RequestParam(value = "role", required = false) com.autotest.test_management_service.domain.submission.SubmissionType role,
             @RequestHeader("X-Member-Id") Long memberId
     ) {
+        String name=workspaceName==null?null:com.autotest.test_management_service.application.service.SubmissionWorkspaceService.validName(workspaceName);
         Submission submission = submissionService.submit(
                 file,
                 role == null ? com.autotest.test_management_service.domain.submission.SubmissionType.AGREEMENT : role,
                 new MemberId(memberId),
                 new ProductId(productId)
         );
+        workspaces.update(submission.submissionId().value(),memberId,name==null?"시험 작업 "+submission.submissionId().value().toString().substring(0,8):name,"documents");
         AiDocumentDeliveryService.DeliveryResult delivery = aiDocumentDeliveryService.deliverIfReady(submission.submissionId());
         return ResponseEntity.ok(SubmissionResponse.from(
             submission,
