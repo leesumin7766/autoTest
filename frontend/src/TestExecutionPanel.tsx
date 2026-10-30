@@ -13,6 +13,7 @@ export type Run = { runId: string; tcSetId: string; status: string; stale: boole
 export type View = { run: Run | null; history: { runId: string; status: string; createdAt: string }[]; executorConnected: boolean; judgeConnected: boolean; executorBusy?: boolean; planner?: string; readinessIssues?: {code:string;message:string}[] }
 const labels: Record<string, string> = { EXCLUDED: '실행 제외·검토 필요', PREPARED: '실행 전 · 항목 확인', WAITING_EXECUTOR: '실행 대기', RUNNING: '시험 중', COMPLETED: '완료', PARTIAL: '일부 미판정', FAILED: '실행 실패', INTERRUPTED: '실행 중단·복구 필요', ERROR: '수행 오류', NEEDS_CONTEXT: '추가 정보 필요', NEEDS_REVIEW: '검토 필요', CANCELED: '중단됨', PENDING: '대기' }
 const executionErrors: Record<string,string> = {
+  EXECUTION_INITIAL_ENTRY_NOT_READY:'지정한 최초 URL을 확인하지 못해 시험을 시작하지 않았습니다. 초기 진입·복구 증거에서 실제 도착 주소를 확인하세요.',
   EXECUTION_AI_REQUEST_REJECTED:'AI 서버가 시험 요청을 거부했습니다. 요청 형식과 서비스 간 통신 버전을 확인해야 합니다.',
   EXECUTION_AI_AUTH_FAILED:'AI 서버 내부 인증에 실패했습니다. 서비스 간 인증 설정을 확인해야 합니다.',
   EXECUTION_AI_API_MISSING:'AI 서버에 시험 실행 API가 없습니다. 실행 중인 소스 버전을 확인해야 합니다.',
@@ -90,7 +91,7 @@ export function TestExecutionPanel({ submissionId, memberId, active = true, pref
   const unjudged = performed.filter(item => !item.result)
   const hasStarted = !!run && (!!run.snapshot.startedAt || running || performed.length > 0 || failedExecution.length > 0 || ['COMPLETED','PARTIAL','FAILED','INTERRUPTED'].includes(run.status))
   const bucket = (item: Item) => item.tc.featureId.startsWith('scope:') && ['NEEDS_CONTEXT','PENDING'].includes(item.executionStatus) ? 'SEPARATE' : item.executionStatus === 'NEEDS_CONTEXT' ? 'INPUT' : item.executionStatus === 'PENDING' ? 'WAITING' : item.executionStatus
-  const stages: Record<string, string> = { SELECTING: 'Qwen이 TC 적용 범위 확인 중', CONNECTING: '브라우저 접속·로그인', PLANNING: 'Qwen이 다음 조작 계획 중', ACTING: 'Playwright 화면 조작·증거 수집', RECHECK: '변경 내용 재조회', JUDGING: 'Jev가 수행 증거 판정 중' }
+  const stages: Record<string, string> = { AUTHENTICATING: '저장된 시험 계정 입력·로그인 수행 중', INITIALIZING: 'Qwen이 최초 URL 복구 확인 중', SELECTING: 'Qwen이 TC 적용 범위 확인 중', CONNECTING: '브라우저 접속·초기 상태 준비', PLANNING: 'Qwen이 다음 조작 계획 중', ACTING: 'Playwright 화면 조작·증거 수집', RECHECK: '변경 내용 재조회', JUDGING: 'Jev가 수행 증거 판정 중' }
   const currentItem = run?.snapshot.items.find(item => item.caseId === run.snapshot.currentCaseId)
   useEffect(() => {
     if (!run || !['WAITING_EXECUTOR', 'RUNNING'].includes(run.status)) return

@@ -24,10 +24,10 @@ export function RunProgress({ title, active, elapsedMs, receivedAt, taskKey, sta
   useEffect(() => { if (!active) return; const timer = window.setInterval(() => tick(value => value+1),1000); return () => window.clearInterval(timer) }, [active,taskKey])
   const elapsed = clock.current.value
   const percentage = total ? Math.min(100, Math.round(completed / total * 100)) : null
-  return <div className={`run-progress is-${tone || (active ? 'active' : 'neutral')}`} aria-label="작업 진행 현황">
+  return <div className={`run-progress is-${tone || (active ? 'active' : 'neutral')} ${active ? 'is-running' : ''}`} aria-label="작업 진행 현황">
     <div className="run-progress-heading"><div><span className="run-status-dot" /><strong>{title}</strong></div><div className="run-clock"><span>소요 시간</span><b>{duration(elapsed)}</b></div></div>
     <div className="run-progress-current" role="status">{active && <span className="spinner" />}<span>{current}</span></div>
-    <div className="run-progress-track">{total ? <progress aria-label={progressAriaLabel || '전체 항목 처리율'} value={completed} max={total} /> : <progress aria-label={active ? '화면 탐색 진행 중 · 전체 수 미확정' : '화면 탐색 종료'} {...(active ? {} : { value: 0, max: 1 })} />}<span>{progressText || (percentage === null ? `${completed.toLocaleString()}개 캡처 저장 · ${active ? '전체 수 탐색 중' : '탐색 종료'}` : `${completed.toLocaleString()} / ${total!.toLocaleString()}개 처리 · ${percentage}%`)}</span></div>
+    <div className="run-progress-track"><span className="run-progress-bar">{total ? <progress aria-label={progressAriaLabel || '전체 항목 처리율'} value={completed} max={total} /> : <progress aria-label={active ? '화면 탐색 진행 중 · 전체 수 미확정' : '화면 탐색 종료'} {...(active ? {} : { value: 0, max: 1 })} />}<span className="run-progress-shimmer" aria-hidden="true" /></span><span>{progressText || (percentage === null ? `${completed.toLocaleString()}개 캡처 저장 · ${active ? '전체 수 탐색 중' : '탐색 종료'}` : `${completed.toLocaleString()} / ${total!.toLocaleString()}개 처리 · ${percentage}%`)}</span></div>
     <div className="run-progress-metrics">{metrics.map(metric => <div key={metric.label} className={metric.tone || ''}><b>{metric.value.toLocaleString()}</b><span>{metric.label}</span></div>)}</div>
     {note && <p className="run-progress-note">{note}</p>}
   </div>
