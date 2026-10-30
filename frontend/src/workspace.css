@@ -235,3 +235,16 @@
 .retry-list summary { cursor: pointer; overflow-wrap: anywhere; }
 .retry-list small { color: #b45309; margin-left: 8px; font-size: 12px; }
 .retry-list p { color: #6b7280; margin: 6px 0 0!important; font-size: 12px; overflow-wrap: anywhere; }
+.workspace .saved-workspace { display: grid; gap: 8px; padding: 16px 12px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.workspace .saved-workspace label { display: grid; gap: 6px; }
+.workspace .saved-workspace small { color: #6b7280; font-size: 11px; overflow-wrap: anywhere; }
+.workspace .saved-workspace input { width: 100%; min-width: 0; box-sizing: border-box; }
+.workspace .saved-workspace-dialog { width: min(880px, calc(100vw - 48px)); max-height: 85vh; overflow: auto; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; color: #111827; }
+.workspace .saved-workspace-dialog::backdrop { background: rgb(17 24 39 / 35%); }
+.workspace .saved-workspace-list { display: grid; gap: 10px; margin: 16px 0; }
+.workspace .saved-workspace-list article { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; }
+.workspace .saved-workspace-list article > div { min-width: 0; overflow-wrap: anywhere; }
+.workspace .saved-workspace-list strong { display: block; margin-bottom: 6px; font-size: 14px; }
+.workspace .saved-workspace-list p { margin: 8px 0 0; font-size: 12px; }
+.workspace .saved-workspace-list button { flex-shrink: 0; }
+.jev-confidence { font-variant-numeric: tabular-nums; white-space: nowrap; }

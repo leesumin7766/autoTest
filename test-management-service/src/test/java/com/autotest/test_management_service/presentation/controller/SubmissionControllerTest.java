@@ -41,6 +41,9 @@ class SubmissionControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @MockitoBean
+    private com.autotest.test_management_service.application.service.SubmissionWorkspaceService workspaces;
+
         @MockitoBean
     private SubmissionService submissionService;
 
@@ -184,7 +187,7 @@ class SubmissionControllerTest {
 
     @Test
     void unsupportedUploadFormatStillReturns400() throws Exception {
-        doThrow(new IllegalArgumentException("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다."))
+        doThrow(new com.autotest.test_management_service.exception.TestManagementException(com.autotest.test_management_service.exception.TestManagementErrorCode.DOCUMENT_FORMAT_UNSUPPORTED))
                 .when(submissionService).submit(any(), any(com.autotest.test_management_service.domain.submission.SubmissionType.class), eq(new MemberId(1L)), eq(new ProductId(100L)));
         MockMultipartFile file = new MockMultipartFile("file", "document.txt", "text/plain", "not allowed".getBytes(StandardCharsets.UTF_8));
 
@@ -194,8 +197,16 @@ class SubmissionControllerTest {
                         .param("role", "AGREEMENT")
                         .header("X-Member-Id", "1"))
                 .andExpect(status().isBadRequest())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
-                        .string("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다."));
+                .andExpect(jsonPath("$.code").value("DOCUMENT_FORMAT_UNSUPPORTED"))
+                .andExpect(jsonPath("$.message").value("허용되지 않은 파일 형식입니다. PDF, Excel, HWP, Word만 업로드 가능합니다."))
+                .andExpect(jsonPath("$.traceId").exists());
+    }
+
+    @Test void initialUploadRegistersTheChosenWorkspaceName()throws Exception{
+        SubmissionId id=SubmissionId.generate();when(submissionService.submit(any(),any(com.autotest.test_management_service.domain.submission.SubmissionType.class),eq(new MemberId(1L)),eq(new ProductId(100L)))).thenReturn(submission(id,SubmissionStatus.UPLOADED));
+        when(submissionService.findDocumentsBySubmissionId(id)).thenReturn(List.of());
+        mockMvc.perform(multipart("/api/submissions").file(new MockMultipartFile("file","manual.pdf","application/pdf",new byte[]{1})).param("productId","100").param("workspaceName"," 제품 시험 A ").header("X-Member-Id","1")).andExpect(status().isOk());
+        verify(workspaces).update(id.value(),1L,"제품 시험 A","documents");
     }
 
         private Submission submission(SubmissionId id, SubmissionStatus status) {

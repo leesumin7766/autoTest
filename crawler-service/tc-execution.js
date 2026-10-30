@@ -39,11 +39,16 @@ async function observe(s) {
     };
     const elements = [...document.querySelectorAll('a,button,input,select,textarea,[role="button"],[role="tab"],[role="option"],[role="menuitem"],[role="checkbox"],[role="radio"],[role="switch"],[role="combobox"]')].filter(actionable).slice(0, 120).map((el, i) => {
       el.setAttribute('data-autotest-execution-id', String(offset+i));
-      return { id: String(offset+i),frameIndex,context:el.closest('tr')?.innerText.slice(0,240)||'', tag: el.tagName.toLowerCase(),role:el.getAttribute('role')||'', type: el.getAttribute('type') || '', navigation:!!el.closest('nav,aside,[role="navigation"]') || (el.tagName==='A'&&!el.hasAttribute('download')), name: (el.getAttribute('aria-label') || el.labels?.[0]?.innerText || el.getAttribute('placeholder') || el.innerText || '').trim().slice(0, 160), href: el.tagName === 'A' ? el.href : '', options: el.tagName === 'SELECT' ? [...el.options].slice(0, 30).map(x => ({ label: x.text, value: x.value })) : undefined };
+      const childPanel=[el.nextElementSibling,el.parentElement?.nextElementSibling].find(panel=>panel&&visible(panel)&&[...panel.querySelectorAll('a,[role="menuitem"],[role="tab"]')].some(actionable));
+      return { id: String(offset+i),frameIndex,context:el.closest('tr')?.innerText.slice(0,240)||'', tag: el.tagName.toLowerCase(),role:el.getAttribute('role')||'', type: el.getAttribute('type') || '', navigation:!!el.closest('nav,aside,[role="navigation"]') || (el.tagName==='A'&&!el.hasAttribute('download')), selected:el.getAttribute('aria-selected')==='true'||el.getAttribute('aria-current')==='page'||el.getAttribute('data-state')==='active', expanded:el.getAttribute('aria-expanded')==='true'||el.getAttribute('data-state')==='open'||!!childPanel, name: (el.getAttribute('aria-label') || el.labels?.[0]?.innerText || el.getAttribute('placeholder') || el.innerText || '').trim().slice(0, 160), href: el.tagName === 'A' ? el.href : '', options: el.tagName === 'SELECT' ? [...el.options].slice(0, 30).map(x => ({ label: x.text, value: x.value })) : undefined };
     });
     const main=activeLayer||document.querySelector('main,[role="main"]');
     const headings=[...(main||document.body).querySelectorAll('h1,h2,h3')].filter(el=>visible(el)&&!el.closest('nav,aside,header,footer,[role="navigation"]')).map(el=>el.innerText.trim()).filter(Boolean).slice(0,20);
-    return { url: location.href, title: document.title, text: document.body.innerText.slice(0, 10000), mainText:main?.innerText.slice(0,8000)||'',headings,screenReady:true,elements,activeLayer:activeLayer?{role:activeLayer.getAttribute('role')||'dialog',label:activeLayer.getAttribute('aria-label')||''}:null, iframeCount: document.querySelectorAll('iframe').length };
+    const tables=[...(main||document.body).querySelectorAll('table')].filter(visible).slice(0,4).map(table=>({
+      headers:[...table.querySelectorAll('thead th')].map(cell=>cell.innerText.trim().slice(0,100)),
+      rows:[...table.querySelectorAll('tbody tr')].filter(visible).slice(0,80).map(row=>[...row.querySelectorAll('td')].map(cell=>cell.innerText.trim().slice(0,180)))
+    }));
+    return { url: location.href, title: document.title, text: document.body.innerText.slice(0, 10000), mainText:main?.innerText.slice(0,8000)||'',headings,tables,screenReady:true,elements,activeLayer:activeLayer?{role:activeLayer.getAttribute('role')||'dialog',label:activeLayer.getAttribute('aria-label')||''}:null, iframeCount: document.querySelectorAll('iframe').length };
     },{offset:parts.reduce((count,part)=>count+part.elements.length,0),frameIndex});parts.push(part);
   }
   const observation={...parts[0],text:parts.map((part,index)=>index?`\n[frame ${index}]\n${part.text}`:part.text).join('').slice(0,16000),elements:parts.flatMap(part=>part.elements),supportedFrameCount:parts.length-1};
@@ -53,7 +58,7 @@ async function observe(s) {
     &&observation.elements.some(el=>el.type==='password')&&observation.elements.some(el=>el.tag==='input'&&['','text','email'].includes(el.type))
     &&observation.elements.some(el=>(el.tag==='button'||el.type==='submit')&&/로그인|log\s?in|sign\s?in|접속/i.test(el.name));
   if(loginEntry){s.authenticatedBySetup=false;s.authenticatedByTest=false;}
-  observation.entryState={requestedUrl:publicUrl(s.openInput.targetUrl),actualUrl:observation.url,atInitialUrl,initialScreenReady:atInitialUrl||loginEntry,redirectDisposition:atInitialUrl?'NONE':loginEntry?'LOGIN_ENTRY_REDIRECT':s.authenticatedByTest||s.authenticatedBySetup?'AUTHENTICATED_DESTINATION':'UNEXPECTED_REDIRECT',initialEntryRequired:s.openInput.initialEntry===true,
+  observation.entryState={requestedUrl:publicUrl(s.openInput.targetUrl),actualUrl:observation.url,atInitialUrl,initialScreenReady:atInitialUrl||loginEntry||s.authenticatedBySetup,redirectDisposition:atInitialUrl?'NONE':loginEntry?'LOGIN_ENTRY_REDIRECT':s.authenticatedByTest||s.authenticatedBySetup?'AUTHENTICATED_DESTINATION':'UNEXPECTED_REDIRECT',initialEntryRequired:s.openInput.initialEntry===true,
     sessionMode:s.anonymous?'FRESH_ANONYMOUS':'SETUP',authenticationState:s.authenticatedBySetup?'AUTHENTICATED_BY_SETUP':loginEntry?'LOGIN_FORM_OBSERVED':'UNKNOWN',sessionResets:s.entryResetCount};
   if(s.authenticatedByTest)observation.entryState.authenticationState='AUTHENTICATED_BY_TEST';
   observation.authentication={savedAccountAvailable:!!(s.openInput.password&&s.openInput.setup?.automation?.username),dedicatedLoginAllowed:s.positiveLogin,loginAttempted:s.loginAttempted,outcome:s.loginOutcome||'NOT_ATTEMPTED',requiredStartState:s.requiredStartState,startStateVerified:!!s.startStateVerified,preparationMethod:s.anonymous?'FRESH_ANONYMOUS_CONTEXT':'SAVED_SETUP_LOGIN'};
@@ -79,9 +84,11 @@ async function open(input) {
     const setup = input.setup || { loginMethod: 'NONE', automation: {} };
     const positiveLogin=input.testRuleId==='LOGIN-04';
     const requiresAnonymous=anonymousLoginRules.has(input.testRuleId);
-    const anonymous=input.initialEntry===true||requiresAnonymous;
+    // An ordinary first TC still needs the saved setup login. Only login
+    // behavior TCs start anonymously to observe the login form itself.
+    const anonymous=requiresAnonymous;
     if (!['NONE', 'FORM_AUTO', 'BASIC_AUTH'].includes(setup.loginMethod)) throw failure('EXECUTION_LOGIN_UNSUPPORTED');
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true,
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', acceptDownloads: true,
       ignoreHTTPSErrors: setup.automation?.ignoreHTTPSErrors === true,
       ...(!anonymous && setup.loginMethod === 'BASIC_AUTH' ? { httpCredentials: { username: setup.automation.username, password: input.password } } : {}) });
     const page = await context.newPage(); page.setDefaultTimeout(8000);

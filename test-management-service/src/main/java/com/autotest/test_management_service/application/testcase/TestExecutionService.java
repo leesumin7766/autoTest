@@ -26,9 +26,16 @@ public class TestExecutionService {
     private String prerequisite(JsonNode tc){
         if(tc.path("featureId").asText().startsWith("scope:"))return "공통·문서 시험: 별도 문서·환경·수동 수행 증거가 필요합니다.";
         String specification=TcExecutionSpecification.preparationReason(tc);if(!specification.isEmpty())return specification;
+        if(needsReadBaseline(tc))return "사전 입력 필요: 조회 조건·대상 식별값과 기준 시점의 기대 값·건수를 먼저 연결하세요. 화면 표시 여부는 별도 조회 화면 TC로 시험할 수 있습니다.";
         String scope=tc.path("scopeDescription").asText(),scenario=tc.path("scenario").asText();
         if((scope.matches("(?is).*(업로드|upload).*")&&"FEATURE-01".equals(tc.path("ruleId").asText()))||(scope.matches("(?is).*(업로드|upload|import|가져오|파일).*")&&scenario.matches("(?s).*(확장자|스크립트 파일|최대 개수|파일의.*크기).*")))return "사전 입력 필요: 시험용 파일과 기대 확장자·크기·개수. 현재 파일 공급 기능 미지원입니다.";
         return "";
+    }
+    static boolean needsReadBaseline(JsonNode tc) {
+        return Set.of("CRUD-01","CRUD-08").contains(tc.path("ruleId").asText())
+            && "READ".equals(tc.path("executionPlan").path("selection").path("scopeOperation").asText())
+            && tc.path("inputs").asText().contains("비교할 기대 데이터")
+            && tc.path("expectedResult").asText().contains("기준 시점의 기대 데이터");
     }
     private void owner(UUID submission,long member,boolean lock) {
         var id=SubmissionId.of(submission);

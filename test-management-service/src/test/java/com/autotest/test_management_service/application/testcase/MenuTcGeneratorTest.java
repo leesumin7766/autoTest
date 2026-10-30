@@ -35,6 +35,43 @@ class MenuTcGeneratorTest {
         var rows=mapper.createArrayNode();var row=rows.addObject().put("featureId","feature-1").put("functionName","파일 업로드").put("description","파일을 업로드하는 기능");
         if(type!=null)row.put("featureType",type);row.putArray("featurePath").add("제품").add("업로드");row.putArray("evidence");return rows;
     }
+    @Test void observedCrudReadAddsSeparateScreenCheckWithoutChangingOriginalTemplates() {
+        var features=feature("CRUD");var read=(ObjectNode)features.get(0);
+        read.put("functionName","대시보드 조회").put("description","실행 현황을 조회하는 기능");
+        read.set("featurePath",mapper.createArrayNode().add("제품").add("대시보드").add("대시보드 조회"));
+        read.putArray("matchedMenuKeys").add("menu-dashboard");
+        var output=generator.generate("제품",features,mapper.createObjectNode().put("targetUrl","https://fixture.test/"));
+        var rows=new ArrayList<JsonNode>();output.path("testCases").forEach(tc->{if(tc.path("featureId").asText().equals("feature-1"))rows.add(tc);});
+        assertEquals(17,rows.size());
+        assertEquals(16,rows.stream().filter(tc->tc.path("ruleId").asText().matches("CRUD-\\d{2}")).count());
+        var view=rows.stream().filter(tc->tc.path("ruleId").asText().equals("CRUD-VIEW-01")).findFirst().orElseThrow();
+        assertEquals("READY",view.path("executionReadiness").asText());
+        assertTrue(view.path("expectedResult").asText().contains("제목과 기본 본문"));
+        assertEquals("menu-dashboard",view.path("executionPlan").path("menuKeys").get(0).asText());
+    }
+    @Test void sharedMenuGetsOneScreenCheckNotOnePerDataField() {
+        var features=feature("CRUD");var first=(ObjectNode)features.get(0);
+        first.put("functionName","대시보드 조회");first.putArray("matchedMenuKeys").add("menu-dashboard");
+        var second=features.addObject().put("featureId","feature-2").put("functionName","최근 실행 조회")
+            .put("description","최근 실행 내역을 조회하는 기능").put("featureType","CRUD");
+        second.putArray("featurePath").add("제품").add("대시보드").add("최근 실행 조회");
+        second.putArray("evidence");second.putArray("matchedMenuKeys").add("menu-dashboard");
+        var output=generator.generate("제품",features,mapper.createObjectNode());
+        var view=new ArrayList<JsonNode>();output.path("testCases").forEach(tc->{if("CRUD-VIEW-01".equals(tc.path("ruleId").asText()))view.add(tc);});
+        assertEquals(1,view.size());
+        assertEquals("feature-1",view.getFirst().path("featureId").asText());
+    }
+    @Test void searchableReadAddsSeparateBehaviorCheckWithoutRemovingOriginalCrudCases() {
+        var features=feature("CRUD");var row=(ObjectNode)features.get(0);
+        row.put("functionName","Job 목록 조회").put("description","Job 목록을 조회하고 검색, 필터링하는 기능");
+        row.putArray("matchedMenuKeys").add("menu-jobs");
+        var output=generator.generate("제품",features,mapper.createObjectNode());
+        var rows=new ArrayList<JsonNode>();output.path("testCases").forEach(tc->{if("feature-1".equals(tc.path("featureId").asText()))rows.add(tc);});
+        assertEquals(18,rows.size());
+        assertEquals(16,rows.stream().filter(tc->tc.path("ruleId").asText().matches("CRUD-\\d{2}")).count());
+        assertEquals(1,rows.stream().filter(tc->"CRUD-VIEW-01".equals(tc.path("ruleId").asText())).count());
+        assertEquals(1,rows.stream().filter(tc->"CRUD-SEARCH-01".equals(tc.path("ruleId").asText())).count());
+    }
     @Test void deterministicAndBlankVerdictsAndIndependentDefectExamples() {
         var source=mapper.createObjectNode().put("kind","TEST");
         var first=generator.generate("제품",feature("주요기능"),source);
