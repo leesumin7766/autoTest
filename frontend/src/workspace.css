@@ -248,3 +248,14 @@
 .workspace .saved-workspace-list p { margin: 8px 0 0; font-size: 12px; }
 .workspace .saved-workspace-list button { flex-shrink: 0; }
 .jev-confidence { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.manual-review-panel { display: grid; gap: 18px; min-width: 0; }
+.manual-review-target, .manual-review-shortcut { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px; border: 1px solid var(--line); border-radius: 8px; }
+.manual-review-shortcut { margin-top: 18px; background: #fff7ed; flex-wrap: wrap; }
+.manual-review-shortcut p { flex: 1 1 260px; margin: 0; }
+.manual-review-target p { overflow-wrap: anywhere; }
+.manual-review-target h2, .manual-review-scopes h3, .manual-review-pending h3 { margin-top: 0; }
+.manual-review-scopes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.manual-review-scopes article, .manual-review-pending { padding: 20px; border: 1px solid var(--line); border-radius: 8px; }
+.manual-review-panel small { color: #6b7280; }
+.manual-review-pending { background: #f9fafb; }
+@media (max-width: 700px) { .manual-review-scopes { grid-template-columns: 1fr; } .manual-review-target { align-items: flex-start; flex-direction: column; } }

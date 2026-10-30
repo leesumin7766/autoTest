@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SubmissionWorkspaceService {
     private final JdbcTemplate jdbc;
-    private static final Set<String> PAGES=Set.of("documents","crawl","menu","tc-generate","execution","defects","reports");
+    private static final Set<String> PAGES=Set.of("documents","crawl","menu","tc-generate","execution","manual-review","defects","reports");
     public SubmissionWorkspaceService(JdbcTemplate jdbc){this.jdbc=jdbc;}
     public record Workspace(UUID id,long productId,String name,String lastPage,Instant createdAt,Instant updatedAt,
                             int documentCount,int parsedDocumentCount,String deliveryStatus,int crawlCount,int menuCount,int tcSetCount,int runCount){}

@@ -16,6 +16,8 @@ const assert = require('node:assert/strict')
     await page.route('**/api/**', async route => {
       const req = route.request(), url = new URL(req.url()), path = url.pathname
       const json = value => route.fulfill({ contentType: 'application/json', body: JSON.stringify(value) })
+      if (path === '/api/crawl-agents/local/status') return json({ connected: true, busy: false, jobs: [] })
+      if (path.endsWith('/workspace')) return json({ id: 'ui-execution', name: '실행 UI 검증', productId: 1, lastPage: 'documents' })
       if(path.endsWith('/tls-policy'))return json({ignoreHTTPSErrors:true});
       if(path.endsWith('/evidence')){assert.equal(req.headers()['x-member-id'],'1');return json({evidence:[{id:'remote-evidence',kind:'BROWSER_OBSERVATION',text:'별도 저장한 수행 증거'}],plans:[]});}
       if (path === '/api/crawl-agents') return json({ agents: [{ agentId: 'agent-1', name: '시험 PC', online: true, busy: false }] })
@@ -64,9 +66,9 @@ const assert = require('node:assert/strict')
     await page.getByRole('button', { name: '세트 조회', exact: true }).click()
     await page.getByRole('button', { name: '05 시험 실행', exact: true }).click()
     await page.getByText('TC 생성 탭에서 먼저 TC를 생성하세요.',{exact:true}).waitFor();
-    await page.getByRole('button',{name:'06 결함 검토',exact:true}).click();
+    await page.getByRole('button',{name:'07 결함 검토',exact:true}).click();
     await page.getByRole('region',{name:'결함·판정 검토',exact:true}).getByText('실행 이력 없음',{exact:true}).waitFor({state:'attached'});
-    await page.getByRole('button',{name:'07 리포트·재시험',exact:true}).click();
+    await page.getByRole('button',{name:'08 리포트·재시험',exact:true}).click();
     await page.getByRole('region',{name:'리포트·재시험 관리',exact:true}).getByText('실행 이력 없음',{exact:true}).waitFor({state:'attached'});
     await page.getByRole('button',{name:'04 TC 생성',exact:true}).click();
     await page.getByRole('button',{name:'TC 초안 생성',exact:true}).click();
@@ -76,7 +78,7 @@ const assert = require('node:assert/strict')
     assert.equal(await page.getByLabel('시험 대상 URL',{exact:true}).inputValue(),'https://example.com');
     executionApiAvailable=false;
     await page.getByRole('button',{name:'실행 정보 새로고침',exact:true}).click();
-    await page.getByRole('alert').filter({hasText:'실행 API 점검 중'}).waitFor();
+    await page.getByRole('alert').filter({hasText:'현재 서비스를 이용할 수 없습니다.'}).waitFor();
     assert.equal(await page.getByLabel('실행할 TC 세트').inputValue(),'set-1','Execution API failure must not hide TC source');
     assert(await page.getByRole('button',{name:'시험 실행 준비',exact:true}).isDisabled());
     executionApiAvailable=true;await page.getByRole('button',{name:'실행 정보 새로고침',exact:true}).click();
@@ -151,7 +153,7 @@ const assert = require('node:assert/strict')
     await page.getByRole('button', { name: '실행 정보 새로고침', exact: true }).click()
     await page.getByText('원본이 변경된 TC입니다. TC를 다시 생성하세요.', { exact: true }).waitFor()
     assert(await page.getByRole('button', { name: '시험 실행 준비', exact: true }).isDisabled())
-    await page.getByRole('button',{name:'06 결함 검토',exact:true}).click()
+    await page.getByRole('button',{name:'07 결함 검토',exact:true}).click()
     const review=page.getByRole('region',{name:'결함·판정 검토',exact:true})
     await review.getByRole('button',{name:'판정 검토',exact:true}).first().click()
     await review.getByLabel('최종 판정').selectOption('F')
@@ -165,7 +167,7 @@ const assert = require('node:assert/strict')
     const reportDownload=page.waitForEvent('download')
     await review.getByRole('button',{name:'시험 보고서 초안 다운로드',exact:true}).click()
     assert.match((await reportDownload).suggestedFilename(),/시험보고서-초안\.md$/)
-    await page.getByRole('button',{name:'07 리포트·재시험',exact:true}).click()
+    await page.getByRole('button',{name:'08 리포트·재시험',exact:true}).click()
     await page.getByRole('region',{name:'리포트·재시험 관리',exact:true}).getByRole('button',{name:'판정 검토',exact:true}).first().waitFor()
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No review page overflow')
     stale=false;
