@@ -10,6 +10,7 @@ import { FunctionalMenuPanel } from './FunctionalMenuPanel'
 import { MenuTcPanel } from './MenuTcPanel'
 import { TestExecutionPanel } from './TestExecutionPanel'
 import { ExecutionReviewPanel } from './ExecutionReviewPanel'
+import { ManualReviewPanel } from './ManualReviewPanel'
 import { PreflightWarningDetails, type PreflightDiagnostics, type PreflightWarning } from './PreflightWarningDetails'
 
 type Role = 'AGREEMENT' | 'FUNCTION_LIST' | 'MANUAL'
@@ -65,8 +66,9 @@ const acceptedFiles = '.pdf,.xls,.xlsx,.hwp,.hwpx,.doc,.docx'
 const upcomingPages = [
   { id: 'tc-generate', title: 'TC 생성', step: '04', description: '승인된 메뉴트리와 문서 근거로 테스트케이스 초안을 생성하고, 검토·수정 및 자동·수동 시험 구분 후 승인합니다.' },
   { id: 'execution', title: '시험 실행', step: '05', description: '승인된 테스트케이스를 실행하고 실제 결과와 화면·API 증거를 기록합니다.' },
-  { id: 'defects', title: '결함 검토', step: '06', description: '결함 후보와 재현 근거를 검토하고 확정·기각·추가 시험을 기록합니다.' },
-  { id: 'reports', title: '리포트·재시험', step: '07', description: '확정 결함으로 기업용 리포트를 작성하고 패치 후 재시험 이력을 관리합니다.' },
+  { id: 'manual-review', title: '매뉴얼 검토', step: '06', description: '등록된 매뉴얼의 오탈자와 지원 종료 SW 표기를 검토합니다.' },
+  { id: 'defects', title: '결함 검토', step: '07', description: '결함 후보와 재현 근거를 검토하고 확정·기각·추가 시험을 기록합니다.' },
+  { id: 'reports', title: '리포트·재시험', step: '08', description: '확정 결함으로 기업용 리포트를 작성하고 패치 후 재시험 이력을 관리합니다.' },
 ]
 
 const workflowPages = [
@@ -334,6 +336,7 @@ function App() {
   const selectedCount = roles.filter(({ id }) => files[id]).length
   const registeredCount = Object.keys(documents).length
   const validating = aiDelivery.status === 'PENDING' && !aiDelivery.retryable
+  const manualReady = Boolean(submissionId && documents.MANUAL?.status === 'PARSED' && !busy)
   const validationReady = aiDelivery.status === 'DELIVERED' && ['READY', 'READY_WITH_WARNINGS'].includes(aiDelivery.preflight?.decision || '')
   const pageTitle = workflowPages.find(item => item.id === page)?.title || '자료 등록'
   const validationLabel = validating ? 'Jev 문서 검증 중' : aiDelivery.status === 'BLOCKED' ? '검증 차단' : aiDelivery.status === 'FAILED' ? '전달 실패' : validationReady ? aiDelivery.preflight?.decision === 'READY_WITH_WARNINGS' ? '검증 완료 · 경고 있음' : '검증 완료' : '문서 준비 대기'
@@ -464,6 +467,7 @@ function App() {
             {busy ? '업로드·추출 중…' : `자료 업로드·검증${selectedCount ? ` · ${selectedCount}` : ''}`}
           </button>
         </div>
+        {manualReady && <div className="manual-review-shortcut"><p>제품 매뉴얼이 등록되었습니다. 오탈자·지원 종료 SW 표기 검토 화면을 확인할 수 있습니다.</p><button type="button" className="primary-button" onClick={() => navigate('manual-review')}>매뉴얼 검토로 이동</button></div>}
         <dialog ref={missingDocumentsDialog} className="dialog tc-dialog" aria-labelledby="missing-documents-title" onCancel={() => setPendingUploadRoles([])}>
           <h2 id="missing-documents-title">필수 문서가 아직 없습니다</h2>
           <p>{missingCoreRoles.map((role) => roles.find((item) => item.id === role)?.title).join(', ')} 문서가 업로드되지 않았습니다.</p>
@@ -491,11 +495,14 @@ function App() {
           {!submissionId && <div className="workspace-empty"><h2>등록된 문서 세트가 없습니다</h2><p>자료 등록과 TC 생성을 완료한 뒤 시험을 준비하세요.</p><button className="primary-button" onClick={() => navigate('documents')}>자료 등록으로 이동</button></div>}
           {submissionId && visited.has('execution') && <TestExecutionPanel active={page === 'execution'} key={`execution:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} preferredSetId={generatedTc?.context === `${submissionId}:${memberId}` ? generatedTc.setId : undefined} />}
         </div>
+        <div className="workflow-page" hidden={page !== 'manual-review'}>
+          {visited.has('manual-review') && <ManualReviewPanel manual={!busy && submissionId ? documents.MANUAL : undefined} onDocuments={() => navigate('documents')} />}
+        </div>
         {upcomingPages.filter(item => item.id === 'defects' || item.id === 'reports').map(item => <div key={item.id} className="workflow-page" hidden={page !== item.id}>
           {!submissionId && <div className="workspace-empty"><h2>등록된 문서 세트가 없습니다</h2><p>자료 등록과 TC 시험을 먼저 진행하세요.</p></div>}
           {submissionId && visited.has(item.id) && <ExecutionReviewPanel active={page === item.id} key={`${item.id}:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} reports={item.id === 'reports'} />}
         </div>)}
-        {upcomingPages.filter(item => !['tc-generate', 'execution', 'defects', 'reports'].includes(item.id)).map(item => <section key={item.id} className="workflow-page workspace-empty" hidden={page !== item.id} aria-label={item.title}>
+        {upcomingPages.filter(item => !['tc-generate', 'execution', 'manual-review', 'defects', 'reports'].includes(item.id)).map(item => <section key={item.id} className="workflow-page workspace-empty" hidden={page !== item.id} aria-label={item.title}>
           <span className="workspace-badge">준비 중</span>
           <h2>{item.title}</h2>
           <p>{item.description}</p>
