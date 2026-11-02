@@ -1,0 +1,23 @@
+{
+  "submissionId": "da43a84f-6be2-42a6-a6e3-7a396f247edf",
+  "jobId": "f63e00a2-e01d-48a1-8dda-a285e52d693d",
+  "totalPages": 56,
+  "firstPausedPage": 2,
+  "firstCompletedPages": 1,
+  "finalPausedPage": 2,
+  "finalCompletedPages": 1,
+  "completedCheckpointsUnchanged": true,
+  "elapsedFrozenWhilePaused": true,
+  "attempt": 2,
+  "status": "PAUSED",
+  "pauseSeconds": 0.089,
+  "secondPauseSeconds": 0.076,
+  "noDuplicateCandidates": true,
+  "foreignMemberDenied": true,
+  "verificationScope": "Progress, confirmed stop, resume and completed-page reuse; not full-document accuracy",
+  "automatedTests": {
+    "java": 6,
+    "python": 19,
+    "javaDatabase": "autotest_test"
+  }
+}

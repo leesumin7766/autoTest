@@ -15,6 +15,7 @@ const origin = process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173'
       calls.push(path)
       const json = data => route.fulfill({ contentType: 'application/json', body: JSON.stringify(data) })
       if (path === '/api/crawl-agents/local/status') return json({ connected: true, busy: false, jobs: [] })
+      if (path.endsWith('/manual-reviews')) return json({ job: null, history: [] })
       if (path.endsWith('/workspace')) {
         if (req.method() === 'PATCH') lastPage = req.postDataJSON().lastPage || lastPage
         return json({ id: 'manual-qa', productId: 1, name: '매뉴얼 검증 작업', lastPage })
@@ -35,7 +36,7 @@ const origin = process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173'
     await page.getByText('관리자매뉴얼.pdf', { exact: true }).last().waitFor()
     await page.getByRole('heading', { name: '오탈자 검토', exact: true }).waitFor()
     await page.getByRole('heading', { name: '지원 종료 SW 표기 검토', exact: true }).waitFor()
-    assert.equal(await page.getByRole('button', { name: '자동 검토 준비 중' }).isDisabled(), true)
+    assert.equal(await page.getByRole('button', { name: '매뉴얼 검토 시작', exact: true }).isEnabled(), true)
     await page.waitForTimeout(500)
     assert.equal(lastPage, 'manual-review')
     await page.reload()
@@ -54,7 +55,7 @@ const origin = process.env.FRONTEND_QA_URL || 'http://127.0.0.1:4173'
     }
     await page.getByRole('button', { name: '07 결함 검토', exact: true }).waitFor()
     await page.getByRole('button', { name: '08 리포트·재시험', exact: true }).waitFor()
-    assert.equal(calls.some(path => /executions|manual-reviews/.test(path)), false)
+    assert.equal(calls.some(path => /executions/.test(path)), false)
     assert.deepEqual(errors, [])
     console.log('PASS: manual review navigation, document gates, restore, mobile and isolation')
   } finally { await browser.close() }

@@ -6,6 +6,11 @@ import org.springframework.http.HttpStatus;
 /** Public messages only. Exception details belong in server logs. */
 public enum TestManagementErrorCode implements BaseErrorCode {
     // 400
+    MANUAL_REVIEW_INPUT_CHANGED("매뉴얼 원본이 변경되어 이어서 검토할 수 없습니다. 새 검토를 시작해 주세요.", HttpStatus.CONFLICT),
+    MANUAL_REVIEW_PDF_REQUIRED("현재 자동 검토는 50 MiB 이하 PDF 매뉴얼을 지원합니다.", HttpStatus.BAD_REQUEST),
+    MANUAL_REVIEW_DOCUMENT_REQUIRED("제품 매뉴얼의 등록과 문서 처리를 먼저 완료해 주세요.", HttpStatus.CONFLICT),
+    MANUAL_REVIEW_BUSY("다른 매뉴얼을 분석 중입니다. 완료 후 다시 시작해 주세요.", HttpStatus.CONFLICT),
+    MANUAL_REVIEW_UNAVAILABLE("로컬 매뉴얼 검토 서비스와 원본 문서 저장소의 연결을 확인해 주세요.", HttpStatus.SERVICE_UNAVAILABLE),
     TC_LOGIN_URL_INVALID("저장된 기본 접속 주소 또는 로그인 주소를 선택해 주세요.", HttpStatus.BAD_REQUEST),
     AGENT_ACTION_INVALID("지원하지 않는 실행기 요청입니다.", HttpStatus.BAD_REQUEST),
     AGENT_NAME_INVALID("실행 PC 이름을 입력해 주세요.", HttpStatus.BAD_REQUEST),

@@ -258,4 +258,14 @@
 .manual-review-scopes article, .manual-review-pending { padding: 20px; border: 1px solid var(--line); border-radius: 8px; }
 .manual-review-panel small { color: #6b7280; }
 .manual-review-pending { background: #f9fafb; }
+.manual-review-toolbar { display: flex; flex-wrap: wrap; gap: 10px; }
+.manual-review-history, .manual-review-filter { display: grid; gap: 8px; margin-top: 16px; }
+.manual-review-panel select { min-width: 0; max-width: 100%; padding: 8px; font: inherit; }
+.manual-review-candidates { display: grid; gap: 14px; margin-top: 18px; }
+.manual-review-candidates article { min-width: 0; border: 1px solid var(--line); padding: 16px; border-radius: 8px; }
+.manual-review-candidates .manual-review-target { padding: 0; border: 0; }
+.manual-review-candidates h4 { margin: 0; }
+.manual-review-candidates blockquote { margin: 12px 0; padding: 12px; background: #f9fafb; white-space: pre-wrap; overflow-wrap: anywhere; border-left: 3px solid #ff6c37; }
+.manual-review-results p, .manual-review-results a { overflow-wrap: anywhere; }
+.manual-review-warning { color: #92400e; background: #fffbeb; padding: 12px; border-radius: 4px; }
 @media (max-width: 700px) { .manual-review-scopes { grid-template-columns: 1fr; } .manual-review-target { align-items: flex-start; flex-direction: column; } }

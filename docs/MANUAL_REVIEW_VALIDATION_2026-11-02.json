@@ -1,0 +1,82 @@
+{
+  "date": "2026-11-02",
+  "branch": "dev-document",
+  "tests": {
+    "pythonUnitAndApi": 12,
+    "javaUnitAndIsolatedIntegration": 4,
+    "frontendBuild": "PASS",
+    "manualNavigation": "PASS",
+    "manualRunUi": "PASS",
+    "executionUiRegression": "PASS",
+    "savedWorkspaceRegression": "PASS",
+    "apiErrorCatalog": "PASS"
+  },
+  "cpuOcr": {
+    "network": "none",
+    "device": "cpu",
+    "model": "PaddleOCR-VL-1.6",
+    "sourcePage": 53,
+    "sourcePageCount": 56,
+    "testedPages": 1,
+    "blockCount": 22,
+    "characterCount": 1000,
+    "lifecycleCandidateCount": 1,
+    "elapsedSeconds": 359.86
+  },
+  "localQwen": {
+    "model": "qwen3:4b",
+    "status": "COMPLETED",
+    "failedChunks": 0,
+    "typoCandidates": 1,
+    "lifecycleCandidates": 1,
+    "allNeedReview": true,
+    "elapsedSeconds": 3.51
+  },
+  "liveApi": {
+    "submissionId": "3f3ab9b4-a42c-4c7f-9419-9c88abc29825",
+    "jobId": "1e3448a8-8415-4682-b125-375afb3a8a49",
+    "status": "PARTIAL",
+    "sourceOriginalPage": 53,
+    "testedPages": 1,
+    "nativePageCount": 1,
+    "ocrPageCount": 0,
+    "candidateCount": 1,
+    "failedChunks": 0,
+    "retriedChunks": 1,
+    "failureCodes": {},
+    "allNeedReview": true,
+    "foreignMemberDenied": true,
+    "elapsedSeconds": 66.96
+  },
+  "liveUi": {
+    "passed": true,
+    "port": 5173,
+    "candidates": 1,
+    "automaticJobStarts": 0,
+    "pageErrors": [],
+    "restoredAfterReload": true
+  },
+  "network": {
+    "internalDockerNetwork": true,
+    "localOllamaStatus": 200,
+    "externalConnectError": 101,
+    "publicOcrPort": false
+  },
+  "deployment": {
+    "frontendPort": 5173,
+    "flywayVersions": [
+      "27",
+      "28"
+    ],
+    "databaseBackup": "backups/manual-review-before-v28-20261102.dump",
+    "firstIncompleteRunPreserved": true
+  },
+  "limitations": [
+    "Only PDF up to 50MiB and 300 pages",
+    "Only Windows 10 Home/Pro, Windows 8.1 and Windows 7 lifecycle catalog",
+    "Text-first PDF extraction; images on native text pages are not OCR-processed and are warned as PARTIAL",
+    "All candidates require human review",
+    "Only one original sample page was tested with CPU OCR; no full-manual accuracy benchmark",
+    "No cancellation or resume UI in this increment"
+  ]
+}
