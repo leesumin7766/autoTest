@@ -45,3 +45,6 @@ frontend/public/downloads/*.zip
 # Python runtime caches
 __pycache__/
 *.py[cod]
+
+# Confidential local sample documents
+/sample/
