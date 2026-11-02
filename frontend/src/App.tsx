@@ -496,7 +496,7 @@ function App() {
           {submissionId && visited.has('execution') && <TestExecutionPanel active={page === 'execution'} key={`execution:${submissionId}:${memberId}`} submissionId={submissionId} memberId={memberId} preferredSetId={generatedTc?.context === `${submissionId}:${memberId}` ? generatedTc.setId : undefined} />}
         </div>
         <div className="workflow-page" hidden={page !== 'manual-review'}>
-          {visited.has('manual-review') && <ManualReviewPanel manual={!busy && submissionId ? documents.MANUAL : undefined} onDocuments={() => navigate('documents')} />}
+          {visited.has('manual-review') && <ManualReviewPanel key={`manual:${submissionId}:${memberId}:${documents.MANUAL?.fileId}`} active={page === 'manual-review'} submissionId={submissionId} memberId={memberId} manual={!busy && submissionId ? documents.MANUAL : undefined} onDocuments={() => navigate('documents')} />}
         </div>
         {upcomingPages.filter(item => item.id === 'defects' || item.id === 'reports').map(item => <div key={item.id} className="workflow-page" hidden={page !== item.id}>
           {!submissionId && <div className="workspace-empty"><h2>등록된 문서 세트가 없습니다</h2><p>자료 등록과 TC 시험을 먼저 진행하세요.</p></div>}

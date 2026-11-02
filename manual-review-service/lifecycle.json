@@ -1,0 +1,8 @@
+{
+  "version": "microsoft-desktop-2026-11-02",
+  "products": [
+    {"id":"windows-10","pattern":"(?i)\\bWindows\\s*10(?![\\d.])", "name":"Windows 10", "supportEnd":"2025-10-14", "scope":"Home/Pro 일반 지원. LTSC·IoT·ESU 등은 별도 확인", "url":"https://learn.microsoft.com/en-us/lifecycle/products/windows-10-home-and-pro", "checkedAt":"2026-11-02"},
+    {"id":"windows-81","pattern":"(?i)\\bWindows\\s*8\\.1(?![\\d.])", "name":"Windows 8.1", "supportEnd":"2023-01-10", "scope":"일반 확장 지원 종료", "url":"https://learn.microsoft.com/en-us/lifecycle/products/windows-81", "checkedAt":"2026-11-02"},
+    {"id":"windows-7","pattern":"(?i)\\bWindows\\s*7(?![\\d.])", "name":"Windows 7", "supportEnd":"2020-01-14", "scope":"일반 확장 지원 종료. Embedded·ESU 등은 별도 확인", "url":"https://learn.microsoft.com/en-us/lifecycle/products/windows-7", "checkedAt":"2026-11-02"}
+  ]
+}
