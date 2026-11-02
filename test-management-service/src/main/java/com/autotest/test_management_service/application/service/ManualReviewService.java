@@ -125,9 +125,32 @@ public class ManualReviewService {
             var checkpoints=jdbc.query("SELECT page_no,complete,updated_at FROM manual_review_pages WHERE job_id=? ORDER BY page_no",(rs,n)->mapper.createObjectNode()
                 .put("page",rs.getInt(1)).put("complete",rs.getBoolean(2)).put("updatedAt",rs.getTimestamp(3).toInstant().toString()),job);
             details.getFirst().set("checkpoints",mapper.valueToTree(checkpoints));
+            var decisions=mapper.createObjectNode();
+            jdbc.query("SELECT candidate_id,decision,note,decided_at FROM manual_review_decisions WHERE job_id=? ORDER BY candidate_id",rs->{
+                decisions.putObject(rs.getString(1)).put("decision",rs.getString(2)).put("note",rs.getString(3)).put("decidedAt",rs.getTimestamp(4).toInstant().toString());
+            },job);
+            details.getFirst().set("decisions",decisions);
             view.set("job",details.getFirst());
         }
         return view;
+    }
+    private boolean hasCandidate(UUID job,String candidate){
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM manual_review_jobs j,jsonb_array_elements(COALESCE(j.output->'candidates','[]'::jsonb)) c WHERE j.job_id=? AND c->>'id'=?)",Boolean.class,job,candidate));
+    }
+    public ObjectNode decide(UUID id,long member,UUID job,String candidate,String decision,String note){
+        owner(id,member);
+        state(id,member,job,false);
+        if(!hasCandidate(job,candidate))throw new CommonException(CommonErrorCode.RESOURCE_NOT_FOUND);
+        if(!Set.of("CONFIRMED","DISMISSED").contains(decision==null?"":decision)||(note!=null&&note.length()>500))throw new CommonException(CommonErrorCode.INVALID_INPUT_VALUE);
+        jdbc.update("INSERT INTO manual_review_decisions(job_id,candidate_id,decision,note) VALUES(?,?,?,?) ON CONFLICT(job_id,candidate_id) DO UPDATE SET decision=EXCLUDED.decision,note=EXCLUDED.note,decided_at=now()",
+            job,candidate,decision,note==null||note.isBlank()?null:note.strip());
+        return get(id,member,job);
+    }
+    public ObjectNode clearDecision(UUID id,long member,UUID job,String candidate){
+        owner(id,member);
+        state(id,member,job,false);
+        jdbc.update("DELETE FROM manual_review_decisions WHERE job_id=? AND candidate_id=?",job,candidate);
+        return get(id,member,job);
     }
     public synchronized ObjectNode start(UUID id,long member){
         owner(id,member);configured();

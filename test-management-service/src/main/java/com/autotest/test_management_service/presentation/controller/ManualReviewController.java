@@ -21,4 +21,13 @@ public class ManualReviewController {
     @PostMapping("/{job}/resume") public ResponseEntity<?> resume(@PathVariable UUID id,@PathVariable UUID job,@RequestHeader("X-Member-Id")long member){
         return ResponseEntity.accepted().cacheControl(CacheControl.noStore()).body(service.resume(id,member,job));
     }
+    public record DecisionRequest(String decision,String note){}
+    @PutMapping("/{job}/candidates/{candidate}/decision") public ResponseEntity<?> decide(@PathVariable UUID id,@PathVariable UUID job,@PathVariable String candidate,
+            @RequestHeader("X-Member-Id")long member,@RequestBody DecisionRequest body){
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.decide(id,member,job,candidate,body.decision(),body.note()));
+    }
+    @DeleteMapping("/{job}/candidates/{candidate}/decision") public ResponseEntity<?> clearDecision(@PathVariable UUID id,@PathVariable UUID job,@PathVariable String candidate,
+            @RequestHeader("X-Member-Id")long member){
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.clearDecision(id,member,job,candidate));
+    }
 }
