@@ -63,4 +63,18 @@ class ManualReviewIntegrationTest {
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM manual_review_pages WHERE job_id=? AND complete",Integer.class,job));
         mvc.perform(post("/api/submissions/{id}/manual-reviews/{job}/resume",id,job).header("X-Member-Id",98002)).andExpect(status().isForbidden());
     }
+    @Test void candidateDecisionsAreOwnedValidatedAndReversible() throws Exception {
+        var id=submission();var job=UUID.randomUUID();
+        jdbc.update("INSERT INTO manual_review_jobs(job_id,submission_id,member_id,manual_file_id,filename,document_hash,status,as_of,output) VALUES(?,?,98001,?,'d.pdf','h','COMPLETED',current_date,'{\"candidates\":[{\"id\":\"c1\",\"type\":\"TYPO\"}]}'::jsonb)",job,id,UUID.randomUUID());
+        var url="/api/submissions/{id}/manual-reviews/{job}/candidates/{c}/decision";
+        mvc.perform(put(url,id,job,"c1").header("X-Member-Id",98002).contentType("application/json").content("{\"decision\":\"CONFIRMED\"}")).andExpect(status().isForbidden());
+        mvc.perform(put(url,id,job,"nope").header("X-Member-Id",98001).contentType("application/json").content("{\"decision\":\"CONFIRMED\"}")).andExpect(status().isNotFound());
+        mvc.perform(put(url,id,job,"c1").header("X-Member-Id",98001).contentType("application/json").content("{\"decision\":\"MAYBE\"}")).andExpect(status().isBadRequest());
+        mvc.perform(put(url,id,job,"c1").header("X-Member-Id",98001).contentType("application/json").content("{\"decision\":\"DISMISSED\",\"note\":\"용어\"}")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.job.decisions.c1.decision").value("DISMISSED")).andExpect(jsonPath("$.job.decisions.c1.note").value("용어"));
+        mvc.perform(put(url,id,job,"c1").header("X-Member-Id",98001).contentType("application/json").content("{\"decision\":\"CONFIRMED\"}")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.job.decisions.c1.decision").value("CONFIRMED"));
+        mvc.perform(get("/api/submissions/{id}/manual-reviews",id).header("X-Member-Id",98001)).andExpect(jsonPath("$.job.decisions.c1.decision").value("CONFIRMED"));
+        mvc.perform(delete(url,id,job,"c1").header("X-Member-Id",98001)).andExpect(status().isOk()).andExpect(jsonPath("$.job.decisions.c1").doesNotExist());
+    }
 }

@@ -4,7 +4,8 @@ import { RunProgress } from './RunProgress'
 
 export type ReviewManual = { fileId: string; originalFilename: string; status: string; format: string }
 type Candidate = { id: string; type: 'TYPO' | 'EOL_SOFTWARE'; page: number; quote: string; title: string; reason: string; original?: string; suggestion?: string; reference?: { url: string; scope: string; supportEnd: string; checkedAt: string } }
-type Review = { jobId: string; manualFileId: string; filename: string; status: string; createdAt: string; asOf: string; errorCode?: string; stale: boolean; attempt?: number; resumable?: boolean; progress?: { totalPages: number; currentPage: number; completedPages: number; stage: string; elapsedMs: number }; output?: { pageCount: number; blockCount: number; reviewedChunks: number; failedChunks: number; catalogVersion: string; catalogProducts: string[]; candidates: Candidate[]; warnings: string[] } }
+type Review = { jobId: string; manualFileId: string; filename: string; status: string; createdAt: string; asOf: string; errorCode?: string; stale: boolean; decisions?: Record<string, Decision>; attempt?: number; resumable?: boolean; progress?: { totalPages: number; currentPage: number; completedPages: number; stage: string; elapsedMs: number }; output?: { pageCount: number; blockCount: number; reviewedChunks: number; failedChunks: number; catalogVersion: string; catalogProducts: string[]; candidates: Candidate[]; warnings: string[] } }
+type Decision = { decision: 'CONFIRMED' | 'DISMISSED'; note?: string }
 type View = { job: Review | null; history: Review[] }
 const labels: Record<string, string> = { RUNNING: '매뉴얼 분석 중', PAUSING: '중단 확인 중', PAUSED: '매뉴얼 검토 중단됨', COMPLETED: '검사 완료', PARTIAL: '일부 검사 미완료', FAILED: '분석 실패', INTERRUPTED: '분석 중단' }
 const stages: Record<string, string> = { EXTRACTING: 'PDF 텍스트·OCR 확인 중', REVIEWING: '오탈자·지원 종료 표기 검토 중', PAGE_DONE: '페이지 결과 저장 중', FINALIZING: '최종 결과 저장 중', PAUSING: '현재 처리 중단 확인 중', PAUSED: '중단됨', INTERRUPTED: '중단됨', FAILED: '처리 실패', COMPLETED: '검토 완료', PARTIAL: '검토 종료 · 확인 필요' }
@@ -49,6 +50,19 @@ export function ManualReviewPanel({ manual, onDocuments, submissionId, memberId,
       if (!controller.signal.aborted) { mutation.current++; setView(value); setReceivedAt(Date.now()); setSelected(kind === 'start' ? '' : value.job!.jobId); if (kind === 'start') setFilter('ALL') }
     } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : '검토를 시작하지 못했습니다.') }
     finally { if (!controller.signal.aborted) { setStarting(false); setPendingAction('') } }
+  }
+  const decide = async (candidate: string, decision?: 'CONFIRMED' | 'DISMISSED') => {
+    if (!view.job) return
+    mutation.current++
+    setError('')
+    try {
+      const target = `${base}/${view.job.jobId}/candidates/${encodeURIComponent(candidate)}/decision`
+      const response = await apiFetch(target, decision
+        ? { method: 'PUT', headers: { 'X-Member-Id': memberId, 'Content-Type': 'application/json' }, body: JSON.stringify({ decision }) }
+        : { method: 'DELETE', headers: { 'X-Member-Id': memberId } })
+      const value = await response.json() as View
+      mutation.current++; setView(current => ({ job: value.job ?? current.job, history: current.history }))
+    } catch (e) { setError(e instanceof Error ? e.message : '후보 판정을 저장하지 못했습니다.') }
   }
   if (!manual || manual.status !== 'PARSED') return <div className="workspace-empty">
     <h2>제품 매뉴얼을 등록해 주세요</h2>
@@ -109,6 +123,10 @@ export function ManualReviewPanel({ manual, onDocuments, submissionId, memberId,
           <p>PDF {item.page}페이지</p><blockquote>{item.quote}</blockquote>
           {item.type === 'TYPO' && <p><del>{item.original}</del> → <strong>{item.suggestion}</strong></p>}
           <p>{item.reason}</p>
+          <div className="manual-review-toolbar" role="group" aria-label={`${item.title} 판정`}>
+            {(['CONFIRMED', 'DISMISSED'] as const).map(kind => <button key={kind} type="button" className={view.job!.decisions?.[item.id]?.decision === kind ? 'primary-button' : 'quiet-button'} aria-pressed={view.job!.decisions?.[item.id]?.decision === kind} onClick={() => void decide(item.id, kind)}>{kind === 'CONFIRMED' ? '문서 결함으로 확인' : '문제 아님으로 기각'}</button>)}
+            {view.job!.decisions?.[item.id] && <button type="button" className="quiet-button" onClick={() => void decide(item.id)}>판정 취소</button>}
+          </div>
           {item.reference && <p>일반 지원 종료일 {item.reference.supportEnd} · 기준 확인일 {item.reference.checkedAt}<br />{item.reference.scope} · <a href={/^https:\/\/learn\.microsoft\.com\//.test(item.reference.url) ? item.reference.url : undefined} target="_blank" rel="noreferrer">공식 지원 기준</a></p>}
         </article>)}</div>
       </>}
