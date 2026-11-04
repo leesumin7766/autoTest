@@ -135,6 +135,7 @@ public class RemoteCrawlService {
                     value.put("errorCode",rs.getString("error_code")); value.put("stopReason",rs.getString("stop_reason"));
                     value.put("purpose",rs.getString("purpose"));value.put("executionMode",rs.getString("execution_mode"));
                     value.set("result",rs.getString("check_result")==null?mapper.nullNode():parse(rs.getString("check_result")));
+                    value.set("crawlResult",rs.getString("crawl_result")==null?mapper.nullNode():parse(rs.getString("crawl_result")));
                     return value;
                 },submission);
         ObjectNode result=mapper.createObjectNode();
@@ -144,12 +145,21 @@ public class RemoteCrawlService {
         for(String type:List.of("CONNECTION","LOGIN")) rows.stream().filter(row->type.equals(row.path("purpose").asText())).findFirst().ifPresent(row->checks.set(type,row));
         if(crawl.isPresent()) {
             UUID job=UUID.fromString(crawl.get().path("jobId").asText());
-            result.set("pages",mapper.valueToTree(jdbc.query("SELECT page_index,url,title FROM playwright_crawl_pages WHERE job_id=? ORDER BY page_index",
-                    (rs,n)->new PageSummary(rs.getInt(1),rs.getString(2),rs.getString(3)),job)));
+            result.set("pages",mapper.valueToTree(jdbc.query("SELECT page_index,url,title,screen_state::text,nav_transition::text FROM playwright_crawl_pages WHERE job_id=? ORDER BY page_index",
+                    (rs,n)->new PageSummary(rs.getInt(1),rs.getString(2),rs.getString(3),parse(rs.getString(4)),parse(rs.getString(5))),job)));
         } else result.putArray("pages");
         return result;
     }
-    public record PageSummary(int pageIndex,String url,String title) { }
+    public record PageSummary(int pageIndex,String url,String title,JsonNode screenState,JsonNode transition) { }
+    public ObjectNode menuTree(UUID submission,long member,UUID job) {
+        owner(submission,member);
+        var states=jdbc.query("SELECT status FROM playwright_crawl_jobs WHERE job_id=? AND submission_id=? AND purpose='CRAWL'",
+                (rs,n)->rs.getString(1),job,submission);
+        if(states.isEmpty()) throw error(HttpStatus.NOT_FOUND,"CRAWL_NOT_FOUND","수집 작업을 찾을 수 없습니다.");
+        var pages=jdbc.query("SELECT page_index,url,title,navigation::text,screen_state::text,nav_transition::text FROM playwright_crawl_pages WHERE job_id=? ORDER BY page_index",
+                (rs,n)->new CapturedMenuTree.Page(rs.getInt(1),rs.getString(2),rs.getString(3),parse(rs.getString(4)),parse(rs.getString(5)),parse(rs.getString(6))),job);
+        return CapturedMenuTree.build(mapper,pages).put("jobId",job.toString()).put("crawlStatus",states.getFirst());
+    }
     public void cancel(UUID submission,long member,UUID job) {
         owner(submission,member);
         jdbc.update("UPDATE playwright_crawl_jobs SET status='CANCELED',password_ciphertext=NULL,updated_at=now() WHERE job_id=? AND submission_id=? AND status IN ('QUEUED','RUNNING')",job,submission);
@@ -166,11 +176,12 @@ public class RemoteCrawlService {
     public JsonNode evidence(UUID submission,long member,UUID job,int index) {
         owner(submission,member);
         var rows=jdbc.query("""
-                SELECT p.url,p.title,p.body_text,p.elements::text,p.links::text FROM playwright_crawl_pages p
+                SELECT p.url,p.title,p.body_text,p.elements::text,p.links::text,p.navigation::text,p.screen_state::text,p.nav_transition::text FROM playwright_crawl_pages p
                 JOIN playwright_crawl_jobs j USING(job_id) WHERE j.submission_id=? AND p.job_id=? AND p.page_index=?
                 """,(rs,n)->{
                     var value=mapper.createObjectNode(); value.put("url",rs.getString(1));value.put("title",rs.getString(2));
-                    value.put("bodyText",rs.getString(3));value.set("elements",parse(rs.getString(4)));value.set("links",parse(rs.getString(5)));return value;
+                    value.put("bodyText",rs.getString(3));value.set("elements",parse(rs.getString(4)));value.set("links",parse(rs.getString(5)));value.set("navigation",parse(rs.getString(6)));
+                    value.set("screenState",parse(rs.getString(7)));value.set("transition",parse(rs.getString(8)));return value;
                 },submission,job,index);
         if(rows.isEmpty()) throw error(HttpStatus.NOT_FOUND,"PAGE_NOT_FOUND","수집 화면을 찾을 수 없습니다.");
         return rows.getFirst();
@@ -228,8 +239,13 @@ public class RemoteCrawlService {
                 } else {
                 String reason=body.path("stopReason").asText("DONE");
                 if(!Set.of("DONE","PAGE_LIMIT","DEPTH_LIMIT","TIME_LIMIT","STORAGE_LIMIT").contains(reason)) reason="DONE";
-                jdbc.update("UPDATE playwright_crawl_jobs SET status=?,error_code=?,stop_reason=?,password_ciphertext=NULL,updated_at=now() WHERE job_id=?",
-                        active.count()>0?"COMPLETED":"FAILED",active.count()>0?null:"NO_PAGES_CAPTURED",reason,job);
+                ObjectNode summary=mapper.createObjectNode();
+                for(String field:List.of("incompleteCount","navigationFailureCount","noChangeCount","uniqueScreenCount"))
+                    summary.put(field,Math.max(0,Math.min(500,body.path("result").path(field).asInt())));
+                var skipped=body.path("result").path("skipped");
+                if(skipped.isArray() && skipped.size()<=500 && json(skipped).length()<200_000) summary.set("skipped",skipped);
+                jdbc.update("UPDATE playwright_crawl_jobs SET status=?,error_code=?,stop_reason=?,crawl_result=?::jsonb,password_ciphertext=NULL,updated_at=now() WHERE job_id=?",
+                        active.count()>0?"COMPLETED":"FAILED",active.count()>0?null:"NO_PAGES_CAPTURED",reason,json(summary),job);
                 }
             } else if("failed".equals(event)) {
                 String code=body.path("errorCode").asText();
@@ -253,13 +269,34 @@ public class RemoteCrawlService {
         catch(Exception invalid) { throw error(HttpStatus.BAD_REQUEST,"CRAWL_PAGE_INVALID","스크린샷 형식이 올바르지 않습니다."); }
         String title=body.path("title").asText(), text=body.path("bodyText").asText();
         JsonNode elements=body.path("elements"), links=body.path("links");
+        JsonNode navigation=body.has("navigation")?body.get("navigation"):mapper.createArrayNode();
+        if(!navigation.isArray() || navigation.size()>500 || json(navigation).length()>500_000)
+            throw error(HttpStatus.BAD_REQUEST,"CRAWL_PAGE_INVALID","메뉴 수집 결과의 크기 또는 형식이 올바르지 않습니다.");
+        for(JsonNode item:navigation) {
+            JsonNode path=item.path("path");
+            if(!path.isArray() || path.isEmpty() || path.size()>12
+                    || !Set.of("LINK","GROUP","TAB","BUTTON").contains(item.path("kind").asText())
+                    || !permitted(active.setup(),item.path("frameUrl").asText())
+                    || (!item.path("url").asText().isEmpty() && !permitted(active.setup(),item.path("url").asText())))
+                throw error(HttpStatus.BAD_REQUEST,"CRAWL_PAGE_INVALID","메뉴 경로 또는 대상 URL이 올바르지 않습니다.");
+            for(JsonNode label:path) if(!label.isTextual() || label.asText().isBlank() || label.asText().length()>160)
+                throw error(HttpStatus.BAD_REQUEST,"CRAWL_PAGE_INVALID","메뉴 이름이 올바르지 않습니다.");
+        }
         if(image.length<3 || image.length>2*1024*1024 || image[0]!=(byte)0xff || image[1]!=(byte)0xd8
                 || title.length()>300 || text.length()>32_000 || !elements.isArray() || elements.size()>500
                 || !links.isArray() || links.size()>500 || json(elements).length()>200_000 || json(links).length()>200_000)
             throw error(HttpStatus.BAD_REQUEST,"CRAWL_PAGE_INVALID","수집 결과의 크기 또는 형식이 올바르지 않습니다.");
         if(active.bytes()+image.length>64L*1024*1024) throw error(HttpStatus.CONFLICT,"CRAWL_STORAGE_LIMIT","작업당 화면 저장 한도 64 MiB를 초과했습니다.");
-        jdbc.update("INSERT INTO playwright_crawl_pages(job_id,page_index,url,title,body_text,elements,links,screenshot) VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?)",
-                job,index,url,title,text,json(elements),json(links),image);
+        JsonNode screen=body.has("screenState")?body.get("screenState"):mapper.createObjectNode();
+        JsonNode transition=body.has("transition")?body.get("transition"):mapper.createObjectNode();
+        if(!screen.isObject() || !transition.isObject() || json(screen).length()>100_000 || json(transition).length()>30_000
+                || (!screen.isEmpty() && (!screen.path("screenKey").asText().matches("[a-f0-9]{64}")
+                    || !Set.of("READY","LOAD_TIMEOUT").contains(screen.path("readiness").asText())))
+                || (!transition.isEmpty() && (!Set.of("CONFIRMED","NO_STATE_CHANGE","LOAD_TIMEOUT").contains(transition.path("outcome").asText())
+                    || !transition.path("menuKey").asText().matches("(?:[a-f0-9]{64})?"))))
+            throw error(HttpStatus.BAD_REQUEST,"CRAWL_PAGE_INVALID","화면 상태 또는 메뉴 이동 근거가 올바르지 않습니다.");
+        jdbc.update("INSERT INTO playwright_crawl_pages(job_id,page_index,url,title,body_text,elements,links,screenshot,navigation,screen_state,nav_transition) VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?,?::jsonb,?::jsonb,?::jsonb)",
+                job,index,url,title,text,json(elements),json(links),image,json(navigation),json(screen),json(transition));
         jdbc.update("UPDATE playwright_crawl_jobs SET page_count=page_count+1,screenshot_bytes=screenshot_bytes+? WHERE job_id=?",image.length,job);
     }
     static boolean permitted(JsonNode setup,String value) {

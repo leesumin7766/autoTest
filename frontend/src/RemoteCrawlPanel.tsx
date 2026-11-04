@@ -1,12 +1,13 @@
 import { browserCheckMessage } from './browserCheckMessages'
+import { CapturedMenuTreePanel } from './CapturedMenuTreePanel'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 
 type Agent = { agentId: string; name: string; online: boolean; busy: boolean }
 export type BrowserCheck = { jobId: string; status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELED'
   agentName: string; pageCount: number; errorCode: string | null; stopReason: string | null
   result?: { httpStatus: number; elapsedMs: number; loginVerified: boolean } }
-type Job = BrowserCheck
-type Page = { pageIndex: number; url: string; title: string }
+type Job = BrowserCheck & { crawlResult?: { incompleteCount: number; navigationFailureCount: number; noChangeCount: number; uniqueScreenCount: number } }
+type Page = { pageIndex: number; url: string; title: string; screenState?: { screenKey?: string; readiness?: string; frames?: unknown[] }; transition?: { menuPath?: string[]; outcome?: string } }
 type View = { job: Job | null; pages: Page[]; checks?: Partial<Record<CheckType, BrowserCheck>> }
 export type CheckType = 'CONNECTION' | 'LOGIN'
 export type BrowserExecutionHandle = { runCheck: (type: CheckType, draft: unknown) => Promise<void>; invalidate: (type: 'ALL' | 'LOGIN') => void }
@@ -155,8 +156,15 @@ export const RemoteCrawlPanel = forwardRef<BrowserExecutionHandle, Props>(functi
     {view.job && <p role="status">{view.job.agentName} · {({ QUEUED: '실행기 작업 수신 대기', RUNNING: '화면 수집 중', COMPLETED: '수집 완료', FAILED: '수집 실패', CANCELED: '수집 중단' })[view.job.status]}
       {' · '}{view.job.pageCount}개 화면{view.job.stopReason && ` · ${stopMessages[view.job.stopReason] || view.job.stopReason}`}</p>}
     {view.job?.errorCode && <p className="error-copy" role="alert">{browserCheckMessage(view.job.errorCode)}</p>}
+    {view.job?.crawlResult && <p>확인된 화면 상태 {view.job.crawlResult.uniqueScreenCount}개 · 로딩 미완료 {view.job.crawlResult.incompleteCount}개
+      {' · '}이동 실패 {view.job.crawlResult.navigationFailureCount}개 · 변화 미확인 {view.job.crawlResult.noChangeCount}개</p>}
+    {view.job && view.pages.length > 0 && <CapturedMenuTreePanel key={view.job.jobId} base={base} jobId={view.job.jobId}
+      memberId={memberId} busy={busy} showPage={showPage} />}
     {view.pages.length > 0 && <ul className="crawl-page-list">{view.pages.map(page => <li key={page.pageIndex}>
       <button type="button" disabled={busy} onClick={() => void showPage(page)}>{page.pageIndex + 1}. {page.title || '제목 없음'} · 화면·근거 보기</button>
+      <small>{page.transition?.menuPath?.join(' → ') || '시작 화면'} · {page.screenState?.readiness === 'LOAD_TIMEOUT' ? '로딩 미완료 · 진단 캡처'
+        : page.transition?.outcome === 'NO_STATE_CHANGE' ? '클릭 후 변화 미확인'
+        : page.screenState?.readiness === 'READY' ? '로딩 완료 확인' : '이전 수집 · 상태 근거 없음'}</small>
       <small>{page.url}</small></li>)}</ul>}
     {error && <p className="error-copy" role="alert">{error}</p>}
     <dialog ref={preview} className="crawl-preview"><h3>{pageTitle}</h3>

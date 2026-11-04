@@ -180,9 +180,27 @@ class PlaywrightSetupIntegrationTest {
         var bytes=new java.io.ByteArrayOutputStream();
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(4,4,java.awt.image.BufferedImage.TYPE_INT_RGB),"jpeg",bytes);
         page.put("screenshot",java.util.Base64.getEncoder().encodeToString(bytes.toByteArray()));
+        var menu=page.putArray("navigation").addObject().put("kind","LINK").put("url","https://test.example/dashboard")
+                .put("frameUrl","https://test.example/dashboard").put("order",0);
+        menu.putArray("path").add("System").add("Dashboard");
+        String menuKey="a".repeat(64);
+        menu.put("menuKey",menuKey);
+        page.putObject("screenState").put("screenKey","b".repeat(64)).put("readiness","READY");
+        page.putObject("transition").put("menuKey",menuKey).put("outcome","CONFIRMED");
+        menu.put("url","https://outside.example/blocked");
+        channel(agent,"event",page,400);
+        menu.put("url","https://test.example/dashboard");
         channel(agent,"event",page,200);channel(agent,"event",page,200);
         assertEquals(1,remote.status(id,8101).path("job").path("pageCount").asInt());
         UUID jobId=UUID.fromString(job.path("jobId").asText());
+        String menuEndpoint="/api/submissions/"+id+"/playwright-crawls/"+jobId+"/menu-tree";
+        mvc.perform(get(menuEndpoint).header("X-Member-Id",8101)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes[0].children[0].title").value("Dashboard"))
+                .andExpect(jsonPath("$.nodes[0].children[0].status").value("CAPTURED"))
+                .andExpect(jsonPath("$.nodes[0].children[0].pageIndex").value(0));
+        mvc.perform(get(menuEndpoint).header("X-Member-Id",8102)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/submissions/"+id+"/playwright-crawls/"+UUID.randomUUID()+"/menu-tree").header("X-Member-Id",8101))
+                .andExpect(status().isNotFound());
         mvc.perform(get("/api/submissions/"+id+"/playwright-crawls/"+jobId+"/pages/0/screenshot").header("X-Member-Id",8101))
                 .andExpect(status().isOk()).andExpect(content().contentType("image/jpeg"));
         mvc.perform(get("/api/submissions/"+id+"/playwright-crawls/"+jobId+"/pages/0/screenshot").header("X-Member-Id",8102))
