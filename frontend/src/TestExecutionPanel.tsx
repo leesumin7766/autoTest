@@ -3,11 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ExecutionConnectionTest } from './ExecutionConnectionTest'
 import { RunProgress } from './RunProgress'
 import { JevConfidence } from './JevConfidence'
+import { ReadBindingsEditor, type ReadBindingCase } from './ReadBindingsEditor'
 import { useExecutionEvidence, type EvidenceGroup } from './useExecutionEvidence'
 
 // TC source and execution health are loaded independently when this tab opens.
 
-type Tc = { id: string; tcId: string; featureId: string; featurePath: string[]; scenario: string; expectedResult: string; inputs: string }
+type Tc = ReadBindingCase & { id: string; tcId: string; featureId: string; featurePath: string[]; scenario: string; expectedResult: string; inputs: string }
 type TcSet = { setId: string; stale: boolean; output: { productName: string; testCases: Tc[] } }
 export type Item = { confidence?: number; judgmentDetails?: Record<string, {choice?: string; confidence?: number}>; judgedBy?: string; caseId: string; tc: Tc; executionStatus: string; judgmentStatus: string; result: 'P' | 'F' | 'N/A' | null; actualResult: string | null; reason: string | null; evidence: unknown[]; defectCandidate?: boolean; defectDisposition?: string; conditionAssessments?: { conditionId: string; requirementQuote: string; outcome: string; evidenceIds: string[] }[] }
 export type Run = { runId: string; tcSetId: string; status: string; stale: boolean; elapsedMs?: number; completedCount: number; notExecutedCount?: number; excludedCount?: number; reviewCount?: number; pendingCount?: number; errorCount?: number; passCount?: number; failCount?: number; naCount?: number; unjudgedCount?: number; snapshot: { productName: string; allowMutation?: boolean; startedAt?: string; priorElapsedMs?: number; resumedFrom?: string; preservedCount?: number; resumeNeedsReview?: string[]; progress?: { stage: string; round?: number; caseId?: string; trace?: { round:number; planner:string; decision:string; phase:string; explanation:string; rejectedReason?:string; actions:unknown[]; records?:unknown[] }[] }; productVersion?: string; reviewRevision?: number; reviews?: unknown[]; previousAttempts?: unknown[]; retryOf?: string; targetUrl: string; notes: string; errorCode?: string; currentFeatureId?: string; currentCaseId?: string; caseCount: number; groupCount: number; groupResults?: EvidenceGroup[]; groups: { featureId: string; kind: string; featurePath: string[]; caseIds: string[] }[]; items: Item[] } }
@@ -120,6 +121,7 @@ export function TestExecutionPanel({ submissionId, memberId, active = true, pref
       <label className="tc-field">TC 세트<select aria-label="실행할 TC 세트" value={selectedSet || source?.setId || ''} disabled={busy || loading} onChange={e => setSelectedSet(e.target.value)}><option value="" disabled>TC 세트를 선택하세요</option>{sets.map(set => <option key={set.setId} value={set.setId}>{new Date(set.createdAt).toLocaleString('ko-KR')} · {set.setId.slice(0, 8)}</option>)}</select></label>
       {!loading && !source && <p>TC 생성 탭에서 먼저 TC를 생성하세요.</p>}
       {source?.stale && <p role="alert">원본이 변경된 TC입니다. TC를 다시 생성하세요.</p>}
+      {source && <ReadBindingsEditor key={`${submissionId}:${source.setId}`} submissionId={submissionId} memberId={memberId} setId={source.setId} cases={source.output.testCases} disabled={busy || running || source.stale} onSaved={() => load()} />}
       <label className="tc-field">시험 대상 URL<input type="url" placeholder="https://시험대상주소" value={targetUrl} disabled={connectionBusy} maxLength={2000} onChange={e => setTargetUrl(e.target.value)} /></label>
       <ExecutionConnectionTest submissionId={submissionId} memberId={memberId} targetUrl={targetUrl} ignoreHTTPSErrors={ignoreHTTPSErrors} onUrlChange={setTargetUrl} onBusyChange={setConnectionBusy} />
       <label className="tc-field">시험 데이터·환경 메모<textarea rows={3} maxLength={4000} value={notes} placeholder="필요한 시험 데이터와 환경을 적어주세요. 비밀번호는 입력하지 마세요." onChange={e => setNotes(e.target.value)} /></label>

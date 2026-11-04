@@ -150,5 +150,9 @@ export const serviceErrorMessages: Record<string, string> = {
   "INTERNAL_AUTH_NOT_CONFIGURED": "처리 서비스에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
   "PLAYWRIGHT_CREDENTIAL_STORAGE_UNAVAILABLE": "로그인 정보를 안전하게 보관하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   "PRODUCT_DESCRIPTION_DISABLED": "현재 제품 설명 생성 기능을 사용할 수 없습니다.",
+  "READ_BINDING_INVALID": "조회 근거 연결을 확인하세요. 수집 화면과 원문에 존재하는 인용문만 사용할 수 있습니다.",
+  "READ_BINDING_CONFLICT": "연결 정보 또는 TC가 변경되었습니다. 저장된 연결을 다시 불러온 뒤 수정하세요.",
+  "READ_BINDING_UNSUPPORTED": "조건 입력 없는 조회 명세만 연결할 수 있습니다.",
+  "TC_CASE_NOT_FOUND": "선택한 TC를 찾을 수 없습니다. TC 세트를 다시 확인하세요.",
   "MENU_SERVICE_TIMEOUT": "메뉴트리 처리 대기 시간이 초과되었습니다. 작업 상태를 확인한 뒤 다시 시도해 주세요."
 }

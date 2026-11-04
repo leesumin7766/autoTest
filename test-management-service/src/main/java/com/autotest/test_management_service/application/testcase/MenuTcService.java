@@ -101,6 +101,47 @@ public class MenuTcService {
         set.put("stale",menu.path("stale").asBoolean()||!"APPROVED".equals(menu.path("status").asText())||set.path("menuRevision").asInt()!=menu.path("revision").asInt());
         result.set("set",set);return result;
     }
+    private ObjectNode readCase(JsonNode set,String caseId) {
+        for(var tc:set.path("output").path("testCases"))if(caseId.equals(tc.path("id").asText())) {
+            if(!TcExecutionSpecification.VERSION.equals(tc.path("executionPlan").path("specificationVersion").asText()))
+                throw conflict("READ_BINDING_UNSUPPORTED","조건 입력 없는 조회 명세만 연결할 수 있습니다.");
+            return (ObjectNode)tc;
+        }
+        throw new ProductDescriptionException(HttpStatus.NOT_FOUND,"TC_CASE_NOT_FOUND","TC를 찾을 수 없습니다.");
+    }
+    private ArrayNode readTargets(UUID submission,long member,JsonNode set,JsonNode tc) {
+        var hints=mapper.createArrayNode();
+        var sources=jdbc.query("SELECT snapshot::text FROM functional_menu_jobs WHERE job_id=? AND submission_id=? AND member_id=?",
+            (rs,n)->parse(rs.getString(1)),UUID.fromString(set.path("menuJobId").asText()),submission,member);
+        if(!sources.isEmpty())for(var key:tc.path("executionPlan").path("menuKeys"))for(var evidence:sources.getFirst().path("evidence")) {
+            var path=evidence.path("webPath");
+            if(hints.size()<20&&key.asText().equals(evidence.path("menuKey").asText())&&path.isArray()&&!path.isEmpty())
+                hints.addObject().put("menuKey",key.asText()).put("href",evidence.path("url").asText()).put("label",path.get(path.size()-1).asText());
+        }
+        return hints;
+    }
+    public ObjectNode readBindings(UUID submission,long member,UUID selected,String caseId) {
+        var set=status(submission,member,selected).path("set");var tc=readCase(set,caseId);
+        var result=mapper.createObjectNode().put("stale",set.path("stale").asBoolean());
+        result.set("tc",tc);result.set("targets",readTargets(submission,member,set,tc));return result;
+    }
+    @Transactional
+    public ObjectNode saveReadBindings(UUID submission,long member,UUID selected,String caseId,JsonNode request) {
+        owner(submission,member,true);
+        var set=status(submission,member,selected).path("set");
+        if(set.path("stale").asBoolean())throw conflict("TC_SOURCE_CHANGED","메뉴·문서가 변경되었습니다. TC를 다시 생성하세요.");
+        var tc=readCase(set,caseId);var spec=tc.path("executionPlan").path("specification");
+        if(request==null||!request.path("revision").isIntegralNumber()||request.path("revision").asInt(-1)!=spec.path("bindingRevision").asInt()
+                ||!spec.path("sourceTcDigest").asText().equals(request.path("sourceTcDigest").asText()))
+            throw conflict("READ_BINDING_CONFLICT","다른 화면에서 연결 정보를 변경했거나 TC가 바뀌었습니다. 다시 불러온 뒤 저장하세요.");
+        var updated=ReadSpecificationBindings.apply(mapper,tc,request,readTargets(submission,member,set,tc));
+        ((ObjectNode)updated.path("executionPlan").path("specification")).put("bindingRevision",spec.path("bindingRevision").asInt()+1)
+            .put("boundBy",member).put("boundAt",java.time.Instant.now().toString());
+        var output=set.path("output");var cases=(ArrayNode)output.path("testCases");
+        for(int i=0;i<cases.size();i++)if(caseId.equals(cases.get(i).path("id").asText()))cases.set(i,updated);
+        jdbc.update("UPDATE menu_tc_sets SET output=?::jsonb WHERE set_id=? AND submission_id=? AND member_id=?",output.toString(),selected,submission,member);
+        return readBindings(submission,member,selected,caseId);
+    }
     public byte[] download(UUID submission,long member,UUID selected) {
         var set=status(submission,member,selected).path("set");
         if(set.path("stale").asBoolean())throw conflict("TC_SOURCE_CHANGED","메뉴트리·문서가 변경되었습니다. 새 승인본으로 TC를 생성하세요.");
