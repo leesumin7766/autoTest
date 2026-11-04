@@ -1,0 +1,17 @@
+.git
+**/node_modules
+.gradle
+build
+*/build
+*/bin
+.runtime
+sample
+artifacts
+output
+outputs
+backups
+ai-service
+crawler-service
+manual-review-service
+frontend
+!frontend/public/downloads/menu-tree-common-rules.md

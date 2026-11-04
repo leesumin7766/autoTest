@@ -1,0 +1,154 @@
+# 운영(사내 서버) override. 개발용 docker-compose.yml 위에 겹쳐 사용한다.
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d --build
+# 외부 공개는 caddy(80/443)뿐이다. 나머지 서비스는 내부 Docker 네트워크에서만 접근한다.
+# 절차·이전·검증: docs/PRODUCTION_DEPLOYMENT.md
+name: autotest
+
+services:
+  caddy:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    image: autotest-web:prod
+    restart: unless-stopped
+    ports:
+      - "${AUTOTEST_HTTP_PORT:-80}:80"
+      - "${AUTOTEST_HTTPS_PORT:-443}:443"
+    environment:
+      AUTOTEST_SITE_ADDRESS: ${AUTOTEST_SITE_ADDRESS:?Set AUTOTEST_SITE_ADDRESS (server IP or host name) in .env}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api-gateway
+    mem_limit: 256m
+
+  db:
+    container_name: !reset null
+    ports: !reset []
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-test}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-test} -d autotest"]
+    mem_limit: 2g
+
+  seaweedfs:
+    image: chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 1g
+
+  auth-service:
+    build:
+      dockerfile: docker/java-service.Dockerfile
+      args: { SERVICE: auth-service }
+    image: autotest-auth-service:prod
+    ports: !reset []
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-test}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    mem_limit: 768m
+
+  test-management-service:
+    build:
+      dockerfile: docker/java-service.Dockerfile
+      args: { SERVICE: test-management-service }
+    image: autotest-test-management-service:prod
+    ports: !reset []
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-test}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    # 100 MiB 문서 파싱(PDF·Excel·HWP)
+    mem_limit: 3g
+
+  test-execution-service:
+    build:
+      dockerfile: docker/java-service.Dockerfile
+      args: { SERVICE: test-execution-service }
+    image: autotest-test-execution-service:prod
+    ports: !reset []
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-test}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    mem_limit: 768m
+
+  report-service:
+    build:
+      dockerfile: docker/java-service.Dockerfile
+      args: { SERVICE: report-service }
+    image: autotest-report-service:prod
+    ports: !reset []
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-test}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    mem_limit: 768m
+
+  api-gateway:
+    build:
+      dockerfile: docker/java-service.Dockerfile
+      args: { SERVICE: api-gateway }
+    image: autotest-api-gateway:prod
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 768m
+
+  ai-service:
+    container_name: !reset null
+    image: autotest-ai-service:prod
+    ports: !reset []
+    restart: unless-stopped
+    # 소스 bind mount·--reload 없이 이미지에 포함된 소스로 실행한다.
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8005"]
+    volumes: !override
+      - generation_cache:/generation-cache
+    environment:
+      AI_DATABASE_URL: postgresql://${DB_USER:-test}:${DB_PASSWORD:?Set DB_PASSWORD in .env}@db:5432/autotest
+    mem_limit: 2g
+
+  crawler-service:
+    container_name: !reset null
+    image: autotest-crawler-service:prod
+    ports: !reset []
+    restart: unless-stopped
+    volumes: !reset []
+    # Chromium 다중 탭
+    mem_limit: 4g
+
+  ollama:
+    image: ollama/ollama@sha256:1bef639749741b375e9a1eb2c1346fb57ce52f5432de1f74846e44ccc18e1687
+    ports: !reset []
+    restart: unless-stopped
+    # qwen3.8:27b(약 17GB)를 CPU로 실행한다.
+    mem_limit: 20g
+
+  # 필요한 모델이 볼륨에 없을 때만 한 번 받는다. 이미 있으면 바로 끝난다.
+  ollama-init:
+    image: ollama/ollama@sha256:1bef639749741b375e9a1eb2c1346fb57ce52f5432de1f74846e44ccc18e1687
+    depends_on:
+      - ollama
+    restart: "no"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODELS: ${OLLAMA_MODELS-qwen3.8:27b}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for i in $$(seq 1 60); do ollama list >/dev/null 2>&1 && break; sleep 2; done
+        for model in $$OLLAMA_MODELS; do
+          if ollama show "$$model" >/dev/null 2>&1; then echo "model ready: $$model"
+          else echo "pulling: $$model"; ollama pull "$$model" || exit 1; fi
+        done
+        echo "ollama-init done"
+
+  manual-review-service:
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

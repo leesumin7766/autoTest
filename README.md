@@ -206,7 +206,9 @@ sample/, scripts/, output/, docs/   원본·검증·기록·상세 계약
 
 ## 환경 설정과 실행
 
-Java 21, Gradle Wrapper 8.10.2, Spring Boot 3.5.6, Python 3.13, Node.js 24.21.0(.nvmrc), npm 11.x, Docker Compose를 사용합니다. 프런트엔드는 Compose에 포함되지 않습니다.
+Java 21, Gradle Wrapper 8.10.2, Spring Boot 3.5.6, Python 3.13, Node.js 24.21.0(.nvmrc), npm 11.x, Docker Compose를 사용합니다. 아래 개발 구성에는 프런트엔드가 포함되지 않습니다.
+
+**사내 서버 운영:** Docker만으로 전체를 빌드·실행하는 `docker-compose.prod.yml` 구성은 [운영 배포](docs/PRODUCTION_DEPLOYMENT.md)를 따릅니다. HTTPS 진입점 하나, frontend 포함, 내부 포트 비공개 구성입니다. 업무 허브 연동 설계는 [허브 연동](docs/HUB_API_INTEGRATION.md)을 참고하세요.
 
 루트 .env는 사용자가 작성하며 Git에 포함하지 않습니다.
 

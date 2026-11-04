@@ -1,0 +1,62 @@
+# 운영 진입점. 외부에 공개하는 유일한 서비스이다.
+# AUTOTEST_SITE_ADDRESS 예: "192.168.0.10" 또는 "autotest.local, 192.168.0.10"
+{
+	admin off
+	skip_install_trust
+	servers {
+		timeouts {
+			read_body 30m
+			idle 5m
+		}
+	}
+}
+
+{$AUTOTEST_SITE_ADDRESS} {
+	# 사내망용 Caddy 자체 CA. 루트 인증서는 /downloads/autotest-server-ca.crt 로 받는다.
+	tls internal
+	encode zstd gzip
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+	}
+
+	# 서비스 간 내부 API는 외부에서 접근하지 않는다(게이트웨이도 라우팅하지 않음).
+	handle /api/internal/* {
+		respond 404
+	}
+
+	handle /api/* {
+		# 문서 업로드는 파일당 100 MiB, 역할 3종
+		request_body {
+			max_size 512MB
+		}
+		reverse_proxy api-gateway:8080 {
+			flush_interval -1
+			transport http {
+				dial_timeout 10s
+				response_header_timeout 30m
+			}
+		}
+	}
+
+	# 공개 루트 인증서(비밀 아님). 허브·원격 실행기 PC의 신뢰 저장소에 설치한다.
+	handle /downloads/autotest-server-ca.crt {
+		root * /data/caddy/pki/authorities/local
+		rewrite * /root.crt
+		header Content-Type application/x-x509-ca-cert
+		file_server
+	}
+
+	handle {
+		root * /srv
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@pages not path /assets/*
+		header @pages Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}
