@@ -48,3 +48,8 @@ __pycache__/
 
 # Confidential local sample documents
 /sample/
+
+# Dependencies and build outputs (untracked build copies)
+node_modules/
+*/bin/
+artifacts/
