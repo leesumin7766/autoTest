@@ -1,6 +1,6 @@
 # 업무 허브 연동·서버 배포 설계
 
-2026-11-04 설계안. 아직 구현 전이며, 단계별 구현 시 이 문서를 갱신한다.
+2026-11-04 설계안. 1단계(운영 배포 구성)는 구현·검증했고, 2단계 이후는 미구현이다. 단계별로 구현할 때 이 문서를 갱신한다. 진행 현황은 [인수인계](LLM_HANDOFF_2026-11-05.md)를 따른다.
 
 ## 1. 전제
 
@@ -50,7 +50,9 @@
 3. 검증된 토큰의 member ID를 `X-Member-Id`로 다시 넣어 하위 서비스로 전달한다. 기존 서비스 코드는 바꾸지 않는다.
 4. `/api/internal/**`은 게이트웨이에 라우팅하지 않는다(현재와 같음).
 
-공개 경로: `POST /api/auth/login`, `POST /api/auth/refresh`, `GET /api/v1/hub/health`.
+공개 경로:
+- `POST /api/auth/login`, `POST /api/auth/refresh`, `GET /api/v1/hub/health`
+- `POST /api/crawl-agents/{agent}/channel/{action}`: 원격 실행기에는 사용자 토큰이 없고, 자체 서명(`X-Agent-Timestamp`·`X-Agent-Nonce`·wire 서명)으로 인증한다. 예외로 두지 않으면 원격 수집이 끊긴다.
 
 ### 3.4 CORS
 
