@@ -58,6 +58,8 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RunList" } } } }
         "404": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
   /api/v1/hub/workspaces/{id}/runs/{run}:
     get:
       summary: 실행 상태·진행률
@@ -65,6 +67,8 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Run" } } } }
         "404": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
   /api/v1/hub/workspaces/{id}/runs/{run}/report:
     get:
       summary: 시험·결함 검토 보고서 초안(Markdown)
@@ -72,6 +76,8 @@ paths:
       responses:
         "200": { description: OK, content: { text/markdown: { schema: { type: string } } } }
         "404": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
 components:
   securitySchemes:
     apiKey: { type: http, scheme: bearer, bearerFormat: "atk_ + 43 base64url" }
