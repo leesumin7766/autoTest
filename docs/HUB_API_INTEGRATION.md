@@ -183,6 +183,10 @@ GET /api/v1/hub/workspaces/{id}/runs/{run}/report   보고서 Markdown
 - 응답은 웹용 실행 `snapshot`(대상 URL·TC 본문 등)을 그대로 내보내지 않고 고정된 요약 형태로 옮긴다.
 - 요청 제한(`429`)은 아직 없다. 키 소유자가 사내 사용자뿐이라 후속으로 미뤘다.
 - 기존 `/api/submissions/**` 등 웹 화면 API는 허브 계약에 포함하지 않는다. 내부 변경이 허브에 영향을 주지 않게 하기 위해서다.
+- 스모크 검사(조회만): `AUTOTEST_URL=https://autotest.local AUTOTEST_API_KEY=atk_... HUB_VERSION=1.0.0 node scripts/verify-hub-api.mjs`
+- 환경 변수: `AUTOTEST_URL`(서버 주소), `AUTOTEST_API_KEY`(키, 출력하지 않음), `HUB_VERSION`(X-Hub-Version, 기본 `0.0.0`). 사내 CA는 `NODE_EXTRA_CA_CERTS`로 지정하며 검증을 끄는 옵션은 없다.
+- 8개 검사를 PASS/FAIL/SKIP으로 출력하고, FAIL이 있으면 종료 코드 1이다. 자체 테스트(가짜 서버): `node --test scripts/verify-hub-api.test.mjs`
+- 실제 개발 서버에서 실행하는 것은 I-02 항목에서 사람이 키를 넣어 한다.
 
 ### 5.3 범위 밖(2026-11-06 결정)
 
