@@ -10,6 +10,7 @@
 > - 그래서 2단계를 **게이트웨이 API 키**로 바꿔 구현했다(`ApiKeyFilter`, `scripts/new-api-key.mjs`, `GET /api/v1/hub/whoami`). 설계는 `HUB_API_INTEGRATION.md` 3장.
 > - 이전 로그인 설계로 누군가 작업하다 커밋하지 않은 코드(auth-service 계정·JWT·로그인 화면)는 로컬 브랜치 `wip-login-auth`(`dd796c2`)에 보관만 했다. 사용하지 않는다.
 > - 아래 5장 2~4번, 6.B는 이 변경으로 대체됐다.
+> - 3단계 허브 조회 API v1도 같은 브랜치에서 구현·검증했다(6.C). 계약은 `docs/hub-api-v1.openapi.yaml`.
 
 ---
 
@@ -20,7 +21,7 @@
 | 1단계 운영 배포 구성(Docker 전용, HTTPS 단일 진입점) | **구현·검증 완료**. `origin/deploy-prod-env`에 push(`8e6c64d`) |
 | 실제 서버를 운영 구성으로 전환 | **미수행**. 사용자 승인 필요(데이터·실행 중 서버 영향) |
 | 2단계 인증 → **API 키 방식으로 변경**(게이트웨이 `ApiKeyFilter`) | **구현·검증 완료**(`hub-api-key` 브랜치) |
-| 3단계 허브 API v1(`/api/v1/hub/*` 조회) | **설계 확정, 미구현** |
+| 3단계 허브 API v1(`/api/v1/hub/*` 조회) | **구현·검증 완료**(`hub-api-key` 브랜치) |
 | 4단계 허브에서 실행 시작·완료 이벤트 | 방향만 정함 |
 | 허브와 웹의 연결 방식(API만 / 화면 열기 / 둘 다) | **미결정**. 설계는 둘 다 지원 |
 
@@ -240,7 +241,18 @@ ai-service/manual-review → ollama:11434 (qwen3.8:27b 실행 계획, qwen3:4b �
 - 원격 실행기 채널은 `Authorization`을 보내지 않으므로 그대로 통과한다(테스트 포함).
 - 남은 위험: 웹 화면·키 없는 `/api/**`는 여전히 회원 ID를 믿는다. 사내망 전용 운영이 전제다.
 
-### 6.C 3단계 — 허브 API v1(조회)
+### 6.C 3단계 — 허브 API v1(조회, 구현·검증 완료 2026-11-06)
+
+**구현 결과(아래 원래 계획보다 우선):**
+- `test-management-service/.../presentation/controller/HubV1Controller.java`: health, workspaces, summary, runs, run, report. 기존 `SubmissionWorkspaceService`·`TestExecutionService.status`·`ExecutionReviewService.report`를 재사용하고, 응답은 고정 레코드로 옮긴다(`snapshot` 비노출).
+- 게이트웨이 라우트에 `/api/v1/hub/**` → TMS 추가. `whoami`는 게이트웨이 컨트롤러가 먼저 처리한다.
+- `X-Hub-Version` 필수(없으면 400), `HUB_MIN_VERSION`(기본 `0.0.0`)보다 낮으면 426.
+- `webUrl` 대신 `webPath`(`/?member=&workspace=&page=`)를 준다. `frontend/src/App.tsx`가 이 링크를 처리한다.
+- OpenAPI는 springdoc 대신 계약 파일 `docs/hub-api-v1.openapi.yaml`.
+- 검증: `HubV1ControllerTest` 8건. 격리 스택(`-p autotest-hubverify`, Caddy HTTPS)에서 16항목 확인 — whoami·health, 키 없음 401, 버전 없음 400·낮음 426, 키로 업로드 시 위조 `X-Member-Id: 1`이 42로 바뀜, 목록·요약·실행 이력, 다른 회원 키 404·빈 목록, 없는 실행 404, `/api/internal` 404. Chromium으로 `webPath` 링크 → 작업 복원·08 단계 이동·콘솔 오류 0.
+- 미검증: 실제 실행 이력이 있는 작업의 `runs/{run}`·`report` 응답(단위 테스트로만 확인). 요청 제한(429)은 미구현.
+
+**원래 계획:**
 
 - **엔드포인트:**
   - `GET /api/v1/hub/health` → `{status, apiVersion, minHubVersion}`
@@ -343,7 +355,7 @@ $DC down -v --remove-orphans   # 반드시 -p autotest-prodverify 인지 확인�
 >
 > 먼저 `main`(또는 이어서 작업 중인 브랜치)과 실제 실행 중인 Docker 상태를 확인하라. 실행 중인 `autotest` 프로젝트는 사용자 승인 없이 재생성·중지하지 말라. 운영 전환(6.A)은 사용자가 승인했을 때만 백업부터 수행하라.
 >
-> 2단계는 API 키로 완료됐다. 사용자 로그인은 사용자가 원하지 않으므로 다시 제안하지 말라. 개발은 3단계 허브 API v1(6.C)부터 TDD로 작게 진행하라. 허브 경로는 게이트웨이 `ApiKeyFilter`가 키를 강제하므로 TMS는 `X-Member-Id` 소유권 검사만 하면 된다.
+> 2·3단계(API 키, 허브 조회 API v1)는 완료됐다. 사용자 로그인은 사용자가 원하지 않으므로 다시 제안하지 말라. 다음은 4단계(6.D: 허브에서 실행 시작, 완료 알림)이며 TDD로 작게 진행하라. v1 계약(`docs/hub-api-v1.openapi.yaml`)은 필드 추가만 허용한다.
 >
 > 5장의 확정된 결정(exe 공용 키 금지·사용자별 API 키, Electron main 프로세스 호출, CORS 미개방, `/api/v1/hub` 분리, iframe 미지원)은 사용자의 새 지시 없이 바꾸지 말라.
 >

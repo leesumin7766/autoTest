@@ -1,6 +1,6 @@
 # 업무 허브 연동·서버 배포 설계
 
-2026-11-04 설계안, 2026-11-06 인증 방식 변경. 1단계(운영 배포 구성)와 2단계(API 키)는 구현·검증했고, 3단계 이후는 미구현이다. 단계별로 구현할 때 이 문서를 갱신한다. 진행 현황은 [인수인계](LLM_HANDOFF_2026-11-05.md)를 따른다.
+2026-11-04 설계안, 2026-11-06 인증 방식 변경. 1~3단계(운영 배포 구성, API 키, 허브 조회 API v1)는 구현·검증했고, 4단계(실행 시작·알림)는 미구현이다. 단계별로 구현할 때 이 문서를 갱신한다. 진행 현황은 [인수인계](LLM_HANDOFF_2026-11-05.md)를 따른다.
 
 ## 1. 전제
 
@@ -70,7 +70,8 @@ DB 테이블·관리 화면을 두지 않은 이유: 허브 사용자가 소수�
 
 ### 3.5 화면 연결
 
-- 허브 API 응답의 각 작업에 `webUrl`(예: `https://<서버>/?workspace=<id>&tab=report`)을 포함한다. 허브는 이 주소를 기본 브라우저로 연다.
+- 허브 API 응답의 작업·실행에 `webPath`(예: `/?member=3&workspace=<id>&page=reports`)를 포함한다. 허브는 자기가 아는 서버 주소 뒤에 붙여 기본 브라우저로 연다(서버가 공개 주소를 알 필요 없음).
+- 웹 화면은 이 링크로 열리면 회원 ID를 맞추고 작업을 불러와 해당 단계로 이동한 뒤 주소창의 파라미터를 지운다.
 - 웹 화면에는 로그인이 없으므로 주소만 열면 된다.
 - iframe 삽입은 지원하지 않는다. 도메인이 달라 서드파티 쿠키가 차단된다.
 
@@ -160,12 +161,15 @@ GET /api/v1/hub/whoami   {client, memberId}   키 설정 확인(구현됨)
 401 {code: API_KEY_REQUIRED | API_KEY_INVALID, message, traceId}
 ```
 
-### 5.2 허브 v1 (`/api/v1/hub`, 1차는 조회만)
+### 5.2 허브 v1 (`/api/v1/hub`, 조회만, 구현됨)
+
+계약 전체: [hub-api-v1.openapi.yaml](hub-api-v1.openapi.yaml). 구현: `test-management-service/.../HubV1Controller.java`.
 
 ```text
 GET /api/v1/hub/health                              {status, apiVersion, minHubVersion} (키 필요)
-GET /api/v1/hub/workspaces?offset=&limit=           작업 목록 + webUrl
+GET /api/v1/hub/workspaces?offset=&limit=           작업 목록 + webPath
 GET /api/v1/hub/workspaces/{id}/summary             단계별 상태, TC 수, 최근 실행 P/F/미판정 건수
+GET /api/v1/hub/workspaces/{id}/runs                실행 이력(최근 50건)
 GET /api/v1/hub/workspaces/{id}/runs/{run}          실행 상태·진행률
 GET /api/v1/hub/workspaces/{id}/runs/{run}/report   보고서 Markdown
 ```
@@ -174,9 +178,11 @@ GET /api/v1/hub/workspaces/{id}/runs/{run}/report   보고서 Markdown
 - 오류 형식은 기존 `{code, message, traceId}`를 그대로 쓴다.
 - **버전 호환:** exe는 사용자 PC마다 업데이트 시점이 다르다.
   - `/api/v1`의 필드를 삭제하거나 의미를 바꾸지 않는다. 필드 추가만 허용한다.
-  - 허브는 `X-Hub-Version` 헤더를 보낸다.
+  - 허브는 `X-Hub-Version: x.y.z` 헤더를 보낸다(`/health`·`/whoami` 제외 필수, 없으면 `400 HUB_VERSION_REQUIRED`). 최소 버전은 `.env`의 `HUB_MIN_VERSION`.
   - 서버가 `/health`의 `minHubVersion`보다 낮은 버전의 요청을 받으면 `426 HUB_UPDATE_REQUIRED`를 돌려준다.
-- OpenAPI 문서를 `/api/docs`에 제공한다(springdoc).
+- OpenAPI는 springdoc 자동 생성 대신 손으로 관리하는 계약 파일(`docs/hub-api-v1.openapi.yaml`)로 둔다. 자동 생성은 TMS의 웹·내부 API까지 노출하고, 계약이 코드 변경에 따라 조용히 바뀌기 때문이다.
+- 응답은 웹용 실행 `snapshot`(대상 URL·TC 본문 등)을 그대로 내보내지 않고 고정된 요약 형태로 옮긴다.
+- 요청 제한(`429`)은 아직 없다. 키 소유자가 사내 사용자뿐이라 후속으로 미뤘다.
 - 기존 `/api/submissions/**` 등 웹 화면 API는 허브 계약에 포함하지 않는다. 내부 변경이 허브에 영향을 주지 않게 하기 위해서다.
 
 ### 5.3 후속 (v1.1+)
@@ -190,7 +196,7 @@ GET /api/v1/hub/workspaces/{id}/runs/{run}/report   보고서 Markdown
 | --- | --- | --- |
 | 1 배포 구성·설치 묶음 (구현) | prod compose, 전 서비스 이미지 내 빌드, 내부 포트 비공개, caddy+frontend 빌드, ollama-init, 비밀값 `.env.prod.example` | JDK·Node 없이 compose 한 줄로 기동. 사내 다른 PC에서 `https://<서버>`로 화면 접속. 5432·8082 등 외부 접근 불가 |
 | 2 API 키 (구현) | 게이트웨이 `ApiKeyFilter`, 발급 스크립트, `/api/v1/hub/whoami` | 키 요청은 `X-Member-Id` 위조 불가, 잘못된 키 401, `/api/v1/hub/**` 키 없이 401 |
-| 3 허브 API v1 | `/api/v1/hub/*` 조회, OpenAPI, 버전 검사 | 허브 PC에서 키로 작업 목록·요약·보고서 조회 |
+| 3 허브 API v1 (구현) | `/api/v1/hub/*` 조회, OpenAPI 계약 파일, 버전 검사, 웹 딥링크 | 키로 작업 목록·요약·실행·보고서 조회, 다른 회원 404, 낮은 버전 426 |
 | 4 후속 | 실행 시작, 이벤트 | 별도 계획 |
 
 운영 DB 스키마를 바꾸기 전에는 기존 백업 규칙에 따라 백업한다(2단계는 DB 변경 없음).

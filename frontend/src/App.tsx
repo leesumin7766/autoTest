@@ -78,18 +78,31 @@ const workflowPages = [
   ...upcomingPages,
 ]
 
+// 업무 허브가 여는 링크: /?member=<회원>&workspace=<작업>&page=<단계>. 한 번 읽고 주소창에서 지운다.
+type HubLink={member:string,workspace:string,page:string}
+const hubLink=((): HubLink|null=>{
+  try{
+    const query=new URLSearchParams(window.location.search)
+    if(!query.has('workspace'))return null
+    window.history.replaceState(window.history.state,'',window.location.pathname+window.location.hash)
+    const link={member:query.get('member')??'',workspace:query.get('workspace')??'',page:query.get('page')??''}
+    return /^[1-9]\d{0,17}$/.test(link.member)&&/^[0-9a-f-]{36}$/i.test(link.workspace)?link:null
+  }catch{return null}
+})()
+
 function App() {
   const [page, setPage] = useState('documents')
   const [visited, setVisited] = useState<Set<string>>(() => new Set(['documents']))
   const navigate = (next: string) => { setPage(next); setVisited(current => new Set([...current, next])) }
   const [productId, setProductId] = useState('1')
-  const [memberId, setMemberId] = useState(()=>{try{const saved=localStorage.getItem('autotest:last-member:v1');return saved&&/^[1-9]\d*$/.test(saved)?saved:'1'}catch{return '1'}})
+  const [memberId, setMemberId] = useState(()=>{if(hubLink)return hubLink.member;try{const saved=localStorage.getItem('autotest:last-member:v1');return saved&&/^[1-9]\d*$/.test(saved)?saved:'1'}catch{return '1'}})
   const [submissionId, setSubmissionId] = useState('')
   const [lookupId,setLookupId]=useState('')
   const [workspace,setWorkspace]=useState<SavedWorkspace|null>(null)
   const [workspaceName,setWorkspaceName]=useState('새 시험 작업')
   const [restoring,setRestoring]=useState(false)
   const restoreRequest=useRef<AbortController|null>(null)
+  const pendingHubLink=useRef<HubLink|null>(hubLink)
   const [generatedTc, setGeneratedTc] = useState<{ context: string; setId: string } | null>(null)
   const [fileSelectionGeneration, setFileSelectionGeneration] = useState(0)
   const [files, setFiles] = useState<Partial<Record<Role, File>>>({})
@@ -260,12 +273,16 @@ function App() {
       setLookupId(result.submissionId)
       updateAiDelivery(result.aiDelivery)
       setWorkspace(saved);setWorkspaceName(saved.name);setProductId(String(saved.productId))
-      const nextPage=workflowPages.some(item=>item.id===saved.lastPage)?saved.lastPage:'documents'
+      const linkPage=pendingHubLink.current?.workspace===id?pendingHubLink.current.page:''
+      const wanted=workflowPages.some(item=>item.id===linkPage)?linkPage:saved.lastPage
+      const nextPage=workflowPages.some(item=>item.id===wanted)?wanted:'documents'
       setPage(nextPage);setVisited(new Set(['documents',nextPage]))
       try{localStorage.setItem(`autotest:active-workspace:v1:${memberId}`,id)}catch{ /* List still restores server data. */ }
+      if(pendingHubLink.current?.workspace===id)pendingHubLink.current=null
       setNotice(`‘${saved.name}’ 작업을 불러왔습니다. 각 단계의 저장 이력을 이어서 사용할 수 있습니다.`)
     } catch (error) {
       if(!controller.signal.aborted)setNotice(error instanceof Error ? error.message : '작업을 불러오지 못했습니다.')
+      if(!controller.signal.aborted&&pendingHubLink.current?.workspace===id)pendingHubLink.current=null
       throw error
     } finally {
       if(restoreRequest.current===controller){setBusy(false);setRestoring(false)}
@@ -280,6 +297,7 @@ function App() {
     setAiDelivery({status:'NOT_READY',attempts:0,lastError:null,deliveredAt:null,updatedAt:null,retryable:false,preflight:null})
     setPage('documents');setVisited(new Set(['documents']));setBusy(false);setRestoring(false)
     let id='';try{id=localStorage.getItem(`autotest:active-workspace:v1:${memberId}`)||''}catch{ /* Optional convenience. */ }
+    if(pendingHubLink.current?.member===memberId)id=pendingHubLink.current.workspace
     if(id)void restoreWorkspace(id).catch(()=>{})
     return()=>restoreRequest.current?.abort()
   },[memberId,restoreWorkspace])

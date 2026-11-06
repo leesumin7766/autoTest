@@ -62,6 +62,8 @@ services:
       timeout: 3s
       retries: 12
     environment:
+      # 허브 API v1이 허용하는 최소 허브 버전(x.y.z). 낮은 버전은 426
+      HUB_MIN_VERSION: ${HUB_MIN_VERSION:-0.0.0}
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/autotest
       SPRING_DATASOURCE_USERNAME: test
       SPRING_DATASOURCE_PASSWORD: test

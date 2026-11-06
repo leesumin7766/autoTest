@@ -1,0 +1,158 @@
+openapi: 3.1.0
+info:
+  title: autoTest Hub API
+  version: "1"
+  description: |
+    업무 허브(Electron) 전용 조회 API. 웹 화면용 `/api/submissions/**`와 분리된 고정 계약이다.
+    - 모든 요청에 `Authorization: Bearer atk_...`가 필요하다(키 발급: `node scripts/new-api-key.mjs <이름> <회원ID>`).
+    - `/health` 외 모든 요청에 `X-Hub-Version: x.y.z`가 필요하다. `minHubVersion`보다 낮으면 426.
+    - 데이터는 키에 묶인 회원의 것만 보인다. 다른 회원의 작업은 404.
+    - v1에서는 필드를 삭제하거나 의미를 바꾸지 않는다. 허브는 모르는 필드를 무시해야 한다.
+    - 오류 본문은 항상 `{code, message, traceId}`.
+    - `webPath`는 서버 주소 뒤에 붙여 기본 브라우저로 연다(예: `https://autotest.local` + webPath).
+    - 시험 실행은 CPU 추론이라 오래 걸린다. 상태 조회는 5초 이상 간격으로 한다.
+servers:
+  - url: https://{server}
+    variables:
+      server: { default: autotest.local }
+security:
+  - apiKey: []
+paths:
+  /api/v1/hub/whoami:
+    get:
+      summary: 키 확인(게이트웨이가 응답, 버전 헤더 불필요)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/WhoAmI" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/hub/health:
+    get:
+      summary: 서버 상태와 최소 허브 버전(버전 헤더 불필요)
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/hub/workspaces:
+    get:
+      summary: 내 시험 작업 목록(최근 업로드 순)
+      parameters:
+        - $ref: "#/components/parameters/HubVersion"
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/WorkspacePage" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+  /api/v1/hub/workspaces/{id}/summary:
+    get:
+      summary: 작업 요약과 최근 실행
+      parameters: [ { $ref: "#/components/parameters/HubVersion" }, { $ref: "#/components/parameters/WorkspaceId" } ]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Summary" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/Error" }
+        "426": { $ref: "#/components/responses/UpdateRequired" }
+  /api/v1/hub/workspaces/{id}/runs:
+    get:
+      summary: 실행 이력(최근 50건, 최신순)
+      parameters: [ { $ref: "#/components/parameters/HubVersion" }, { $ref: "#/components/parameters/WorkspaceId" } ]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RunList" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/hub/workspaces/{id}/runs/{run}:
+    get:
+      summary: 실행 상태·진행률
+      parameters: [ { $ref: "#/components/parameters/HubVersion" }, { $ref: "#/components/parameters/WorkspaceId" }, { $ref: "#/components/parameters/RunId" } ]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Run" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/hub/workspaces/{id}/runs/{run}/report:
+    get:
+      summary: 시험·결함 검토 보고서 초안(Markdown)
+      parameters: [ { $ref: "#/components/parameters/HubVersion" }, { $ref: "#/components/parameters/WorkspaceId" }, { $ref: "#/components/parameters/RunId" } ]
+      responses:
+        "200": { description: OK, content: { text/markdown: { schema: { type: string } } } }
+        "404": { $ref: "#/components/responses/Error" }
+components:
+  securitySchemes:
+    apiKey: { type: http, scheme: bearer, bearerFormat: "atk_ + 43 base64url" }
+  parameters:
+    HubVersion: { name: X-Hub-Version, in: header, required: true, schema: { type: string, example: "1.0.0" } }
+    WorkspaceId: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    RunId: { name: run, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Error: { description: 오류, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    Unauthorized: { description: "API_KEY_REQUIRED | API_KEY_INVALID", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    UpdateRequired: { description: HUB_UPDATE_REQUIRED, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  schemas:
+    Error:
+      type: object
+      properties: { code: { type: string }, message: { type: string }, traceId: { type: string } }
+    WhoAmI:
+      type: object
+      properties: { client: { type: string }, memberId: { type: string } }
+    Health:
+      type: object
+      properties: { status: { type: string, example: UP }, apiVersion: { type: string, example: "1" }, minHubVersion: { type: string, example: "0.0.0" } }
+    Counts:
+      type: object
+      properties:
+        documents: { type: integer }
+        parsedDocuments: { type: integer }
+        crawls: { type: integer }
+        menus: { type: integer }
+        tcSets: { type: integer }
+        runs: { type: integer }
+    Workspace:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        productId: { type: integer }
+        lastPage: { type: string, description: "documents|crawl|menu|tc-generate|execution|manual-review|defects|reports" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        documentDelivery: { type: string, description: "문서 AI 전달 상태(NOT_READY, DELIVERED 등)" }
+        counts: { $ref: "#/components/schemas/Counts" }
+        webPath: { type: string, example: "/?member=3&workspace=...&page=reports" }
+    WorkspacePage:
+      type: object
+      properties:
+        workspaces: { type: array, items: { $ref: "#/components/schemas/Workspace" } }
+        hasMore: { type: boolean }
+    RunCounts:
+      type: object
+      properties:
+        total: { type: integer }
+        completed: { type: integer }
+        pass: { type: integer }
+        fail: { type: integer }
+        na: { type: integer }
+        unjudged: { type: integer, description: "P/F/N/A 판정이 아직 없는 TC" }
+        pending: { type: integer }
+        error: { type: integer }
+        notExecuted: { type: integer }
+        needsReview: { type: integer }
+        excluded: { type: integer }
+    Run:
+      type: object
+      properties:
+        runId: { type: string, format: uuid }
+        status: { type: string, description: "PREPARED|WAITING_EXECUTOR|RUNNING|COMPLETED|PARTIAL|FAILED|INTERRUPTED|CANCELED. 모르는 값은 그대로 표시" }
+        active: { type: boolean, description: "실행 대기 또는 실행 중" }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        elapsedMs: { type: integer }
+        tcSetChanged: { type: boolean, description: "실행 후 TC 세트가 바뀜" }
+        counts: { $ref: "#/components/schemas/RunCounts" }
+        webPath: { type: string }
+    RunItem:
+      type: object
+      properties: { runId: { type: string, format: uuid }, status: { type: string }, createdAt: { type: string } }
+    RunList:
+      type: object
+      properties: { runs: { type: array, items: { $ref: "#/components/schemas/RunItem" } } }
+    Summary:
+      type: object
+      properties:
+        workspace: { $ref: "#/components/schemas/Workspace" }
+        latestRun: { oneOf: [ { $ref: "#/components/schemas/Run" }, { type: "null" } ] }
