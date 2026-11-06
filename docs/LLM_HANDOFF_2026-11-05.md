@@ -4,6 +4,13 @@
 
 용어: **구현·검증 완료**, **설계만 확정(미구현)**, **미결정**을 구분한다. 계획을 완료로 보고하지 않는다.
 
+> **2026-11-06 변경(이 문서의 이전 인증 설계보다 우선):**
+> - `deploy-prod-env`를 `main`에 합쳤다(`origin/main` = `7973a22`). 이후 작업은 `hub-api-key` 브랜치에서 한다.
+> - 사용자 결정: 사용자 로그인은 만들지 않는다. 인증은 **외부 프로그램(허브)의 API 호출에만** 쓴다.
+> - 그래서 2단계를 **게이트웨이 API 키**로 바꿔 구현했다(`ApiKeyFilter`, `scripts/new-api-key.mjs`, `GET /api/v1/hub/whoami`). 설계는 `HUB_API_INTEGRATION.md` 3장.
+> - 이전 로그인 설계로 누군가 작업하다 커밋하지 않은 코드(auth-service 계정·JWT·로그인 화면)는 로컬 브랜치 `wip-login-auth`(`dd796c2`)에 보관만 했다. 사용하지 않는다.
+> - 아래 5장 2~4번, 6.B는 이 변경으로 대체됐다.
+
 ---
 
 ## 0. 한눈에 보기
@@ -12,9 +19,9 @@
 | --- | --- |
 | 1단계 운영 배포 구성(Docker 전용, HTTPS 단일 진입점) | **구현·검증 완료**. `origin/deploy-prod-env`에 push(`8e6c64d`) |
 | 실제 서버를 운영 구성으로 전환 | **미수행**. 사용자 승인 필요(데이터·실행 중 서버 영향) |
-| 2단계 인증(auth-service 계정·토큰, 게이트웨이 인증 경계) | **설계 확정, 미구현** |
+| 2단계 인증 → **API 키 방식으로 변경**(게이트웨이 `ApiKeyFilter`) | **구현·검증 완료**(`hub-api-key` 브랜치) |
 | 3단계 허브 API v1(`/api/v1/hub/*` 조회) | **설계 확정, 미구현** |
-| 4단계 허브에서 실행 시작·완료 이벤트·웹 handoff | 방향만 정함 |
+| 4단계 허브에서 실행 시작·완료 이벤트 | 방향만 정함 |
 | 허브와 웹의 연결 방식(API만 / 화면 열기 / 둘 다) | **미결정**. 설계는 둘 다 지원 |
 
 ---
@@ -83,7 +90,7 @@ ai-service/manual-review → ollama:11434 (qwen3.8:27b 실행 계획, qwen3:4b �
 **사용자 식별의 현재 상태:**
 - 모든 업무 API가 `@RequestHeader("X-Member-Id")`로 소유자를 구분한다.
 - 이 값은 화면 입력칸에서 그대로 온다(`frontend/src/App.tsx:86` 초기값, `:377` 입력칸, localStorage `autotest:last-member:v1`).
-- 따라서 **값을 바꾸면 다른 사람의 작업을 열 수 있다.** 2단계에서 반드시 해결한다.
+- 따라서 **값을 바꾸면 다른 사람의 작업을 열 수 있다.** 2026-11-06 결정으로 웹 화면은 이 상태를 유지한다(사내망 전용). API 키 요청만 게이트웨이가 회원 ID를 덮어쓴다.
 
 **서비스 간 내부 API:**
 - `/api/internal/*`는 TMS에서 `X-Internal-Token`(`PRODUCT_DESCRIPTION_INTERNAL_TOKEN`)을 상수 시간 비교로 검사한다.
@@ -182,17 +189,14 @@ ai-service/manual-review → ollama:11434 (qwen3.8:27b 실행 계획, qwen3:4b �
    - 서비스 하나만 갱신할 수 있어야 한다.
    - manual-review의 내부망 격리(`internal: true`)를 유지해야 한다.
    - 대신 "Docker와 `.env`만 있으면 Compose 한 줄로 실행"하는 것을 설치 단위로 삼는다. 다른 PC로 옮길 때는 `docker save` tar로 오프라인 설치한다(후속).
-2. **허브 공용 API 키는 쓰지 않는다.** exe 안의 키는 추출할 수 있다. 허브 사용자도 **autoTest 계정으로 로그인**한다. 결과적으로 허브의 로그인 기능도 이것으로 해결된다.
-3. **auth-service가 유일한 인증 주체다.** 계정은 관리자가 만들고 스스로 가입하는 기능은 없다. 최초 관리자는 `.env`의 `AUTH_BOOTSTRAP_ADMIN_*` 값으로 만든다. 기존 member `1`의 데이터는 관리자 계정에 연결해 보존한다.
-4. **토큰:**
-   - **웹:** HttpOnly·Secure·SameSite=Strict 쿠키를 쓴다. 화면의 다운로드는 `fetch`+blob 방식이므로 쿠키와 Bearer 모두 가능하다.
-   - **허브:** `accessToken`(JWT HS256, 15분)과 `refreshToken`(불투명 값, 30일, 사용할 때마다 교체, DB에는 해시만 저장)을 쓴다.
-   - 게이트웨이가 JWT를 직접 검증한다. 요청마다 auth-service를 부르지 않는다.
+2. ~~허브 공용 API 키 금지·autoTest 계정 로그인~~ → **2026-11-06 대체:** 사용자·PC별 API 키. exe에 공용 키를 넣지 않는 원칙은 유지한다(사용자가 허브 설정에 자기 키를 입력).
+3. ~~auth-service가 인증 주체~~ → **대체:** 게이트웨이가 `.env`의 `AUTOTEST_API_KEYS`(SHA-256 해시)로 검증한다. auth-service는 쓰지 않는다. DB 변경 없음.
+4. ~~쿠키·JWT·refresh token~~ → **대체:** `Authorization: Bearer atk_...` 하나. 폐기는 `.env` 항목 삭제 후 `up -d api-gateway`.
 5. **게이트웨이가 인증 경계다.**
-   - 들어온 `X-Member-Id`와 `X-Internal-Token`을 **항상 삭제**한다.
-   - 검증된 토큰의 member ID로 `X-Member-Id`를 다시 넣는다. 그래서 TMS 등 하위 서비스 코드는 바꾸지 않는다.
+   - 들어온 `X-Internal-Token`·`X-Api-Client`는 **항상 삭제**한다.
+   - API 키 요청은 키의 member ID로 `X-Member-Id`를 덮어쓴다. 그래서 TMS 등 하위 서비스 코드는 바꾸지 않는다. 키 없는 웹 요청은 기존처럼 통과한다(2026-11-06).
 6. **Electron은 main 프로세스에서만 API를 호출한다.**
-   - renderer는 IPC로 main에 요청한다. 토큰은 `safeStorage`로 암호화해 저장한다.
+   - renderer는 IPC로 main에 요청한다. API 키는 `safeStorage`로 암호화해 저장한다.
    - main 프로세스의 호출은 CORS 대상이 아니므로 서버에서 CORS를 열지 않는다.
    - Caddy 사내 CA는 main 프로세스의 HTTPS 클라이언트에 CA로 지정한다. `rejectUnauthorized=false`는 금지한다.
    - `Origin: null`은 허용하지 않는다.
@@ -205,7 +209,7 @@ ai-service/manual-review → ollama:11434 (qwen3.8:27b 실행 계획, qwen3:4b �
 10. **CPU 추론이라 실행은 한 번에 한 건이다.**
     - 실행 시작 요청에는 `202`를 돌려주고, 이미 실행 중이면 `409 EXECUTOR_BUSY`를 돌려준다.
     - 허브는 5초 이상 간격으로 조회하고, 서버는 `429`로 요청 수를 제한한다.
-11. **사내망도 HTTPS로 운영한다.** 비밀번호와 토큰이 오가기 때문이다. 사용자 PC·허브·원격 실행기는 Caddy 루트 CA를 신뢰하도록 설정한다.
+11. **사내망도 HTTPS로 운영한다.** API 키가 오가기 때문이다. 사용자 PC·허브·원격 실행기는 Caddy 루트 CA를 신뢰하도록 설정한다.
 
 ---
 
@@ -226,43 +230,15 @@ ai-service/manual-review → ollama:11434 (qwen3.8:27b 실행 계획, qwen3:4b �
 6. **원격 실행기:** 기존 등록 주소 `http://<IP>:8080`은 닫힌다. 실행기를 `https://<서버>`로 다시 등록하고 CA를 설치한다.
 7. **확인:** 사내 다른 PC에서 화면에 접속하고, 실제 27B 실행을 1건 해 본다. 결과는 `docs/PRODUCTION_DEPLOYMENT.md` 7장에 기록한다.
 
-### 6.B 2단계 — 인증(최우선 개발)
+### 6.B 2단계 — API 키(구현·검증 완료, 2026-11-06)
 
-**완료 기준:**
-- 토큰 없이 `/api/**`를 부르면 401을 돌려준다.
-- 위조한 `X-Member-Id`는 무시된다.
-- 원격 실행기 채널은 계속 동작한다.
-- 기존 member 1의 데이터가 관리자 계정으로 보인다.
-
-**구현 시 주의(코드 확인 결과):**
-- **auth-service는 현재 빈 Spring Boot 앱이다**(`Application.java`만 있음, JPA `ddl-auto: update`).
-  - TMS는 Flyway(V1~V30)로 **같은 DB의 public 스키마**를 관리한다.
-  - auth 테이블을 어디에 둘지 결정해야 한다. 권장안은 auth-service에 Flyway를 추가하고 **별도 스키마 `auth`** 와 별도 history 테이블을 쓰는 것이다. TMS 이력과 섞이지 않고, `ddl-auto`를 `validate`로 바꿀 수 있다.
-  - 운영 DB를 바꾸기 전에는 반드시 백업한다.
-- **테이블(초안):**
-  - `auth.users(id, member_id UNIQUE, username UNIQUE, password_hash(bcrypt), display_name, roles, disabled, failed_count, locked_until, created_at)`
-  - `auth.refresh_tokens(id, user_id, token_hash, client('web'|'hub'), expires_at, revoked_at, replaced_by)`
-  - member_id는 기존 TMS 데이터의 `member_id` 값과 같은 숫자 공간을 쓴다. 관리자 = 1.
-- **API:** `/api/auth/login|refresh|logout|me`, 관리자용 `/api/auth/users`(생성·비밀번호 초기화·비활성화). 계약은 `HUB_API_INTEGRATION.md` 5.1절에 있다.
-  - 로그인 실패 5회 시 잠그고, IP별 요청 제한을 둔다.
-- **게이트웨이(Spring Cloud Gateway WebFlux, `api-gateway`):**
-  - GlobalFilter를 높은 우선순위로 둔다.
-  - 처리 순서: 헤더 삭제 → 공개 경로 확인 → 쿠키나 `Authorization: Bearer` 검증 → `X-Member-Id` 재주입.
-  - 기존 `GatewayExceptionHandler`의 `{code,message,traceId}` 형식으로 `401 AUTH_REQUIRED`를 돌려준다.
-- **공개 경로(인증 제외):**
-  - `POST /api/auth/login`, `POST /api/auth/refresh`, `GET /api/v1/hub/health`
-  - **`POST /api/crawl-agents/{agent}/channel/{action}`** — 원격 실행기는 사용자 토큰이 없다. 자체 서명(`X-Agent-Timestamp`, `X-Agent-Nonce`, wire 서명)으로 인증하므로 **반드시 예외로 둔다.** 빠뜨리면 원격 수집이 모두 끊긴다.
-  - 실행기 등록·목록·폐기(`/api/crawl-agents`, `/revoke`)는 사용자 인증 대상이다.
-- **frontend:**
-  - 로그인 화면을 추가한다.
-  - `App.tsx`의 회원 ID 입력칸과 localStorage 기반 memberId를 제거하고, `/api/auth/me`에서 받는다.
-  - 16개 파일이 `X-Member-Id`를 직접 보낸다. 게이트웨이가 덮어쓰므로 1차에서는 그대로 둬도 동작한다. 정리는 별도 단계로 한다.
-  - `apiFetch.ts`는 401을 받으면 로그인으로 이동시킨다.
-  - 개발용 Vite 프록시 환경에서도 로그인할 수 있게 한다.
-- **테스트:** TDD로 진행한다(사용자 원칙).
-  - 게이트웨이 필터 단위 테스트: 위조 헤더, 만료 토큰, 공개 경로, 실행기 채널.
-  - auth-service 통합 테스트: **격리 DB `autotest_test`만** 사용한다.
-  - 운영 스택 smoke: `-p autotest-prodverify` 방식으로 한다.
+- `api-gateway/src/main/java/com/autotest/api_gateway/ApiKeyFilter.java`: 규칙은 `HUB_API_INTEGRATION.md` 3.2절.
+- `HubIdentityController`: `GET /api/v1/hub/whoami` → `{client, memberId}`(허브 키 설정 확인용).
+- `scripts/new-api-key.mjs <이름> <회원ID>`: 키 원문과 `.env` 항목(`name:memberId:sha256`) 출력.
+- `docker-compose.yml` api-gateway에 `AUTOTEST_API_KEYS` 전달(prod는 base를 상속). `.env.prod.example`에 항목 추가.
+- 검증: `ApiKeyFilterTest` 6건 통과. 실제 게이트웨이 jar를 임시 키로 띄워 whoami 200(`memberId` 42), 키 없는 hub 경로 401, 틀린 키 401, 키·무키 일반 경로 모두 필터 통과(하위 서비스 없음 503)를 확인했다.
+- 원격 실행기 채널은 `Authorization`을 보내지 않으므로 그대로 통과한다(테스트 포함).
+- 남은 위험: 웹 화면·키 없는 `/api/**`는 여전히 회원 ID를 믿는다. 사내망 전용 운영이 전제다.
 
 ### 6.C 3단계 — 허브 API v1(조회)
 
@@ -276,13 +252,13 @@ ai-service/manual-review → ollama:11434 (qwen3.8:27b 실행 계획, qwen3:4b �
   - 데이터가 TMS에 있으므로 TMS에 `HubV1Controller`를 두고, 기존 서비스(워크스페이스·실행·보고서)를 재사용한다.
   - 게이트웨이 `application.yml`에 `Path=/api/v1/hub/**` 라우트를 추가한다.
   - ai-service에도 `/api/v1/functional-menus` 같은 내부 경로가 있지만 게이트웨이를 거치지 않는다. 경로 이름이 겹치지 않는지 확인한다.
-- **소유권:** 기존 member 검사를 그대로 쓴다(본인 데이터만 조회).
+- **소유권:** 기존 member 검사를 그대로 쓴다(키에 묶인 회원 데이터만 조회). `/api/v1/hub/**`는 게이트웨이가 이미 키를 강제한다.
 - **버전 검사:** `X-Hub-Version`과 `426`.
 - **문서:** OpenAPI(springdoc)를 `/api/docs`에 제공한다.
 - **허브 개발자용 예시:** Electron main 프로세스 코드를 함께 남긴다. 다음 내용을 담는다.
   - CA 지정
-  - 토큰을 `safeStorage`로 저장
-  - 401을 받으면 refresh
+  - API 키를 `safeStorage`로 저장
+  - 401을 받으면 키 재입력 안내
   - 426을 받으면 업데이트 안내
   - 409를 받으면 대기 안내
 
@@ -290,7 +266,6 @@ ai-service/manual-review → ollama:11434 (qwen3.8:27b 실행 계획, qwen3:4b �
 
 - `run` 권한: 허브에서 시험 재실행을 시작한다(`202`, 이미 실행 중이면 `409`).
 - `GET /api/v1/hub/events?since=` 또는 SSE.
-- `POST /api/auth/web-handoff`: 허브 로그인 정보로 웹 로그인을 대신하는 일회용 코드.
 - 다른 PC 이전용 `docker save` 오프라인 설치 묶음.
 - DB 백업 자동화(작업 스케줄러)와 복구 시험.
 
@@ -339,11 +314,10 @@ docker ps --filter label=com.docker.compose.project=autotest-prodverify --format
 $DC down -v --remove-orphans   # 반드시 -p autotest-prodverify 인지 확인한 뒤 실행
 ```
 
-2단계 이후 추가할 검증:
-- 토큰 없음 401
-- 위조 `X-Member-Id` 무시
+운영 스택에서 추가할 API 키 검증:
+- `node scripts/new-api-key.mjs` 항목을 `.env`에 넣고 `https://<서버>/api/v1/hub/whoami`를 키로 호출 → 200
+- 키 없음·틀린 키 → 401, 위조 `X-Member-Id`가 키의 회원으로 바뀌는지
 - 원격 실행기 채널 통과
-- 로그인 → 화면 흐름(업로드·폴링·다운로드·새로고침)
 - 허브 조건(Node main 프로세스 + CA + Bearer) 호출
 
 ---
@@ -355,7 +329,7 @@ $DC down -v --remove-orphans   # 반드시 -p autotest-prodverify 인지 확인�
 3. `docs/PRODUCTION_DEPLOYMENT.md` — 운영 절차·검증 기록
 4. `docker-compose.yml`, `docker-compose.prod.yml`, `docker/`
 5. `api-gateway/src/main/resources/application.yml`, `api-gateway/src/main/java/com/autotest/api_gateway/GatewayExceptionHandler.java`
-6. `auth-service/` (빈 모듈), `common-lib/src/main/java/com/autotest/common_lib/exception/*` (오류 형식)
+6. `api-gateway/.../ApiKeyFilter.java`, `common-lib/src/main/java/com/autotest/common_lib/exception/*` (오류 형식)
 7. `frontend/src/App.tsx`(memberId 처리), `frontend/src/apiFetch.ts`
 8. `test-management-service/.../presentation/controller/RemoteCrawlController.java` (실행기 채널 서명 인증), `TestExecutionInternalController.java` (내부 토큰)
 9. `test-management-service/src/main/resources/db/migration/` (V1~V30, 기존 파일 수정 금지)
@@ -367,11 +341,11 @@ $DC down -v --remove-orphans   # 반드시 -p autotest-prodverify 인지 확인�
 
 > 이 문서를 운영 배포·허브 연동 작업의 인수인계로 사용하라.
 >
-> 먼저 `deploy-prod-env` 브랜치와 실제 실행 중인 Docker 상태를 확인하라. 실행 중인 `autotest` 프로젝트는 사용자 승인 없이 재생성·중지하지 말라. 운영 전환(6.A)은 사용자가 승인했을 때만 백업부터 수행하라.
+> 먼저 `main`(또는 이어서 작업 중인 브랜치)과 실제 실행 중인 Docker 상태를 확인하라. 실행 중인 `autotest` 프로젝트는 사용자 승인 없이 재생성·중지하지 말라. 운영 전환(6.A)은 사용자가 승인했을 때만 백업부터 수행하라.
 >
-> 개발은 2단계 인증(6.B)부터 TDD로 작게 진행하라. auth 테이블 위치(별도 스키마+Flyway 권장)는 사용자에게 확인한 뒤 결정하라. 원격 실행기 채널은 인증 예외로 두어라. 게이트웨이에서 `X-Member-Id`를 반드시 지우고 다시 넣어라.
+> 2단계는 API 키로 완료됐다. 사용자 로그인은 사용자가 원하지 않으므로 다시 제안하지 말라. 개발은 3단계 허브 API v1(6.C)부터 TDD로 작게 진행하라. 허브 경로는 게이트웨이 `ApiKeyFilter`가 키를 강제하므로 TMS는 `X-Member-Id` 소유권 검사만 하면 된다.
 >
-> 5장의 확정된 결정(공용 API 키 금지, Electron main 프로세스 호출, CORS 미개방, `/api/v1/hub` 분리, iframe 미지원)은 사용자의 새 지시 없이 바꾸지 말라.
+> 5장의 확정된 결정(exe 공용 키 금지·사용자별 API 키, Electron main 프로세스 호출, CORS 미개방, `/api/v1/hub` 분리, iframe 미지원)은 사용자의 새 지시 없이 바꾸지 말라.
 >
 > 검증은 격리 프로젝트(`-p autotest-prodverify`)와 격리 DB로 하고, 운영 DB와 볼륨은 건드리지 말라. `.env`·sample·계정·원문을 Git이나 외부 LLM에 올리지 말라.
 >

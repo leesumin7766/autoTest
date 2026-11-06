@@ -1,6 +1,6 @@
 # 업무 허브 연동·서버 배포 설계
 
-2026-11-04 설계안. 1단계(운영 배포 구성)는 구현·검증했고, 2단계 이후는 미구현이다. 단계별로 구현할 때 이 문서를 갱신한다. 진행 현황은 [인수인계](LLM_HANDOFF_2026-11-05.md)를 따른다.
+2026-11-04 설계안, 2026-11-06 인증 방식 변경. 1단계(운영 배포 구성)와 2단계(API 키)는 구현·검증했고, 3단계 이후는 미구현이다. 단계별로 구현할 때 이 문서를 갱신한다. 진행 현황은 [인수인계](LLM_HANDOFF_2026-11-05.md)를 따른다.
 
 ## 1. 전제
 
@@ -9,7 +9,7 @@
 | 서버 | 이 Windows 11 PC(GPU 없음, RAM 32GB), Docker Desktop으로 상시 실행 |
 | 허브 | 별도 프로젝트(Electron). exe 설치 프로그램으로 사용자 PC마다 배포. 서버와 같은 PC에서는 실행하지 않음 |
 | 네트워크 | 허브는 대부분 서버와 같은 사내망. 도메인(주소)은 서로 다름 |
-| 인증 | 허브·autoTest 모두 사용자 인증 없음. autoTest에 빈 auth-service만 존재 |
+| 인증 | 허브·autoTest 모두 사용자 인증 없음. 사용자 로그인은 만들지 않고 외부 API 호출만 API 키로 인증한다(2026-11-06) |
 | 연결 방식 | 미정. 허브가 API만 호출하는 경우와 허브에서 autoTest 화면을 여는 경우를 모두 지원 |
 
 ## 2. 현재 구조의 배포 차단 문제
@@ -20,39 +20,44 @@
 
 내부 API(`/api/internal/*`)는 이미 `X-Internal-Token`을 상수 시간 비교로 검사하며 ai-service·crawler도 토큰을 보낸다. 다만 포트가 공개되어 있으면 토큰 하나에만 의존하게 된다.
 
-1단계 운영 구성으로 2·3을 해결했다. 절차는 [운영 배포](PRODUCTION_DEPLOYMENT.md)를 따른다. 1은 2단계(인증)에서 해결한다.
+1단계 운영 구성으로 2·3을 해결했다. 절차는 [운영 배포](PRODUCTION_DEPLOYMENT.md)를 따른다. 1은 API 키로 들어오는 요청에 한해 해결했다(3.1). 웹 화면은 사내망 신뢰 모델을 유지한다.
 
 ## 3. 핵심 결정
 
-### 3.1 인증 주체는 autoTest auth-service
+### 3.1 인증 = 외부 프로그램용 API 키 (2026-11-06 결정)
 
-- 허브는 설치형 클라이언트이고 서버가 없다. **exe에 넣은 공용 API 키는 추출할 수 있으므로 쓰지 않는다.**
-- 허브 사용자와 웹 사용자 모두 autoTest 계정으로 로그인한다. 허브의 로그인 기능도 이 계정으로 해결된다.
-- 계정은 관리자가 만든다(스스로 가입하는 기능 없음). 최초 관리자 계정은 `.env`의 `AUTH_BOOTSTRAP_ADMIN_*` 값으로 한 번 생성한다.
-- 기존 데이터의 member `1`은 최초 관리자 계정에 연결해 보존한다.
+사용자 로그인은 만들지 않는다. 인증이 필요한 이유는 허브 같은 외부 프로그램의 API 호출뿐이기 때문이다. 이전 설계(계정·로그인·JWT·refresh token)는 로컬 브랜치 `wip-login-auth`에 보관만 했다.
 
-### 3.2 토큰
+| 항목 | 결정 |
+| --- | --- |
+| 키 형식 | `atk_` + 32바이트 난수(base64url 43자). 추측·대입이 불가능한 길이라 별도 잠금·요청 제한을 두지 않는다 |
+| 서버 저장 | `.env`의 `AUTOTEST_API_KEYS`에 **SHA-256 해시만** 둔다. `.env`가 유출돼도 키 원문은 나오지 않는다 |
+| 발급 | `node scripts/new-api-key.mjs <이름> <회원ID>` → 키 원문(한 번만 표시)과 `.env` 항목 출력 |
+| 단위 | 사용자(또는 PC)마다 한 개. **exe에 공용 키를 넣지 않는다.** 사용자가 허브 설정 화면에 자기 키를 입력한다 |
+| 신원 | 키 하나가 회원 ID 하나에 묶인다. 게이트웨이가 `X-Member-Id`를 키의 회원으로 덮어쓰므로 허브는 다른 회원을 사칭할 수 없다 |
+| 폐기·교체 | `.env`에서 항목을 지우거나 바꾸고 `docker compose ... up -d api-gateway`(수 초) |
+| 전송 | `Authorization: Bearer <키>`. 사내망 HTTPS(Caddy)로만 보낸다 |
+| 허브 쪽 보관 | Electron main 프로세스에서 `safeStorage`로 암호화해 저장. renderer·평문 파일에 두지 않는다 |
 
-| 대상 | 발급 방식 | 저장 위치 |
-| --- | --- | --- |
-| 웹 화면(브라우저) | 로그인 시 HttpOnly·Secure·SameSite=Strict 세션 쿠키 | 브라우저 쿠키 |
-| 허브(Electron) | `accessToken`(JWT, 15분) + `refreshToken`(불투명 값, 30일, 사용할 때마다 교체) | main 프로세스에서 Electron `safeStorage`로 암호화해 저장. renderer와 평문 파일에는 두지 않음 |
+DB 테이블·관리 화면을 두지 않은 이유: 허브 사용자가 소수이고, 키 추가·폐기가 `.env` 한 줄 수정과 게이트웨이 재생성으로 끝난다. 사용자가 늘어 재시작 없는 폐기가 필요해지면 그때 DB로 옮긴다.
 
-- 게이트웨이는 쿠키와 `Authorization: Bearer` 중 하나를 받아 검증한다.
-- JWT는 게이트웨이가 공유 비밀키(HS256, `.env`)로 직접 검증하므로 요청마다 auth-service를 부르지 않는다.
-- 로그아웃·계정 비활성화 시 refresh token을 폐기한다. access token은 최대 15분 뒤 만료된다.
-- 로그인 실패 5회가 누적되면 일정 시간 잠그고, IP별 요청 제한을 둔다.
+### 3.2 게이트웨이 규칙 (`api-gateway/.../ApiKeyFilter.java`)
 
-### 3.3 게이트웨이 = 인증 경계
+1. 외부에서 들어온 `X-Internal-Token`, `X-Api-Client`는 **항상 삭제**한다.
+2. `Authorization` 헤더가 **있으면** 반드시 등록된 키여야 한다. 아니면 `401 API_KEY_INVALID`(형식 오류·폐기 키·`Basic` 등 모두 동일).
+3. 키가 맞으면 `X-Member-Id`를 키의 회원 ID로, `X-Api-Client`를 키 이름으로 설정하고 `Authorization`은 하위 서비스로 넘기지 않는다.
+4. `/api/v1/hub/**`는 키가 필수다. 없으면 `401 API_KEY_REQUIRED`.
+5. `Authorization`이 없는 그 밖의 요청(웹 화면, 원격 실행기 채널)은 기존과 같이 통과한다.
+6. `AUTOTEST_API_KEYS` 형식이 틀리면 게이트웨이가 기동하지 않는다(조용히 무시하지 않음).
+7. `/api/internal/**`은 게이트웨이에 라우팅하지 않고 Caddy도 404로 막는다(현재와 같음).
 
-1. 들어온 요청의 `X-Member-Id`, `X-Internal-Token`을 **항상 삭제**한다.
-2. 아래 공개 경로 외에는 쿠키나 Bearer 토큰을 검증한다. 실패하면 `401 AUTH_REQUIRED`를 돌려준다.
-3. 검증된 토큰의 member ID를 `X-Member-Id`로 다시 넣어 하위 서비스로 전달한다. 기존 서비스 코드는 바꾸지 않는다.
-4. `/api/internal/**`은 게이트웨이에 라우팅하지 않는다(현재와 같음).
+키 확인용: `GET /api/v1/hub/whoami` → `{client, memberId}`.
 
-공개 경로:
-- `POST /api/auth/login`, `POST /api/auth/refresh`, `GET /api/v1/hub/health`
-- `POST /api/crawl-agents/{agent}/channel/{action}`: 원격 실행기에는 사용자 토큰이 없고, 자체 서명(`X-Agent-Timestamp`·`X-Agent-Nonce`·wire 서명)으로 인증한다. 예외로 두지 않으면 원격 수집이 끊긴다.
+### 3.3 남는 위험 (알고 받아들인 것)
+
+- **웹 화면은 여전히 인증이 없다.** 사내망에서 서버에 접속할 수 있는 사람은 화면이나 키 없는 `/api/**` 호출로 회원 ID를 바꿔 다른 사람의 작업을 볼 수 있다. 이 서버는 사내망 전용(방화벽 Private 프로필)으로만 운영한다.
+- 즉 API 키가 보장하는 것은 "허브 요청이 누구 것인지"와 "허브 전용 API는 키 없이 못 쓴다"이다. 웹 쪽 데이터 보호는 아니다.
+- 사내망 밖에 공개하거나 사용자별 접근 통제가 필요해지면 `wip-login-auth` 설계(로그인)를 다시 검토한다.
 
 ### 3.4 CORS
 
@@ -66,7 +71,7 @@
 ### 3.5 화면 연결
 
 - 허브 API 응답의 각 작업에 `webUrl`(예: `https://<서버>/?workspace=<id>&tab=report`)을 포함한다. 허브는 이 주소를 기본 브라우저로 연다.
-- 브라우저에서 처음 열 때는 autoTest 로그인이 필요하다. 이후 허브 로그인 정보로 웹 로그인을 대신하는 일회용 코드 교환(`POST /api/auth/web-handoff`)은 후속 범위다.
+- 웹 화면에는 로그인이 없으므로 주소만 열면 된다.
 - iframe 삽입은 지원하지 않는다. 도메인이 달라 서드파티 쿠키가 차단된다.
 
 ## 4. 배포 구성
@@ -84,14 +89,14 @@
 - `docker-compose.prod.yml`(override 파일)을 새로 둔다. 기존 `docker-compose.yml` 개발 구성은 유지한다.
   - caddy만 `443`(필요하면 `80` → 443 리다이렉트)을 공개한다.
   - 나머지 서비스의 `ports`를 제거한다. 개발 중 확인이 필요한 포트만 `127.0.0.1:`로 묶는다.
-  - db·S3 계정, `AUTH_JWT_SECRET`, `PRODUCT_DESCRIPTION_INTERNAL_TOKEN`을 `.env`로 받는다. `test/test` 기본값은 운영에서 쓰지 않는다.
+  - db·S3 계정, `AUTOTEST_API_KEYS`, `PRODUCT_DESCRIPTION_INTERNAL_TOKEN`을 `.env`로 받는다. `test/test` 기본값은 운영에서 쓰지 않는다.
   - 모든 서비스에 `restart: unless-stopped`를 두고, `latest` 이미지 태그를 고정 버전으로 바꾼다.
 - frontend는 다단계 빌드(`node:24` → 정적 파일)로 caddy 이미지에 포함한다.
 - Caddy 설정:
   - 업로드 최대 크기는 100 MiB 이상으로 한다.
   - 장시간 요청의 읽기 시간 제한을 늘린다.
   - 사내망 HTTPS는 `tls internal`(Caddy 자체 CA)을 사용한다.
-- **사내망 HTTPS:** 비밀번호와 토큰이 오가므로 HTTP로 운영하지 않는다. 허브 exe는 둘 중 하나를 한다.
+- **사내망 HTTPS:** API 키가 오가므로 HTTP로 운영하지 않는다. 허브 exe는 둘 중 하나를 한다.
   - (a) Caddy 루트 인증서를 함께 배포해 신뢰 저장소에 설치한다.
   - (b) 서버 인증서의 지문을 고정(pin)한다.
 - **서버 주소 고정:** 공유기·DHCP에서 이 PC의 IP를 예약하고, 가능하면 사내 DNS 이름(예: `autotest.local`)을 붙인다. 허브는 설치할 때 또는 설정 화면에서 서버 주소를 입력받는다.
@@ -147,31 +152,25 @@ manual-review(`qwen3:4b`)는 기존처럼 profile로 필요할 때만 실행한�
 
 ## 5. API
 
-### 5.1 인증 (`/api/auth`)
+### 5.1 인증
 
 ```text
-POST /api/auth/login     {username, password, client: "web"|"hub"}
-                         web → Set-Cookie,  hub → {accessToken, refreshToken, expiresIn}
-POST /api/auth/refresh   {refreshToken} → 새 토큰 쌍 (이전 refresh token 폐기)
-POST /api/auth/logout    현재 세션 또는 refresh token 폐기
-GET  /api/auth/me        {memberId, username, displayName, roles}
-# 관리자
-POST /api/auth/users                 계정 생성
-POST /api/auth/users/{id}/password   비밀번호 초기화
-POST /api/auth/users/{id}/disable
+모든 허브 요청: Authorization: Bearer atk_...
+GET /api/v1/hub/whoami   {client, memberId}   키 설정 확인(구현됨)
+401 {code: API_KEY_REQUIRED | API_KEY_INVALID, message, traceId}
 ```
 
 ### 5.2 허브 v1 (`/api/v1/hub`, 1차는 조회만)
 
 ```text
-GET /api/v1/hub/health                              {status, apiVersion, minHubVersion}
+GET /api/v1/hub/health                              {status, apiVersion, minHubVersion} (키 필요)
 GET /api/v1/hub/workspaces?offset=&limit=           작업 목록 + webUrl
 GET /api/v1/hub/workspaces/{id}/summary             단계별 상태, TC 수, 최근 실행 P/F/미판정 건수
 GET /api/v1/hub/workspaces/{id}/runs/{run}          실행 상태·진행률
 GET /api/v1/hub/workspaces/{id}/runs/{run}/report   보고서 Markdown
 ```
 
-- 데이터는 로그인한 사용자 본인 것만 조회한다(기존 member 소유권 검사를 그대로 사용).
+- 데이터는 키에 묶인 회원 본인 것만 조회한다(기존 member 소유권 검사를 그대로 사용).
 - 오류 형식은 기존 `{code, message, traceId}`를 그대로 쓴다.
 - **버전 호환:** exe는 사용자 PC마다 업데이트 시점이 다르다.
   - `/api/v1`의 필드를 삭제하거나 의미를 바꾸지 않는다. 필드 추가만 허용한다.
@@ -184,15 +183,14 @@ GET /api/v1/hub/workspaces/{id}/runs/{run}/report   보고서 Markdown
 
 - `run` 권한: 허브에서 시험 재실행을 시작한다(`202` 반환, 실행 중이면 `409`).
 - 허브 알림: 허브는 서버가 없어 웹훅을 받을 수 없다. 대신 `GET /api/v1/hub/events?since=` 폴링이나 SSE로 완료 알림을 받는다.
-- 웹 로그인 대신 허브 로그인 정보를 넘기는 일회용 코드(`web-handoff`).
 
 ## 6. 구현 단계
 
 | 단계 | 범위 | 완료 기준 |
 | --- | --- | --- |
 | 1 배포 구성·설치 묶음 (구현) | prod compose, 전 서비스 이미지 내 빌드, 내부 포트 비공개, caddy+frontend 빌드, ollama-init, 비밀값 `.env.prod.example` | JDK·Node 없이 compose 한 줄로 기동. 사내 다른 PC에서 `https://<서버>`로 화면 접속. 5432·8082 등 외부 접근 불가 |
-| 2 인증 | auth-service 계정·세션·토큰, 게이트웨이 필터, 로그인 화면, member ID 입력칸 제거, member 1 이전 | 토큰 없이 `/api/**` 호출 시 401. 위조한 `X-Member-Id` 무시 |
-| 3 허브 API v1 | `/api/v1/hub/*` 조회, OpenAPI, 버전 검사 | 허브 PC에서 로그인 → 작업 목록·요약·보고서 조회 |
-| 4 후속 | 실행 시작, 이벤트, web-handoff | 별도 계획 |
+| 2 API 키 (구현) | 게이트웨이 `ApiKeyFilter`, 발급 스크립트, `/api/v1/hub/whoami` | 키 요청은 `X-Member-Id` 위조 불가, 잘못된 키 401, `/api/v1/hub/**` 키 없이 401 |
+| 3 허브 API v1 | `/api/v1/hub/*` 조회, OpenAPI, 버전 검사 | 허브 PC에서 키로 작업 목록·요약·보고서 조회 |
+| 4 후속 | 실행 시작, 이벤트 | 별도 계획 |
 
-운영 DB 변경(auth 테이블 추가, member 이전) 전에는 기존 백업 규칙에 따라 백업한다.
+운영 DB 스키마를 바꾸기 전에는 기존 백업 규칙에 따라 백업한다(2단계는 DB 변경 없음).

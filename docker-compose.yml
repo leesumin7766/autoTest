@@ -107,6 +107,9 @@ services:
     build:
       context: .
       dockerfile: api-gateway/Dockerfile
+    environment:
+      # 외부 프로그램용 API 키 해시(name:memberId:sha256, 쉼표 구분). 발급: node scripts/new-api-key.mjs
+      AUTOTEST_API_KEYS: ${AUTOTEST_API_KEYS:-}
     ports:
       - "8080:8080"
     depends_on:
