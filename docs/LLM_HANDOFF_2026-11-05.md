@@ -8,10 +8,14 @@
 > - `deploy-prod-env`를 `main`에 합쳤다(`origin/main` = `7973a22`). 이후 작업은 `hub-api-key` 브랜치에서 한다.
 > - 사용자 결정: 사용자 로그인은 만들지 않는다. 인증은 **외부 프로그램(허브)의 API 호출에만** 쓴다.
 > - 그래서 2단계를 **게이트웨이 API 키**로 바꿔 구현했다(`ApiKeyFilter`, `scripts/new-api-key.mjs`, `GET /api/v1/hub/whoami`). 설계는 `HUB_API_INTEGRATION.md` 3장.
-> - 이전 로그인 설계로 누군가 작업하다 커밋하지 않은 코드(auth-service 계정·JWT·로그인 화면)는 로컬 브랜치 `wip-login-auth`(`dd796c2`)에 보관만 했다. 사용하지 않는다.
+> - 이전 로그인 설계로 누군가 작업하다 커밋하지 않은 코드(auth-service 계정·JWT·로그인 화면)는 태그 `archive/wip-login-auth`(`dd796c2`)로 보관만 했다. 사용하지 않는다.
 > - 아래 5장 2~4번, 6.B는 이 변경으로 대체됐다.
 > - 3단계 허브 조회 API v1도 같은 브랜치에서 구현·검증했다(6.C). 계약은 `docs/hub-api-v1.openapi.yaml`.
 > - `hub-api-key`(API 키·허브 API v1)도 `main`에 fast-forward로 합쳤다(2026-11-06). 다음 작업은 `main`에서 새 브랜치로 분기한다.
+> - 브랜치 정리(2026-11-06): main에 이미 포함된 브랜치는 원격·로컬에서 삭제했다. 원격에는 `main`만 남는다. main에 없는 커밋이 있던 세 브랜치는 검토 후 **적용하지 않고** 태그로 보관했다.
+>   - `archive/dev-self-llm`(`a8ffe46`): 사용자 LLM 메뉴 가져오기 v2. main의 `self-llm-v4`(`SelfLlmMenuContract`)가 대체했고, 잘못된 근거를 경고로 저장하는 v2 정책은 거절하는 v4 정책과 반대다.
+>   - `archive/dev-captured-menu-tree`(`8f86e5f`): 메뉴 계층·화면 전환 수집. 같은 내용이 main에 더 발전된 형태로 이미 있다(V18·V19 마이그레이션 동일).
+>   - `archive/wip-login-auth`(`dd796c2`): 로그인 설계. API 키 방식으로 대체됐다.
 > - 허브 범위는 **조회 + 웹 화면 링크 이동까지**로 확정했다(2026-11-06 사용자 결정). 허브에서 시험 실행 시작·완료 알림은 만들지 않는다. 아래 4단계·`202`/`409`·이벤트 관련 내용은 무효다.
 
 ---
@@ -59,7 +63,7 @@ autoTest는 업체 문서(기능리스트·매뉴얼·시험합의서)를 받아
 - **저장소:** `https://github.com/leesumin7766/autoTest`
 - **이번 작업 브랜치:** `deploy-prod-env` (원격 `origin/deploy-prod-env`, 커밋 `8e6c64d`, 이후 이 문서 커밋)
   - `origin/dev-read-spec-bindings`(`9505c73`)에서 분기했다. 이 브랜치는 origin/main(`81f5ff9`)을 포함한 당시 최신 통합 브랜치다.
-  - 다른 작업 공간에서 진행 중이던 `dev-self-llm`(+2 커밋)과 `dev-captured-menu-tree`(+1 커밋)는 **포함하지 않았다**. 병합할 때 충돌 여부를 확인한다.
+  - 다른 작업 공간에서 진행 중이던 `dev-self-llm`(+2 커밋)과 `dev-captured-menu-tree`(+1 커밋)는 **포함하지 않았다**. 2026-11-06 검토 결과 main이 이미 대체해 적용하지 않고 `archive/*` 태그로 보관했다.
   - 2026-11-06 `main`에 합쳤다. 이어서 만든 `hub-api-key`도 `main`에 합쳤다.
 - **작업 폴더(worktree):** `C:\Users\tta\autoTest\.runtime\dev-document-publish`
 - **실행 중인 서버:**
