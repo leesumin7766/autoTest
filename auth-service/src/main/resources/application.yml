@@ -10,4 +10,9 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
+  flyway:
+    schemas: auth
+    default-schema: auth
+    table: auth_schema_history
+    locations: classpath:db/auth-migration

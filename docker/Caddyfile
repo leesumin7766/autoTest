@@ -34,6 +34,8 @@
 			max_size 512MB
 		}
 		reverse_proxy api-gateway:8080 {
+			# Overwrite client input; only the isolated production gateway trusts this header.
+			header_up X-Auth-Client-IP {remote_host}
 			flush_interval -1
 			transport http {
 				dial_timeout 10s

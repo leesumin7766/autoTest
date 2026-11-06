@@ -48,6 +48,8 @@ services:
     ports: !reset []
     restart: unless-stopped
     environment:
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Set a random AUTH_JWT_SECRET of at least 32 bytes}
+      AUTH_COOKIE_SECURE: "true"
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-test}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     mem_limit: 768m
@@ -90,6 +92,9 @@ services:
     mem_limit: 768m
 
   api-gateway:
+    environment:
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Set a random AUTH_JWT_SECRET of at least 32 bytes}
+      AUTH_TRUST_PROXY: "true"
     build:
       dockerfile: docker/java-service.Dockerfile
       args: { SERVICE: api-gateway }

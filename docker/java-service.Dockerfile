@@ -23,6 +23,7 @@ RUN --mount=type=cache,target=/root/.gradle \
 FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S app && adduser -S -G app -u 10001 app
 WORKDIR /app
+RUN mkdir -p /app/.runtime/playwright && chown app:app /app/.runtime/playwright
 COPY --from=build /app.jar app.jar
 USER app
 # 컨테이너 mem_limit 기준으로 힙을 잡는다.

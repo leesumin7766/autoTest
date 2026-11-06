@@ -78,12 +78,11 @@ const workflowPages = [
   ...upcomingPages,
 ]
 
-function App() {
+function App({ memberId }: { memberId: string }) {
   const [page, setPage] = useState('documents')
   const [visited, setVisited] = useState<Set<string>>(() => new Set(['documents']))
   const navigate = (next: string) => { setPage(next); setVisited(current => new Set([...current, next])) }
   const [productId, setProductId] = useState('1')
-  const [memberId, setMemberId] = useState(()=>{try{const saved=localStorage.getItem('autotest:last-member:v1');return saved&&/^[1-9]\d*$/.test(saved)?saved:'1'}catch{return '1'}})
   const [submissionId, setSubmissionId] = useState('')
   const [lookupId,setLookupId]=useState('')
   const [workspace,setWorkspace]=useState<SavedWorkspace|null>(null)
@@ -274,7 +273,6 @@ function App() {
 
   // Remember only the ID locally; documents, artifacts and names remain server-side.
   useEffect(()=>{
-    try{if(/^[1-9]\d*$/.test(memberId))localStorage.setItem('autotest:last-member:v1',memberId)}catch{ /* Optional convenience, not authentication. */ }
     restoreRequest.current?.abort();setSubmissionId('');setLookupId('');setWorkspace(null);setWorkspaceName('새 시험 작업')
     setDocuments({});setStates({});setErrors({});setFiles({});setGeneratedTc(null);setNotice('')
     setAiDelivery({status:'NOT_READY',attempts:0,lastError:null,deliveredAt:null,updatedAt:null,retryable:false,preflight:null})
@@ -371,10 +369,6 @@ function App() {
         <label>
           <span>제품 ID</span>
           <input value={productId} onChange={(event) => setProductId(event.target.value)} inputMode="numeric" />
-        </label>
-        <label>
-          <span>회원 ID</span>
-          <input value={memberId} onChange={(event) => setMemberId(event.target.value)} inputMode="numeric" />
         </label>
         <div className="set-lookup"><label><span>문서 세트 ID</span><input value={lookupId} onChange={event=>setLookupId(event.target.value)} placeholder="작업 ID로 직접 불러오기" /></label><button className="quiet-button" type="button" disabled={busy||!lookupId.trim()} onClick={()=>void restoreWorkspace(lookupId.trim()).catch(()=>{})}>세트 조회</button></div>
       </section>

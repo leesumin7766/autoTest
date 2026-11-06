@@ -101,14 +101,17 @@ public class SubmissionController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<SubmissionResponse> findById(@PathVariable UUID id) {
-        return submissionService.findById(SubmissionId.of(id))
-            .map(submission -> SubmissionResponse.from(
+    public ResponseEntity<SubmissionResponse> findById(@PathVariable UUID id,
+            @RequestHeader("X-Member-Id") Long memberId) {
+        Submission submission = submissionService.findById(SubmissionId.of(id))
+                .orElseThrow(() -> new com.autotest.common_lib.exception.CommonException(com.autotest.common_lib.exception.CommonErrorCode.RESOURCE_NOT_FOUND));
+        if (!submission.memberId().equals(new MemberId(memberId))) {
+            throw new com.autotest.common_lib.exception.CommonException(com.autotest.common_lib.exception.CommonErrorCode.ACCESS_DENIED);
+        }
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).body(SubmissionResponse.from(
                 submission,
                 submissionService.findDocumentsBySubmissionId(submission.submissionId()),
-                aiDocumentDeliveryService.getStatus(id)))
-                .map(ResponseEntity::ok)
-                .orElseThrow(() -> new com.autotest.common_lib.exception.CommonException(com.autotest.common_lib.exception.CommonErrorCode.RESOURCE_NOT_FOUND));
+                aiDocumentDeliveryService.getStatus(id)));
     }
 
     @PostMapping("/{id}/ai-delivery/retry")

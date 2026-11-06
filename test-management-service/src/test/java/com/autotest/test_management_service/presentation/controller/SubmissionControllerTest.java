@@ -108,7 +108,7 @@ class SubmissionControllerTest {
         when(submissionService.findDocumentsBySubmissionId(id)).thenReturn(List.of(
                 document(id, SubmissionStatus.FAILED, "문서에서 텍스트를 추출할 수 없습니다")));
 
-        mockMvc.perform(get("/api/submissions/{id}", id.value()))
+        mockMvc.perform(get("/api/submissions/{id}", id.value()).header("X-Member-Id", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.submissionId").value(id.value().toString()))
                 .andExpect(jsonPath("$.status").value("FAILED"))
@@ -120,8 +120,18 @@ class SubmissionControllerTest {
         UUID id = UUID.randomUUID();
         when(submissionService.findById(SubmissionId.of(id))).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/submissions/{id}", id))
+        mockMvc.perform(get("/api/submissions/{id}", id).header("X-Member-Id", "1"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getRejectsOtherMemberBeforeLoadingDocumentsOrDelivery() throws Exception {
+        SubmissionId id = SubmissionId.generate();
+        when(submissionService.findById(id)).thenReturn(Optional.of(submission(id, SubmissionStatus.PARSED)));
+        mockMvc.perform(get("/api/submissions/{id}", id.value()).header("X-Member-Id", "2"))
+                .andExpect(status().isForbidden());
+        org.mockito.Mockito.verify(submissionService, org.mockito.Mockito.never()).findDocumentsBySubmissionId(any());
+        org.mockito.Mockito.verifyNoInteractions(aiDocumentDeliveryService);
     }
 
     @Test

@@ -37,6 +37,11 @@ services:
       db:
         condition: service_healthy
     environment:
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-}
+      AUTH_BOOTSTRAP_ADMIN_USERNAME: ${AUTH_BOOTSTRAP_ADMIN_USERNAME:-}
+      AUTH_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:-}
+      AUTH_BOOTSTRAP_ADMIN_DISPLAY_NAME: ${AUTH_BOOTSTRAP_ADMIN_DISPLAY_NAME:-Administrator}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/autotest
       SPRING_DATASOURCE_USERNAME: test
       SPRING_DATASOURCE_PASSWORD: test
@@ -104,6 +109,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: test
 
   api-gateway:
+    environment:
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-}
     build:
       context: .
       dockerfile: api-gateway/Dockerfile

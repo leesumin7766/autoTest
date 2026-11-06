@@ -25,15 +25,43 @@ export function responseError(status: number, body: unknown): ApiError {
   const message = serviceErrorMessages[code] || statusMessages[status] || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
   return new ApiError(code, message, status, trace)
 }
+let refreshPending: Promise<boolean> | undefined
+async function refreshSession(): Promise<boolean> {
+  if (!refreshPending) {
+    const refresh = async () => {
+      const current = await globalThis.fetch('/api/auth/me', { credentials: 'same-origin' })
+      if (current.ok) return true
+      if (current.status !== 401) return false
+      const response = await globalThis.fetch('/api/auth/refresh', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-AutoTest-Web': '1' }, body: '{}',
+      })
+      return response.ok
+    }
+    // Serialize refresh rotation across tabs as well as concurrent requests in this tab.
+    refreshPending = (typeof navigator !== 'undefined' && navigator.locks
+      ? navigator.locks.request('autotest:refresh', refresh) : refresh()).finally(() => { refreshPending = undefined })
+  }
+  return refreshPending
+}
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   let response: Response
-  try { response = await globalThis.fetch(input, init) }
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
+  headers.set('X-AutoTest-Web', '1')
+  const options = { ...init, headers, credentials: 'same-origin' as const }
+  const url = input instanceof Request ? input.url : String(input)
+  const authAction = /\/api\/auth\/(login|refresh)(?:\?|$)/.test(url)
+  const retryInput = input instanceof Request ? input.clone() : input
+  try {
+    response = await globalThis.fetch(input, options)
+    if (response.status === 401 && !authAction && await refreshSession()) response = await globalThis.fetch(retryInput, options)
+  }
   catch (error) {
     if (error instanceof Error && error.name === 'AbortError') throw error
     if (error instanceof Error && error.name === 'TimeoutError') throw new ApiError('NETWORK_TIMEOUT', '응답 대기 시간이 초과되었습니다. 처리 상태를 확인한 뒤 다시 시도해 주세요.')
     throw new ApiError('NETWORK_UNAVAILABLE', '서버에 연결할 수 없습니다. 서버 실행 상태 또는 네트워크를 확인해 주세요.')
   }
   if (!response.ok) {
+    if (response.status === 401 && !authAction && typeof window !== 'undefined') window.dispatchEvent(new Event('autotest:auth-required'))
     let body: unknown
     try { body = await response.json() } catch { body = undefined }
     throw responseError(response.status, body)
