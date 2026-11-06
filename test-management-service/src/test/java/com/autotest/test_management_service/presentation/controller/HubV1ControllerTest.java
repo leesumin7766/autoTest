@@ -55,7 +55,8 @@ class HubV1ControllerTest {
 
     @Test void versionIsRequiredAndOldHubsMustUpdate() throws Exception {
         mvc.perform(get("/api/v1/hub/workspaces").header("X-Member-Id", "7"))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("HUB_VERSION_REQUIRED"));
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("HUB_VERSION_REQUIRED"))
+                .andExpect(jsonPath("$.message").value("X-Hub-Version 헤더(x.y.z)가 필요합니다."));
         mvc.perform(get("/api/v1/hub/workspaces").header("X-Member-Id", "7").header("X-Hub-Version", "banana"))
                 .andExpect(status().isBadRequest());
         for (String old : List.of("1.1.9", "0.9.0", "1.1.99"))
@@ -104,7 +105,16 @@ class HubV1ControllerTest {
         verifyNoInteractions(executions);
     }
 
+    @Test void otherMembersRunsAndReportsAreNotFoundBeforeTouchingExecutions() throws Exception {
+        when(workspaces.get(WS, 8)).thenThrow(new CommonException(CommonErrorCode.RESOURCE_NOT_FOUND));
+        for (String path : List.of("/runs", "/runs/" + RUN, "/runs/" + RUN + "/report"))
+            mvc.perform(get("/api/v1/hub/workspaces/" + WS + path).header("X-Member-Id", "8").header("X-Hub-Version", "1.2.0"))
+                    .andExpect(status().isNotFound());
+        verifyNoInteractions(executions, reviews);
+    }
+
     @Test void runsRunAndReport() throws Exception {
+        when(workspaces.get(WS, 7)).thenReturn(workspace());
         when(executions.status(WS, 7, null)).thenReturn(runStatus());
         when(executions.status(WS, 7, RUN)).thenReturn(runStatus());
         when(reviews.report(WS, 7, RUN)).thenReturn("# 보고서");

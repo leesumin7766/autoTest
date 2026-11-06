@@ -5,6 +5,8 @@ import org.springframework.http.HttpStatus;
 
 /** Public messages only. Exception details belong in server logs. */
 public enum TestManagementErrorCode implements BaseErrorCode {
+    HUB_VERSION_REQUIRED("X-Hub-Version 헤더(x.y.z)가 필요합니다.", HttpStatus.BAD_REQUEST),
+    HUB_UPDATE_REQUIRED("허브를 최신 버전으로 업데이트해 주세요. 최소 버전은 /api/v1/hub/health 에서 확인합니다.", HttpStatus.UPGRADE_REQUIRED),
     // 400
     MANUAL_REVIEW_INPUT_CHANGED("매뉴얼 원본이 변경되어 이어서 검토할 수 없습니다. 새 검토를 시작해 주세요.", HttpStatus.CONFLICT),
     MANUAL_REVIEW_PDF_REQUIRED("현재 자동 검토는 50 MiB 이하 PDF 매뉴얼을 지원합니다.", HttpStatus.BAD_REQUEST),
