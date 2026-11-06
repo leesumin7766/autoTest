@@ -140,3 +140,27 @@ Caddy가 사내 전용 CA를 만들어 서버 인증서를 발급·자동 갱신
 - **27B 모델 추론:** 검증에서는 모델 다운로드를 생략했으므로 실제 추론을 확인하지 않았다. 운영 전환 시에는 기존 ollama_data 볼륨을 이어 쓴다.
 - **사용자 PC 접속:** 사내 다른 PC에서의 접속은 서버 PC의 방화벽·IP 설정 후 확인해야 한다(이 PC 안에서만 검증).
 - **인증:** 웹 화면은 없다. 허브 등 외부 프로그램은 API 키로 인증한다(`docs/HUB_API_INTEGRATION.md` 3장). 키 발급: `node scripts/new-api-key.mjs <이름> <회원ID>` → `.env`의 `AUTOTEST_API_KEYS`에 추가 → `up -d api-gateway`.
+
+## 8. 이 PC(DESKTOP-JA2IHD6) 로컬 운영 구성 기록 (2026-11-07)
+
+실제 운영 서버는 다른 PC다. 이 PC 는 사내망이 아니라서, **지금 환경 기준(localhost)** 으로 운영 구성을 올려 ATDT 연동을 확인했다. 사내망에 올릴 때는 아래 "바꿀 것" 만 바꾼다.
+
+| 단계 | 한 일 | 결과 |
+|---|---|---|
+| 백업 | `.env` → `.env.before-prod-20261107`(git 제외: `.git/info/exclude`), DB `pg_dump -Fc` → `backups/autotest-before-prod-20261107.dump` | 표 18개, 788KB |
+| `.env` 추가 | `AUTOTEST_SITE_ADDRESS=localhost`, `AUTOTEST_HTTP_PORT=18080`, `AUTOTEST_HTTPS_PORT=18443`(이 PC 는 80 을 Windows 가 이미 씀), `DB_USER=test`, `DB_PASSWORD`(무작위 32자, 출력하지 않음), `OLLAMA_MODELS=`(빈칸: 이 PC 는 Docker 메모리 8GB 라 모델을 받지 않음), `EXECUTION_QWEN_MODEL=qwen3:4b`, `AUTOTEST_API_KEYS=`(빈칸), `HUB_MIN_VERSION=0.0.0` | |
+| DB 비밀번호 | `ALTER USER test PASSWORD …` (값은 환경 변수로만 넘김) | |
+| 실행 | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build` | 1회차 Gradle 빌드 오류, 2회차 성공. 11개 서비스 실행 |
+| 확인 | `https://localhost:18443/` 200, `/api/v1/hub/health`(키 없음) 401 `API_KEY_REQUIRED`, `/api/internal/*` 404, `/downloads/autotest-server-ca.crt` 200, CA 없이 접속하면 거절, 5432·8080·8082·8005·8006·9333 닫힘, 기존 데이터 유지(submissions 5건) | |
+| CA | `backups/autotest-server-ca.crt` 로 꺼냄 | |
+
+알게 된 것:
+- Windows `curl`(Schannel) 은 사내 CA 에 폐기 목록이 없어 `CERT_TRUST_REVOCATION_STATUS_UNKNOWN` 으로 거절한다. 확인할 때 `--ssl-no-revoke --cacert …` 를 쓴다(체인 검증은 함).
+- `http://localhost:18080` 은 응답하지 않았다(HTTPS 로만 접속). 사내망 구성에서 80 을 쓰면 다시 확인.
+- 이 PC 는 소켓 listen·connect 가 가끔 `EFAULT`(WSAEFAULT) 로 실패한다. Docker 포트 열기에서도 났고 다시 하면 된다. ATDT 테스트의 `tests/net/efault.ts` 와 같은 원인.
+- ATDT 의 "시험 웹앱" 바로가기는 키 없이 `/api/v1/hub/health` 로 켜짐을 확인한다(401 `API_KEY_…` = 켜짐). ATDT 는 Windows 인증서 저장소를 쓰므로 `autotest-server-ca.crt` 를 **"신뢰할 수 있는 루트 인증 기관"** 에 설치해야 HTTPS 상태 확인과 브라우저 열기가 경고 없이 된다(5장 명령).
+- 허브 API 키(`AUTOTEST_API_KEYS`)는 ATDT 가 더 쓰지 않는다(2026-11-07 결정: ATDT 는 autoTest 를 바로가기로만 연동).
+
+사내망으로 옮길 때 바꿀 것: `AUTOTEST_SITE_ADDRESS`(서버 IP 또는 이름, 여러 개면 쉼표), `AUTOTEST_HTTP_PORT`·`AUTOTEST_HTTPS_PORT`(기본 80·443 이면 줄 삭제), `OLLAMA_MODELS`·`EXECUTION_QWEN_MODEL`(실제 서버 모델), 2장 4번 방화벽. 주소가 바뀌면 Caddy 가 새 서버 인증서를 만들지만 CA 는 같다(`caddy_data` 볼륨 유지 시).
+
+되돌리기(개발 구성으로): `docker compose -f docker-compose.yml -f docker-compose.prod.yml down` → `.env.before-prod-20261107` 를 `.env` 로 → DB 비밀번호를 `test` 로 `ALTER USER` → `docker compose up -d`.
