@@ -11,6 +11,7 @@
 > - 이전 로그인 설계로 누군가 작업하다 커밋하지 않은 코드(auth-service 계정·JWT·로그인 화면)는 로컬 브랜치 `wip-login-auth`(`dd796c2`)에 보관만 했다. 사용하지 않는다.
 > - 아래 5장 2~4번, 6.B는 이 변경으로 대체됐다.
 > - 3단계 허브 조회 API v1도 같은 브랜치에서 구현·검증했다(6.C). 계약은 `docs/hub-api-v1.openapi.yaml`.
+> - `hub-api-key`(API 키·허브 API v1)도 `main`에 fast-forward로 합쳤다(2026-11-06). 다음 작업은 `main`에서 새 브랜치로 분기한다.
 > - 허브 범위는 **조회 + 웹 화면 링크 이동까지**로 확정했다(2026-11-06 사용자 결정). 허브에서 시험 실행 시작·완료 알림은 만들지 않는다. 아래 4단계·`202`/`409`·이벤트 관련 내용은 무효다.
 
 ---
@@ -21,8 +22,8 @@
 | --- | --- |
 | 1단계 운영 배포 구성(Docker 전용, HTTPS 단일 진입점) | **구현·검증 완료**. `origin/deploy-prod-env`에 push(`8e6c64d`) |
 | 실제 서버를 운영 구성으로 전환 | **미수행**. 사용자 승인 필요(데이터·실행 중 서버 영향) |
-| 2단계 인증 → **API 키 방식으로 변경**(게이트웨이 `ApiKeyFilter`) | **구현·검증 완료**(`hub-api-key` 브랜치) |
-| 3단계 허브 API v1(`/api/v1/hub/*` 조회) | **구현·검증 완료**(`hub-api-key` 브랜치) |
+| 2단계 인증 → **API 키 방식으로 변경**(게이트웨이 `ApiKeyFilter`) | **구현·검증 완료**(`main`에 합침) |
+| 3단계 허브 API v1(`/api/v1/hub/*` 조회) | **구현·검증 완료**(`main`에 합침) |
 | 허브에서 실행 시작·완료 알림 | **하지 않음**(2026-11-06 사용자 결정) |
 | 허브와 웹의 연결 방식(API만 / 화면 열기 / 둘 다) | **미결정**. 설계는 둘 다 지원 |
 
@@ -59,7 +60,7 @@ autoTest는 업체 문서(기능리스트·매뉴얼·시험합의서)를 받아
 - **이번 작업 브랜치:** `deploy-prod-env` (원격 `origin/deploy-prod-env`, 커밋 `8e6c64d`, 이후 이 문서 커밋)
   - `origin/dev-read-spec-bindings`(`9505c73`)에서 분기했다. 이 브랜치는 origin/main(`81f5ff9`)을 포함한 당시 최신 통합 브랜치다.
   - 다른 작업 공간에서 진행 중이던 `dev-self-llm`(+2 커밋)과 `dev-captured-menu-tree`(+1 커밋)는 **포함하지 않았다**. 병합할 때 충돌 여부를 확인한다.
-  - main에는 아직 병합하지 않았다.
+  - 2026-11-06 `main`에 합쳤다. 이어서 만든 `hub-api-key`도 `main`에 합쳤다.
 - **작업 폴더(worktree):** `C:\Users\tta\autoTest\.runtime\dev-document-publish`
 - **실행 중인 서버:**
   - 메인 체크아웃 `C:\Users\tta\autoTest`에서 개발 compose(`docker-compose.yml`)로 띄운 Compose 프로젝트 **`autotest`**다.

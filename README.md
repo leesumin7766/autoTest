@@ -4,7 +4,7 @@
 
 ### 2026-11-06 운영 배포·업무 허브 연동
 
-이 PC를 사내 서버로 쓰고, 별도 Electron 업무 허브(exe, 사용자 PC마다 설치, 같은 사내망)가 API로 연결하는 구성을 진행 중입니다. 운영 배포 구성은 `main`에 합쳤고, API 키 인증은 `hub-api-key` 브랜치에서 작업합니다. 다음 LLM·개발자는 [인수인계 문서](docs/LLM_HANDOFF_2026-11-05.md)부터 읽으세요.
+이 PC를 사내 서버로 쓰고, 별도 Electron 업무 허브(exe, 사용자 PC마다 설치, 같은 사내망)가 API로 연결하는 구성을 진행 중입니다. 운영 배포 구성, API 키 인증, 허브 조회 API v1은 모두 `main`에 합쳤습니다. 다음 LLM·개발자는 [인수인계 문서](docs/LLM_HANDOFF_2026-11-05.md)부터 읽으세요.
 
 | 단계 | 상태 |
 | --- | --- |
@@ -187,7 +187,7 @@ sample/, scripts/, output/, docs/   원본·검증·기록·상세 계약
 
 ## 주요 API
 
-회원용 요청은 X-Member-Id, 내부 요청은 X-Internal-Token을 사용합니다. 개발용 회원 헤더는 실제 인증의 대체물이 아닙니다.
+회원용 요청은 X-Member-Id, 내부 요청은 X-Internal-Token을 사용합니다. 개발용 회원 헤더는 실제 인증의 대체물이 아닙니다. 업무 허브는 `Authorization: Bearer atk_...` API 키로 호출하며, 게이트웨이가 X-Member-Id를 키의 회원으로 덮어씁니다. `/health`·`/whoami` 외 허브 요청에는 `X-Hub-Version: x.y.z`가 필요합니다.
 
 | Method | 경로 | 기능 |
 | --- | --- | --- |
@@ -215,6 +215,9 @@ sample/, scripts/, output/, docs/   원본·검증·기록·상세 계약
 | POST | /api/submissions/{id}/executions/{run}/resume | 완료 결과 보존·미완료 TC 이어서 준비 |
 | POST | /api/submissions/{id}/playwright-crawls/{job}/resume | 기존 캡처 보존·미완료 화면 이어서 수집 |
 | GET | /api/submissions/{id}/executions/{run}/report | Markdown 시험 보고서 초안 |
+| GET | /api/v1/hub/whoami, /api/v1/hub/health | 허브: 키 확인(게이트웨이 응답)·서버 상태와 최소 허브 버전 |
+| GET | /api/v1/hub/workspaces, /workspaces/{id}/summary | 허브: 내 작업 목록·작업 요약과 최근 실행(웹 링크 `webPath` 포함) |
+| GET | /api/v1/hub/workspaces/{id}/runs, /runs/{run}, /runs/{run}/report | 허브: 실행 이력·실행 상태·Markdown 보고서. 다른 회원의 작업은 404 |
 | POST | AI /api/v1/test-executions/feature | 내부 기능별 계획·수행·판정 |
 | GET | AI /api/v1/test-executions/capabilities | 모델·Jev 설정, 품질 검증과 별개 |
 | POST | crawler /api/v1/tc-browser/open, /{session}/step, /{session}/close | 내부 브라우저 세션 |
