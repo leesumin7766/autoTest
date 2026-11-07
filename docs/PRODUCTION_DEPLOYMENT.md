@@ -164,3 +164,11 @@ Caddy가 사내 전용 CA를 만들어 서버 인증서를 발급·자동 갱신
 사내망으로 옮길 때 바꿀 것: `AUTOTEST_SITE_ADDRESS`(서버 IP 또는 이름, 여러 개면 쉼표), `AUTOTEST_HTTP_PORT`·`AUTOTEST_HTTPS_PORT`(기본 80·443 이면 줄 삭제), `OLLAMA_MODELS`·`EXECUTION_QWEN_MODEL`(실제 서버 모델), 2장 4번 방화벽. 주소가 바뀌면 Caddy 가 새 서버 인증서를 만들지만 CA 는 같다(`caddy_data` 볼륨 유지 시).
 
 되돌리기(개발 구성으로): `docker compose -f docker-compose.yml -f docker-compose.prod.yml down` → `.env.before-prod-20261107` 를 `.env` 로 → DB 비밀번호를 `test` 로 `ALTER USER` → `docker compose up -d`.
+
+### 8-1. 2026-11-07 오전 점검·조치
+
+- 증상: 누군가 `-f` 없이 `docker compose up -d`(개발 구성)를 실행해 ai-service·api-gateway 등이 2주 전 개발 이미지(`:latest`)로 바뀌고, DB 비밀번호(개발 `test` ↔ 운영 무작위)가 맞지 않아 auth·test-management·test-execution·report 가 `password authentication failed` 로 죽음. 개발 게이트웨이에는 허브 API 가 없어 `/api/v1/hub/health` 404.
+- 조치: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` 로 복구(빌드 없음). 11개 서비스 Up, 웹 200·health 401·internal 404, 내부 포트 닫힘, 데이터 유지(submissions 5).
+- 재발 방지: `.env` 에 `COMPOSE_PATH_SEPARATOR=;`, `COMPOSE_FILE=docker-compose.yml;docker-compose.prod.yml` 추가(바꾸기 전 `.env.before-composefile-20261107`, git 제외). 이제 이 폴더에서 `-f` 없이 `docker compose up -d`·`ps`·`logs` 를 써도 운영 구성. `docker compose up -d` 를 직접 실행해 컨테이너가 그대로인 것을 확인함.
+- 자동 시작: Docker Desktop 은 Windows 로그인 때 시작(HKCU Run), 컨테이너는 모두 `restart: unless-stopped`.
+- 개발 구성으로 돌아가려면: `.env` 의 두 줄을 지우고 8장 "되돌리기" 순서.
