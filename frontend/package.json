@@ -11,7 +11,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:local-prod": "vite --config vite.local-prod.config.ts"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
