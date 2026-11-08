@@ -122,7 +122,7 @@ UI는 Postman을 참고한 좌측 단계 탐색과 접기·펼치기, 표 페이
 - 소유권·입력 digest·메뉴 revision을 검사하고 같은 입력은 재사용합니다. 원본 변경 후 과거 결과를 보존하고 변경 표시·다운로드/실행 시작 제한을 적용합니다.
 - Excel은 TestCase 16열, 실행 정보 20열, 생성 정보 시트로 구성됩니다. TestCase는 사람용 시험 정의이고 실행 정보는 프로그램용 명세입니다. 단순 조회는 `execution-spec-v2-read`의 단계 코드와 구체적인 누락 정보가 생성됩니다. 연결되지 않은 기대값·대상은 `NEEDS_CONTEXT`이며 시험 준비와 실행 전에 검사합니다. 나머지는 기존 `execution-spec-v1` 초안입니다. Excel 편집은 서버에 자동 반영하지 않습니다.
 
-상세: [메뉴트리 TC 생성기·샘플 재현](docs/MENU_TC_GENERATOR.md). 기존 /test-cases LLM 생성 흐름과 /menu-test-cases 템플릿 흐름은 별도입니다.
+상세: [메뉴트리 TC 생성기·샘플 재현](docs/MENU_TC_GENERATOR.md). TC마다 수행 방식(자동·수동·제외)을 정할 수 있습니다(2026-11-08): [TC 수행 방식](docs/TC_EXECUTION_MODES.md). 기존 /test-cases LLM 생성 흐름과 /menu-test-cases 템플릿 흐름은 별도입니다.
 
 ### 시험 실행 프로토타입
 

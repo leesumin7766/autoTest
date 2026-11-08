@@ -140,6 +140,9 @@ const steps = {
   },
 
   manual() {
+    // 매뉴얼 검토 서비스는 manual-review 프로필일 때만 구성·빌드한다(메모리가 작은 PC 에서는 끔). 없으면 건너뛴다
+    const services = run('docker', ['compose', 'config', '--services']).out.split(/\s+/)
+    if (!services.includes('manual-review-service')) return { ok: true, detail: '건너뜀 — manual-review 프로필이 꺼져 있음(COMPOSE_PROFILES=manual-review 로 켜면 실행)' }
     return pytestIn('manual-review-service', 'python -m pytest -q -p no:cacheprovider test_api.py')
   },
 

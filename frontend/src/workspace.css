@@ -269,3 +269,10 @@
 .manual-review-results p, .manual-review-results a { overflow-wrap: anywhere; }
 .manual-review-warning { color: #92400e; background: #fffbeb; padding: 12px; border-radius: 4px; }
 @media (max-width: 700px) { .manual-review-scopes { grid-template-columns: 1fr; } .manual-review-target { align-items: flex-start; flex-direction: column; } }
+
+/* 2026-11-08 TC 수행 방식(자동·수동·제외) */
+.tc-decision-summary { margin: 16px 0 4px; padding: 10px 12px; border: 1px solid #cfdad2; border-radius: 8px; background: #f6f9f7; }
+.tc-decision-summary small { color: #5b6b60; }
+.tc-decision-reason { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin: 8px 0 12px; padding: 10px 12px; border: 1px solid #e3b34a; border-radius: 8px; background: #fff8e8; }
+.tc-decision-reason .tc-field { flex: 1 1 320px; margin: 0; }
+.tc-table select { min-width: 72px; }
