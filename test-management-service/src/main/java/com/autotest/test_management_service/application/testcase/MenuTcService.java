@@ -148,6 +148,19 @@ public class MenuTcService {
         TcExecutionDecisions.decorate(result.path("set").path("output"));
         return result;
     }
+    /** TC 하나의 시험 자료 저장(실행 시 필요한 정보에 대한 답). TC 본문·명세는 바꾸지 않는다 */
+    @Transactional
+    public ObjectNode saveContext(UUID submission,long member,UUID selected,String caseId,JsonNode request) {
+        owner(submission,member,true);
+        var set=status(submission,member,selected).path("set");
+        if(set.path("stale").asBoolean())throw conflict("TC_SOURCE_CHANGED","메뉴·문서가 변경되었습니다. TC를 다시 생성하세요.");
+        var output=(ObjectNode)set.path("output");TcExecutionDecisions.strip(output);
+        ObjectNode target=null;for(var node:output.path("testCases"))if(caseId.equals(node.path("id").asText()))target=(ObjectNode)node;
+        if(target==null)throw new ProductDescriptionException(HttpStatus.NOT_FOUND,"TC_CASE_NOT_FOUND","TC를 찾을 수 없습니다.");
+        TcExecutionContext.apply(target,request,member);
+        jdbc.update("UPDATE menu_tc_sets SET output=?::jsonb WHERE set_id=? AND submission_id=? AND member_id=?",output.toString(),selected,submission,member);
+        return view(submission,member,selected);
+    }
     /** 수행 방식 일괄 저장. TC 본문·명세는 바꾸지 않는다 */
     @Transactional
     public ObjectNode saveDecisions(UUID submission,long member,UUID selected,JsonNode request) {

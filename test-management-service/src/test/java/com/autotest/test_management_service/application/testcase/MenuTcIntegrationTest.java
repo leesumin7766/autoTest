@@ -201,11 +201,12 @@ class MenuTcIntegrationTest {
         // Exercise the actual persistence worker with a deterministic AI transport, separately from live model QA.
         var fakeAi=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
         var aiHttpStatus=new java.util.concurrent.atomic.AtomicInteger(200);
+        var lastAiRequest=new java.util.concurrent.atomic.AtomicReference<com.fasterxml.jackson.databind.JsonNode>();
         fakeAi.createContext("/api/v1/test-executions/feature",exchange->{
             // Uvicorn's HTTP/1 endpoint must not receive Java's default h2c upgrade.
             if(exchange.getRequestHeaders().containsKey("Upgrade")){exchange.sendResponseHeaders(400,-1);exchange.close();return;}
             if(aiHttpStatus.get()!=200){exchange.sendResponseHeaders(aiHttpStatus.get(),-1);exchange.close();return;}
-            var body=mapper.readTree(exchange.getRequestBody());var answer=mapper.createObjectNode();var values=answer.putArray("items");
+            var body=mapper.readTree(exchange.getRequestBody());lastAiRequest.set(body);var answer=mapper.createObjectNode();var values=answer.putArray("items");
             body.path("cases").forEach(tc->{var item=values.addObject().put("caseId",tc.path("id").asText()).put("executionStatus","COMPLETED").put("judgmentStatus","COMPLETED").put("result","P").put("reason","격리된 워커 저장 검증").put("requirementCoverageComplete",true);item.putArray("conditionAssessments").addObject().put("conditionId","C1").put("outcome","PASS").put("grounded",true);});
             answer.putArray("evidence").addObject().put("id","fixture-observation").put("text","테스트 증거");answer.putArray("plans");
             byte[] bytes=mapper.writeValueAsBytes(answer);exchange.getResponseHeaders().set("Content-Type","application/json");exchange.sendResponseHeaders(200,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();
@@ -216,12 +217,21 @@ class MenuTcIntegrationTest {
             String caseId=null;
             for(var item:snapshot.path("items"))if("PENDING".equals(item.path("executionStatus").asText())&&!item.path("featureId").asText().startsWith("scope:")){caseId=item.path("caseId").asText();break;}
             assertNotNull(caseId); // Unbound read recipes are deliberately excluded from this transport/storage check.
+            // 시험원이 적은 시험 자료가 실행기 요청에 userContext 로 실린다
+            String need=null;for(var item:snapshot.path("items"))if(caseId.equals(item.path("caseId").asText()))need=item.path("tc").path("executionPlan").path("requiredContext").path(0).asText(null);
+            assertNotNull(need);
+            var contextBody=mapper.createObjectNode().put("revision",0).put("note","워커 전달 확인");contextBody.putArray("items").addObject().put("need",need).put("value","시험 값 QA-777");
+            mvc.perform(put(base+"/"+set+"/cases/"+caseId+"/context").header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(contextBody.toString())).andExpect(status().isOk());
             var workerRun=executions.prepare(submission,member,UUID.fromString(set),"https://example.com","",List.of(caseId),false).path("run");
             UUID workerRunId=UUID.fromString(workerRun.path("runId").asText());executions.transition(submission,member,workerRunId,false);
             // Keep the competing prepared history, but no other queued work.
             worker.processNext();
             var finished=executions.status(submission,member,workerRunId).path("run");
             assertEquals("COMPLETED",finished.path("status").asText());assertEquals(1,finished.path("passCount").asInt());
+            var sentContext=lastAiRequest.get().path("cases").get(0).path("userContext");
+            assertEquals("TESTER_SUPPLIED",sentContext.path("source").asText());
+            assertEquals("시험 값 QA-777",sentContext.path("items").get(0).path("value").asText());
+            assertEquals("워커 전달 확인",sentContext.path("note").asText());
             assertEquals("P",finished.path("snapshot").path("items").get(0).path("result").asText());
             assertTrue(finished.path("snapshot").path("groupResults").size()>0);
             assertTrue(finished.path("snapshot").path("groupResults").get(0).path("evidence").isEmpty());

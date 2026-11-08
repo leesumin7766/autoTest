@@ -154,5 +154,15 @@ export const serviceErrorMessages: Record<string, string> = {
   "READ_BINDING_CONFLICT": "연결 정보 또는 TC가 변경되었습니다. 저장된 연결을 다시 불러온 뒤 수정하세요.",
   "READ_BINDING_UNSUPPORTED": "조건 입력 없는 조회 명세만 연결할 수 있습니다.",
   "TC_CASE_NOT_FOUND": "선택한 TC를 찾을 수 없습니다. TC 세트를 다시 확인하세요.",
-  "MENU_SERVICE_TIMEOUT": "메뉴트리 처리 대기 시간이 초과되었습니다. 작업 상태를 확인한 뒤 다시 시도해 주세요."
+  "MENU_SERVICE_TIMEOUT": "메뉴트리 처리 대기 시간이 초과되었습니다. 작업 상태를 확인한 뒤 다시 시도해 주세요.",
+  "TC_DECISION_INVALID": "수행 방식은 자동·수동·제외 중에서 고르고, 바꿀 TC를 선택하세요.",
+  "TC_DECISION_REASON_REQUIRED": "제외하는 TC는 제외 사유가 필요합니다. 예: 다국어를 제공하지 않는 제품",
+  "TC_DECISION_CONFLICT": "다른 화면에서 수행 방식을 변경했습니다. 다시 불러온 뒤 저장하세요.",
+  "TC_CONTEXT_INVALID": "이 TC가 요구하는 항목에만 시험 자료를 적을 수 있습니다. 화면을 새로고침한 뒤 다시 입력하세요.",
+  "TC_CONTEXT_TOO_LONG": "시험 자료는 항목마다 1,000자, 메모는 2,000자 이내로 적어 주세요.",
+  "TC_CONTEXT_SECRET": "비밀번호·토큰 같은 비밀값은 적지 마세요. 시험 계정은 화면 수집의 로그인 정보에 저장합니다.",
+  "TC_CONTEXT_CONFLICT": "다른 화면에서 시험 자료를 변경했습니다. 다시 불러온 뒤 저장하세요.",
+  "TC_CONTEXT_READ_BINDING": "조건 입력 없는 조회 TC는 '조회 실행 명세 근거 연결'에서 연결하세요.",
+  "HUB_VERSION_REQUIRED": "X-Hub-Version 헤더(x.y.z)가 필요합니다.",
+  "HUB_UPDATE_REQUIRED": "허브를 최신 버전으로 업데이트해 주세요. 최소 버전은 /api/v1/hub/health 에서 확인합니다."
 }

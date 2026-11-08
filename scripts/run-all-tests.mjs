@@ -136,14 +136,14 @@ const steps = {
   },
 
   ai() {
-    return pytestIn('ai-service', 'python -m pytest -q -p no:cacheprovider')
+    return pytestIn('ai-service', 'python -m pytest -q -p no:cacheprovider', 'ai-service')
   },
 
   manual() {
     // 매뉴얼 검토 서비스는 manual-review 프로필일 때만 구성·빌드한다(메모리가 작은 PC 에서는 끔). 없으면 건너뛴다
     const services = run('docker', ['compose', 'config', '--services']).out.split(/\s+/)
     if (!services.includes('manual-review-service')) return { ok: true, detail: '건너뜀 — manual-review 프로필이 꺼져 있음(COMPOSE_PROFILES=manual-review 로 켜면 실행)' }
-    return pytestIn('manual-review-service', 'python -m pytest -q -p no:cacheprovider test_api.py')
+    return pytestIn('manual-review-service', 'python -m pytest -q -p no:cacheprovider test_api.py', 'manual-review-service')
   },
 
   hub() {
@@ -156,16 +156,24 @@ const steps = {
     const cwd = join(ROOT, 'frontend')
     const lint = run('npm', ['run', 'lint'], { cwd })
     const build = run('npm', ['run', 'build'], { cwd })
+    // 서버 오류 코드 목록(TestManagementErrorCode)과 화면 안내 문구 목록이 같은지 확인
+    const errors = run(process.execPath, ['--experimental-strip-types', '--no-warnings', 'scripts/verify-api-errors.mjs'], { shell: false })
     const warnings = (lint.out.match(/^\S+:\d+:\d+: warning /gm) ?? []).length
-    return { ok: lint.code === 0 && build.code === 0, detail: `lint ${lint.code === 0 ? '통과' : '실패'}(경고 ${warnings}), build ${build.code === 0 ? '성공' : '실패'}`, lines: build.code === 0 ? [] : [build.out.slice(-800)] }
+    return { ok: lint.code === 0 && build.code === 0 && errors.code === 0, detail: `lint ${lint.code === 0 ? '통과' : '실패'}(경고 ${warnings}), build ${build.code === 0 ? '성공' : '실패'}, 오류 문구 ${errors.code === 0 ? '일치' : '불일치'}`, lines: [...(build.code === 0 ? [] : [build.out.slice(-800)]), ...(errors.code === 0 ? [] : [errors.out.split('\n').filter(l => /^[+-] /.test(l)).slice(0, 10).join('\n')])] }
   }
 }
 
-/** pytest 는 운영 이미지에 없으므로 일회용 컨테이너에서 설치 후 실행(인터넷 필요). 운영 컨테이너는 그대로 */
-function pytestIn(service, cmd) {
+/**
+ * pytest 는 운영 이미지에 없으므로 일회용 컨테이너에서 설치 후 실행(인터넷 필요). 운영 컨테이너는 그대로.
+ * 이미지의 의존성은 그대로 쓰고, 소스는 지금 작업 폴더를 읽기 전용으로 덮어 최신 코드를 시험한다
+ */
+function pytestIn(service, cmd, sourceDir) {
   const img = composeImage(service)
   if (!imageExists(img)) return { ok: false, detail: `이미지 없음: ${img} (docker compose build ${service})` }
-  const r = run('docker', ['run', '--rm', '--user', '0', '--entrypoint', 'sh', '-e', 'LLM_MODE=mock', img, '-c', `pip install -q --disable-pip-version-check pytest >/dev/null 2>&1; ${cmd}`])
+  // 소스는 읽기 전용으로 붙이고, 테스트가 쓰는 파일(.runtime 등) 때문에 쓰기 가능한 임시 폴더로 복사해 실행한다
+  const mount = sourceDir ? ['-v', `${join(ROOT, sourceDir).replace(/\\/g, '/')}:/src:ro`, '--tmpfs', '/work:exec', '-e', 'PYTHONDONTWRITEBYTECODE=1'] : []
+  const prepare = sourceDir ? "cp -r /src/. /work/ && rm -rf /work/.runtime /work/__pycache__ && cd /work && " : ''
+  const r = run('docker', ['run', '--rm', '--user', '0', ...mount, '--entrypoint', 'sh', '-e', 'LLM_MODE=mock', img, '-c', `pip install -q --disable-pip-version-check pytest >/dev/null 2>&1; ${prepare}${cmd}`])
   const c = pytestCounts(r.out)
   return { ok: r.code === 0 && c.total > 0, detail: `${c.total}건 중 ${c.pass} 통과, ${c.fail} 실패, ${c.skip} 건너뜀`, lines: r.code === 0 ? [] : [r.out.slice(-800)] }
 }

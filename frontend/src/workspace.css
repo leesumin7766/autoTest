@@ -276,3 +276,6 @@
 .tc-decision-reason { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin: 8px 0 12px; padding: 10px 12px; border: 1px solid #e3b34a; border-radius: 8px; background: #fff8e8; }
 .tc-decision-reason .tc-field { flex: 1 1 320px; margin: 0; }
 .tc-table select { min-width: 72px; }
+
+.tc-context-form { display: grid; gap: 8px; }
+.tc-context-form textarea { width: 100%; }

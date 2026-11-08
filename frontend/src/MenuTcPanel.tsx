@@ -10,14 +10,18 @@ type FeatureType = '로그인' | '주요기능' | '부가기능' | 'CRUD'
 type MenuRow = { rowId: string; included: boolean; rowType?: string; functionName: string; menuPath: string[]; menuDescription: string; featureType?: FeatureType }
 type Menu = { authentication?:Authentication; jobId: string; productName: string; status: string; revision: number; stale: boolean; generationMode: string; output?: { rows: MenuRow[]; completionStatus?: string } }
 type MenuView = { job: Menu | null; history: { jobId: string; productName: string; status: string }[] }
-type Tc = { id: string; tcId: string; featureId: string; featurePath: string[]; featureType: string; qualityCharacteristic: string; subCharacteristic: string; scenario: string; inputs: string; expectedResult: string; result: null; scopeDescription: string; ruleId: string; evidence: unknown[]; defectExample: { summary: string; severity: string; content: string }; executionPlan: { targetUrl: string; steps: string[]; applicability: string; requiredContext: string[]; specificationVersion?: string }; executionReadiness?: string; decision?: { mode: Mode; defaultMode: Mode; source: 'USER' | 'DEFAULT'; reason?: string } }
+type Tc = { id: string; tcId: string; featureId: string; featurePath: string[]; featureType: string; qualityCharacteristic: string; subCharacteristic: string; scenario: string; inputs: string; expectedResult: string; result: null; scopeDescription: string; ruleId: string; evidence: unknown[]; defectExample: { summary: string; severity: string; content: string }; executionPlan: { targetUrl: string; steps: string[]; applicability: string; requiredContext: string[]; specificationVersion?: string }; executionReadiness?: string; decision?: { mode: Mode; defaultMode: Mode; source: 'USER' | 'DEFAULT'; reason?: string }; context?: { status: ContextStatus; items: { need: string; value: string }[]; note: string; revision: number } }
+type ContextStatus = 'NOT_NEEDED' | 'MISSING' | 'PARTIAL' | 'COMPLETE' | 'READ_BINDING'
 type Mode = 'AUTO' | 'MANUAL' | 'EXCLUDED'
-type Output = { decisionRevision?: number; decisionSummary?: Record<Mode, number>; productName: string; featureCount: number; caseCount: number; templateVersion: string; testCases: Tc[]; summary: Record<string, number>; source?: {authentication?: Authentication} }
+type Output = { decisionRevision?: number; decisionSummary?: Record<Mode, number> & { contextNeeded?: number }; productName: string; featureCount: number; caseCount: number; templateVersion: string; testCases: Tc[]; summary: Record<string, number>; source?: {authentication?: Authentication} }
 type SetView = { set: { setId: string; stale: boolean; menuJobId: string; menuRevision: number; output: Output } | null; history: { setId: string; createdAt: string; menuRevision: number }[] }
 const featureTypes: FeatureType[] = ['로그인', '주요기능', '부가기능', 'CRUD']
 const modeLabels: Record<Mode, string> = { AUTO: '자동', MANUAL: '수동', EXCLUDED: '제외' }
 const modeHelp = '자동: 프로그램이 브라우저로 수행 · 수동: 시험원이 직접 확인하고 결과 입력 · 제외: 이 제품에 해당하지 않음(사유 필수)'
 const modeOf = (tc: Tc): Mode => tc.decision?.mode || 'AUTO'
+// 자동 TC 인데 실행 시 필요한 정보가 아직 채워지지 않음(조회 명세는 근거 연결이 끝나지 않음)
+const needsInfo = (tc: Tc) => modeOf(tc) === 'AUTO' && (tc.context ? ['MISSING', 'PARTIAL'].includes(tc.context.status) || (tc.context.status === 'READ_BINDING' && tc.executionReadiness !== 'READY') : tc.executionReadiness === 'NEEDS_CONTEXT')
+const contextLabels: Record<ContextStatus, string> = { NOT_NEEDED: '필요 정보 없음', MISSING: '정보 필요', PARTIAL: '정보 일부 입력', COMPLETE: '시험 자료 입력됨', READ_BINDING: '조회 근거 연결' }
 const statusLabels: Record<string, string> = { APPROVED: '승인 완료', DRAFT: '초안', GENERATING: '생성 중', FAILED: '실패', CANCELED: '중단' }
 
 export function MenuTcPanel({ submissionId, memberId, active = true, onGenerated }: { submissionId: string; memberId: string; active?: boolean; onGenerated?: (setId: string) => void }) {
@@ -30,6 +34,7 @@ export function MenuTcPanel({ submissionId, memberId, active = true, onGenerated
   const [search, setSearch] = useState(''), [page, setPage] = useState(0), [detail, setDetail] = useState<Tc | null>(null)
   const [modeFilter, setModeFilter] = useState<'' | Mode | 'NEEDS'>(''), [bulkType, setBulkType] = useState(''), [bulkMode, setBulkMode] = useState<Mode>('MANUAL')
   const [pending, setPending] = useState<{ ids: string[]; mode: Mode; label: string } | null>(null), [reason, setReason] = useState(''), [notice, setNotice] = useState('')
+  const [contextValues, setContextValues] = useState<Record<string, string>>({}), [contextNote, setContextNote] = useState(''), [contextFor, setContextFor] = useState('')
   const menuVersion = useRef('')
   const tcVersion = useRef('')
   useEffect(() => { tcVersion.current = view.set?.setId || '' }, [view.set?.setId])
@@ -80,9 +85,21 @@ export function MenuTcPanel({ submissionId, memberId, active = true, onGenerated
   const ready = (!selectedMenu || selectedMenu === menu?.jobId) && menu?.status === 'APPROVED' && !menu.stale && menu.generationMode !== 'MOCK' && menu.output?.completionStatus !== 'PARTIAL' && features.length > 0
   const output = view.set?.output
   const filtered = useMemo(() => (output?.testCases || []).filter(tc => `${tc.tcId} ${tc.featurePath.join(' ')} ${tc.scenario} ${tc.qualityCharacteristic}`.toLowerCase().includes(search.toLowerCase())
-    && (!modeFilter || (modeFilter === 'NEEDS' ? modeOf(tc) === 'AUTO' && tc.executionReadiness === 'NEEDS_CONTEXT' : modeOf(tc) === modeFilter))), [output, search, modeFilter])
+    && (!modeFilter || (modeFilter === 'NEEDS' ? needsInfo(tc) : modeOf(tc) === modeFilter))), [output, search, modeFilter])
   const featureTypesInSet = useMemo(() => [...new Set((output?.testCases || []).map(tc => tc.featureType))], [output])
-  const needsCount = useMemo(() => (output?.testCases || []).filter(tc => modeOf(tc) === 'AUTO' && tc.executionReadiness === 'NEEDS_CONTEXT').length, [output])
+  const needsCount = useMemo(() => (output?.testCases || []).filter(needsInfo).length, [output])
+  // 상세를 연 TC 의 시험 자료를 폼에 채운다(다른 TC 를 열면 다시 채움)
+  useEffect(() => {
+    if (!detail || detail.id === contextFor) return
+    setContextFor(detail.id); setContextNote(detail.context?.note || '')
+    setContextValues(Object.fromEntries((detail.context?.items || []).map(item => [item.need, item.value])))
+  }, [detail, contextFor])
+  const saveContext = (tc: Tc) => action(async () => {
+    const items = tc.executionPlan.requiredContext.map(need => ({ need, value: (contextValues[need] || '').trim() }))
+    const next: SetView = await request(`${base}/${view.set!.setId}/cases/${encodeURIComponent(tc.id)}/context`, { method: 'PUT', body: JSON.stringify({ revision: tc.context?.revision || 0, items, note: contextNote.trim() }) })
+    setView(next); const updated = next.set?.output.testCases.find(item => item.id === tc.id) || null; setDetail(updated)
+    setNotice(`${tc.tcId} 시험 자료를 저장했습니다 · ${contextLabels[updated?.context?.status || 'MISSING']}`)
+  })
   // 수행 방식 저장. 제외는 사유를 받은 뒤 저장한다
   const save = (ids: string[], mode: Mode, why: string, kept = 0) => action(async () => {
     const next: SetView = await request(`${base}/${view.set!.setId}/decisions`, { method: 'PUT', body: JSON.stringify({ revision: output?.decisionRevision || 0, decisions: ids.map(caseId => ({ caseId, mode, reason: why })) }) })
@@ -157,7 +174,7 @@ export function MenuTcPanel({ submissionId, memberId, active = true, onGenerated
       </div>
       <div className="tc-decision-summary" aria-label="수행 방식">
         <strong>수행 방식</strong> <span>자동 {(output.decisionSummary?.AUTO || 0).toLocaleString()} · 수동 {(output.decisionSummary?.MANUAL || 0).toLocaleString()} · 제외 {(output.decisionSummary?.EXCLUDED || 0).toLocaleString()}</span>
-        {needsCount > 0 && <span className="functional-menu-warning"> · 자동 중 정보 필요 {needsCount.toLocaleString()}개(이대로 실행하면 모델이 부족한 정보를 추측합니다)</span>}
+        {needsCount > 0 && <span className="functional-menu-warning"> · 자동 중 정보 필요 {needsCount.toLocaleString()}개(이대로 실행하면 모델이 부족한 정보를 추측합니다. 상세 보기 → 시험 자료에 적어 주세요)</span>}
         <br /><small>{modeHelp}. 공통·추가 증거 TC는 기본 '수동'입니다.</small>
       </div>
       <div className="tc-output-toolbar">
@@ -178,9 +195,18 @@ export function MenuTcPanel({ submissionId, memberId, active = true, onGenerated
       </div>}
       {notice && <p role="status" className="response-empty">{notice}</p>}
       <label className="tc-field">TC 검색<input type="search" value={search} placeholder="기능·시험 항목·품질특성 검색" onChange={event => { setSearch(event.target.value); setPage(0) }} /></label>
-      <div className="tc-table-scroll"><table className="tc-table"><thead><tr>{['TC-ID', '기능 경로', '기능구분', '품질특성', '시험 시나리오', '기대 결과', '수행 방식', '결과', '상세'].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>{filtered.slice(activePage * 25, (activePage + 1) * 25).map(tc => <tr key={tc.id}><td>{tc.tcId}</td><td>{tc.featurePath.join(' / ')}</td><td>{tc.featureType}</td><td>{tc.qualityCharacteristic}<br /><small>{tc.subCharacteristic}</small></td><td>{tc.scenario}</td><td>{tc.expectedResult || '실행 전 보완 필요'}</td><td><select aria-label={`${tc.tcId} 수행 방식`} value={modeOf(tc)} disabled={busy || !!view.set?.stale} onChange={event => decide([tc.id], event.target.value as Mode, tc.tcId)}>{(['AUTO', 'MANUAL', 'EXCLUDED'] as Mode[]).map(mode => <option key={mode} value={mode}>{modeLabels[mode]}</option>)}</select>{tc.decision?.source === 'USER' && <small> 직접 지정</small>}{modeOf(tc) === 'AUTO' && tc.executionReadiness === 'NEEDS_CONTEXT' && <small className="error-copy"><br />정보 필요</small>}{tc.decision?.reason && <small><br />{tc.decision.reason}</small>}</td><td>미실행</td><td><button className="quiet-button" onClick={() => setDetail(tc)}>상세 보기</button></td></tr>)}</tbody></table></div>
+      <div className="tc-table-scroll"><table className="tc-table"><thead><tr>{['TC-ID', '기능 경로', '기능구분', '품질특성', '시험 시나리오', '기대 결과', '수행 방식', '결과', '상세'].map(title => <th key={title}>{title}</th>)}</tr></thead><tbody>{filtered.slice(activePage * 25, (activePage + 1) * 25).map(tc => <tr key={tc.id}><td>{tc.tcId}</td><td>{tc.featurePath.join(' / ')}</td><td>{tc.featureType}</td><td>{tc.qualityCharacteristic}<br /><small>{tc.subCharacteristic}</small></td><td>{tc.scenario}</td><td>{tc.expectedResult || '실행 전 보완 필요'}</td><td><select aria-label={`${tc.tcId} 수행 방식`} value={modeOf(tc)} disabled={busy || !!view.set?.stale} onChange={event => decide([tc.id], event.target.value as Mode, tc.tcId)}>{(['AUTO', 'MANUAL', 'EXCLUDED'] as Mode[]).map(mode => <option key={mode} value={mode}>{modeLabels[mode]}</option>)}</select>{tc.decision?.source === 'USER' && <small> 직접 지정</small>}{modeOf(tc) === 'AUTO' && tc.context && tc.context.status !== 'NOT_NEEDED' && <small className={needsInfo(tc) ? 'error-copy' : ''}><br />{tc.context.status === 'READ_BINDING' ? (tc.executionReadiness === 'READY' ? '조회 근거 연결됨' : '조회 근거 연결 필요') : contextLabels[tc.context.status]}</small>}{tc.decision?.reason && <small><br />{tc.decision.reason}</small>}</td><td>미실행</td><td><button className="quiet-button" onClick={() => setDetail(tc)}>상세 보기</button></td></tr>)}</tbody></table></div>
       <div className="tc-pagination"><button className="quiet-button" disabled={activePage === 0} onClick={() => setPage(activePage - 1)}>이전</button><span aria-live="polite">{activePage + 1} / {pages}쪽 · {filtered.length}개</span><button className="quiet-button" disabled={activePage + 1 >= pages} onClick={() => setPage(activePage + 1)}>다음</button></div>
-      {detail && <section className="tc-case-detail" aria-label="TC 상세"><div className="section-heading"><h3>{detail.tcId} · 상세</h3><button className="quiet-button" onClick={() => setDetail(null)}>상세 닫기</button></div><p>{detail.featurePath.join(' → ')} · {detail.scopeDescription}</p><dl><dt>수행 방식</dt><dd>{modeLabels[modeOf(detail)]}{detail.decision?.source === 'USER' ? ' · 직접 지정' : ' · 기본값'}{detail.decision?.reason ? ` · 사유: ${detail.decision.reason}` : ''}</dd><dt>입력·사전조건</dt><dd>{detail.inputs || '보완 필요'}</dd><dt>기대 결과</dt><dd>{detail.expectedResult || '보완 필요'}</dd><dt>실행 절차</dt><dd><ol>{detail.executionPlan.steps.map((step, i) => <li key={i}>{step}</li>)}</ol></dd><dt>실행 시 필요한 정보</dt><dd>{detail.executionPlan.requiredContext.join(' · ')}</dd><dt>적용 조건</dt><dd>{detail.executionPlan.applicability}</dd><dt>결함 작성 예시 · 실제 결함 아님</dt><dd>{detail.defectExample.severity} · {detail.defectExample.summary}<pre>{detail.defectExample.content}</pre></dd></dl><details><summary>생성 규칙·원본 근거</summary><p>{detail.ruleId} · {detail.featureId}</p><pre>{JSON.stringify(detail.evidence, null, 2)}</pre></details></section>}
+      {detail && <section className="tc-case-detail" aria-label="TC 상세"><div className="section-heading"><h3>{detail.tcId} · 상세</h3><button className="quiet-button" onClick={() => setDetail(null)}>상세 닫기</button></div><p>{detail.featurePath.join(' → ')} · {detail.scopeDescription}</p><dl><dt>수행 방식</dt><dd>{modeLabels[modeOf(detail)]}{detail.decision?.source === 'USER' ? ' · 직접 지정' : ' · 기본값'}{detail.decision?.reason ? ` · 사유: ${detail.decision.reason}` : ''}</dd><dt>입력·사전조건</dt><dd>{detail.inputs || '보완 필요'}</dd><dt>기대 결과</dt><dd>{detail.expectedResult || '보완 필요'}</dd><dt>실행 절차</dt><dd><ol>{detail.executionPlan.steps.map((step, i) => <li key={i}>{step}</li>)}</ol></dd><dt>실행 시 필요한 정보</dt><dd>{detail.executionPlan.requiredContext.join(' · ') || '없음'}</dd>
+        <dt>시험 자료</dt><dd>{modeOf(detail) !== 'AUTO' ? '자동 TC에만 적습니다. 수동 TC는 07 결함 검토에서 결과와 근거를 입력합니다.'
+          : detail.context?.status === 'READ_BINDING' ? '조건 입력 없는 조회 TC입니다. 아래 \'조회 실행 명세 근거 연결\'에서 화면·근거를 연결하세요.'
+          : !detail.executionPlan.requiredContext.length ? '이 TC는 추가로 필요한 정보가 없습니다.'
+          : <div className="tc-context-form">
+            <small>시험원이 정한 입력값·대상 데이터·기대 데이터·계정 역할을 적습니다. 실행 때 모델 계획과 판정에 '시험원이 준 자료'로 함께 전달되며, 관찰 증거로 쓰이지 않습니다. 비밀번호·토큰은 적지 마세요(시험 계정은 화면 수집의 로그인 정보에 저장).</small>
+            {detail.executionPlan.requiredContext.map(need => <label key={need} className="tc-field">{need}<textarea rows={2} maxLength={1000} value={contextValues[need] || ''} placeholder="예: 아이디 qa_user01 / 이름 시험계정 / 저장 후 목록 첫 행에 qa_user01 표시" disabled={busy || !!view.set?.stale} onChange={event => { const value = event.target.value; setContextValues(current => ({ ...current, [need]: value })) }} /></label>)}
+            <label className="tc-field">추가 메모(선택)<textarea rows={2} maxLength={2000} value={contextNote} disabled={busy || !!view.set?.stale} onChange={event => setContextNote(event.target.value)} /></label>
+            <div className="tc-output-toolbar"><button className="primary-button" disabled={busy || !!view.set?.stale} onClick={() => void saveContext(detail)}>시험 자료 저장</button><span>{contextLabels[detail.context?.status || 'MISSING']}</span></div>
+          </div>}</dd><dt>적용 조건</dt><dd>{detail.executionPlan.applicability}</dd><dt>결함 작성 예시 · 실제 결함 아님</dt><dd>{detail.defectExample.severity} · {detail.defectExample.summary}<pre>{detail.defectExample.content}</pre></dd></dl><details><summary>생성 규칙·원본 근거</summary><p>{detail.ruleId} · {detail.featureId}</p><pre>{JSON.stringify(detail.evidence, null, 2)}</pre></details></section>}
       {view.set && <ReadBindingsEditor key={`${submissionId}:${view.set.setId}`} submissionId={submissionId} memberId={memberId} setId={view.set.setId} cases={output.testCases} disabled={busy || !!view.set.stale} onSaved={() => load()} />}
       <p className="response-empty">템플릿 {output.templateVersion} · 로그인 27개 / 주요·부가 9개 / CRUD 기본 16개를 제공합니다. 수집 근거가 있는 조회 화면에는 화면 표시 확인 TC가 추가됩니다. 실행 전 적용 범위를 확인하며 제외 항목도 원본 TC에 남습니다.</p>
     </>}

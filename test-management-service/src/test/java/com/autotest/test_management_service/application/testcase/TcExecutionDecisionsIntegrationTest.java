@@ -40,7 +40,7 @@ class TcExecutionDecisionsIntegrationTest {
     ObjectNode tc(String id,String feature,String automation){
         var tc=mapper.createObjectNode().put("id",id).put("tcId","TC-"+id).put("featureId",feature).put("ruleId","LOGIN-04")
             .put("scenario","시나리오 "+id).put("inputs","입력").put("expectedResult","기대").put("automationMode",automation).put("scopeDescription","범위");
-        tc.putArray("featurePath").add("제품").add(id);tc.putObject("executionPlan");
+        tc.putArray("featurePath").add("제품").add(id);tc.putObject("executionPlan").putArray("requiredContext").add("대상 기능의 구체적인 입력값·기대값과 독립 비교 근거");
         return tc;
     }
 
@@ -69,7 +69,7 @@ class TcExecutionDecisionsIntegrationTest {
         String exclude="{\"revision\":0,\"decisions\":[{\"caseId\":\"a2\",\"mode\":\"EXCLUDED\",\"reason\":\"다국어 미제공\"}]}";
         mvc.perform(put(url).header("X-Member-Id",member+1).contentType(MediaType.APPLICATION_JSON).content(exclude)).andExpect(status().isForbidden());
         mvc.perform(put(url).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content("{\"revision\":0,\"decisions\":[{\"caseId\":\"a2\",\"mode\":\"EXCLUDED\"}]}"))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("TC_DECISION_INVALID"));
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("TC_DECISION_REASON_REQUIRED"));
         mvc.perform(put(url).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content("{\"revision\":0,\"decisions\":[{\"caseId\":\"nope\",\"mode\":\"AUTO\"}]}"))
             .andExpect(status().isNotFound());
         mvc.perform(put(url).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(exclude)).andExpect(status().isOk())
@@ -111,5 +111,21 @@ class TcExecutionDecisionsIntegrationTest {
             .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         assertTrue(report.contains("수행 방식: 수동(시험원 입력)"));
         assertTrue(report.contains("판정: P"));
+
+        // 시험 자료: 자동 TC 에 실행 시 필요한 정보를 적으면 상태가 바뀌고 시험 준비 스냅샷에 실린다
+        String context=base+"/"+set+"/cases/a1/context";
+        String body="{\"revision\":0,\"items\":[{\"need\":\"대상 기능의 구체적인 입력값·기대값과 독립 비교 근거\",\"value\":\"아이디 qa01 입력 후 목록에 qa01 표시\"}],\"note\":\"일반 사용자 권한\"}";
+        mvc.perform(put(context).header("X-Member-Id",member+1).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+        mvc.perform(put(context).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(body.replace("아이디 qa01","password=abc12345"))).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("TC_CONTEXT_SECRET"));
+        mvc.perform(put(context).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.set.output.testCases[0].context.status").value("COMPLETE"))
+            .andExpect(jsonPath("$.set.output.testCases[0].context.revision").value(1));
+        mvc.perform(put(context).header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isConflict());
+        var withContext=executions.prepare(submission,member,set,"https://example.test","",List.of("a1"),false).path("run").path("snapshot").path("items").get(0);
+        assertEquals("아이디 qa01 입력 후 목록에 qa01 표시",withContext.path("tc").path("executionContext").path("items").get(0).path("value").asText());
+        var stored=(ObjectNode)mapper.readTree(jdbc.queryForObject("SELECT output::text FROM menu_tc_sets WHERE set_id=?",String.class,set));
+        assertFalse(stored.path("testCases").get(0).has("context"),"화면용 context 는 저장하지 않는다");
+        assertEquals(original.path("testCases").get(0).path("inputs"),stored.path("testCases").get(0).path("inputs"),"TC 본문은 그대로");
     }
 }

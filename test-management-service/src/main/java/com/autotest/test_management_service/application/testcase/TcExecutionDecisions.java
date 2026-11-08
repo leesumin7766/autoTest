@@ -32,15 +32,21 @@ public final class TcExecutionDecisions {
     /** 화면용: 각 TC 에 decision{mode,source,reason,...} 과 집계를 붙인다. 저장본에는 쓰지 않는다 */
     public static void decorate(JsonNode output) {
         if(!(output instanceof ObjectNode root))return;
-        Map<String,Integer> counts=new LinkedHashMap<>(Map.of(AUTO,0,MANUAL,0,EXCLUDED,0));
+        Map<String,Integer> counts=new LinkedHashMap<>(Map.of(AUTO,0,MANUAL,0,EXCLUDED,0));int contextNeeded=0;
         for(var node:root.path("testCases")) {
             if(!(node instanceof ObjectNode tc))continue;
             String mode=mode(tc);counts.merge(mode,1,Integer::sum);
             var saved=tc.path("executionDecision");
             var view=tc.putObject("decision").put("mode",mode).put("defaultMode",defaultMode(tc)).put("source",saved.isObject()?"USER":"DEFAULT");
             if(saved.isObject()){view.put("reason",saved.path("reason").asText(""));view.put("decidedAt",saved.path("decidedAt").asText(""));}
+            // 시험 자료(실행 시 필요한 정보) 입력 상태. 조회 명세 TC 는 근거 연결 상태로 본다
+            String context=TcExecutionContext.status(tc);var ctx=tc.putObject("context").put("status",context);
+            ctx.set("items",tc.path("executionContext").path("items").isArray()?tc.path("executionContext").path("items").deepCopy():ctx.arrayNode());
+            ctx.put("note",tc.path("executionContext").path("note").asText("")).put("revision",tc.path("executionContext").path("revision").asInt(0));
+            boolean readReady="READY".equals(tc.path("executionPlan").path("specification").path("status").asText());
+            if(AUTO.equals(mode)&&(TcExecutionContext.MISSING.equals(context)||TcExecutionContext.PARTIAL.equals(context)||(TcExecutionContext.READ_BINDING.equals(context)&&!readReady)))contextNeeded++;
         }
-        var summary=root.putObject("decisionSummary");counts.forEach(summary::put);
+        var summary=root.putObject("decisionSummary");counts.forEach(summary::put);summary.put("contextNeeded",contextNeeded);
         root.put("decisionRevision",root.path("decisionRevision").asInt(0));
     }
 
@@ -62,7 +68,7 @@ public final class TcExecutionDecisions {
             if(!cases.containsKey(id))throw new ProductDescriptionException(HttpStatus.NOT_FOUND,"TC_CASE_NOT_FOUND","TC를 찾을 수 없습니다.");
             if(!MODES.contains(mode))throw invalid("수행 방식은 자동·수동·제외 중 하나입니다.");
             if(reason.length()>MAX_REASON)throw invalid("사유는 500자 이내로 적어 주세요.");
-            if(EXCLUDED.equals(mode)&&reason.isEmpty())throw invalid("제외하는 TC는 제외 사유가 필요합니다. 예: 다국어를 제공하지 않는 제품");
+            if(EXCLUDED.equals(mode)&&reason.isEmpty())throw new ProductDescriptionException(HttpStatus.BAD_REQUEST,"TC_DECISION_REASON_REQUIRED","제외하는 TC는 제외 사유가 필요합니다. 예: 다국어를 제공하지 않는 제품");
             wanted.put(id,decision);
         }
         String now=Instant.now().toString();
@@ -78,7 +84,7 @@ public final class TcExecutionDecisions {
     /** 저장 전 화면용 필드를 지운다(decorate 결과가 저장본에 섞이지 않게) */
     static void strip(ObjectNode output) {
         output.remove("decisionSummary");
-        for(var node:output.path("testCases"))if(node instanceof ObjectNode tc)tc.remove("decision");
+        for(var node:output.path("testCases"))if(node instanceof ObjectNode tc){tc.remove("decision");tc.remove("context");}
     }
 
     private static ProductDescriptionException conflict(String code,String message){return new ProductDescriptionException(HttpStatus.CONFLICT,code,message);}
