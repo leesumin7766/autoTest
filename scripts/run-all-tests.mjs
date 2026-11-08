@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 // 전체 자동 테스트를 한 번에 실행한다 (2026-11-08).
-//  - Java: 일회용 테스트 DB 컨테이너(127.0.0.1:55432, autotest_test)를 띄워 ./gradlew test, 끝나면 지운다
+//  - Java: 전용 Docker 네트워크에 일회용 테스트 DB(autotest_test)와 JDK 컨테이너를 띄워 gradle test (호스트 포트 사용 안 함), 끝나면 지운다
 //  - crawler·ai-service·manual-review: 현재 compose 이미지로 일회용 컨테이너에서 실행(운영 컨테이너·볼륨은 건드리지 않음)
 //  - 허브 API 스크립트 테스트, frontend lint·build
 // 사용: node scripts/run-all-tests.mjs [java crawler ai manual hub frontend]  (생략하면 전부)
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
 const DB_NAME = 'autotest-testdb-runall'
-const DB_PORT = 55432
+const TEST_NET = 'autotest-test-net'
+const JDK_IMAGE = 'eclipse-temurin:21-jdk'
 const isWin = process.platform === 'win32'
 
 /** origin/main 에서도 실패하는 기존 문제. 새 실패와 구분해서 보여 준다 */
@@ -22,12 +23,6 @@ const KNOWN_JAVA_FAILURES = {
 function run(cmd, args, opts = {}) {
   const r = spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', shell: isWin && !cmd.includes('docker'), maxBuffer: 256 * 1024 * 1024, ...opts })
   return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}` }
-}
-
-/** 호스트에서 TCP 로 열리는지 (Windows Docker 는 --network host 가 호스트 포트로 이어지지 않으므로 node 로 직접 확인) */
-function hostPortOpen(port) {
-  const r = spawnSync(process.execPath, ['-e', `require('net').connect(${port},'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),2000)`])
-  return r.status === 0
 }
 
 function pause(sec) {
@@ -61,32 +56,51 @@ function pytestCounts(out) {
 
 const steps = {
   java() {
-    run('docker', ['rm', '-f', DB_NAME])
+    // 테스트 DB 와 Gradle 을 모두 전용 Docker 네트워크 안에서 실행한다. 호스트 포트를 쓰지 않으므로
+    // 이 PC 의 포트 바인딩 오류(EFAULT, 재시작 뒤 접속 거부)와 무관하다. 저장소는 컨테이너 안으로 복사해 빌드하고
+    // 결과 XML 만 각 모듈의 build/test-results/test 로 되돌려 놓는다(Windows 빌드 산출물과 섞지 않음)
     const img = composeImage('db')
-    // 이 PC 의 Docker 는 포트 바인딩이 가끔 'invalid pointer address'(EFAULT)로 실패한다. 잠시 뒤 다시 시도
-    let start = { code: 1, out: '' }
-    for (let i = 0; i < 30; i++) {
-      start = run('docker', ['run', '-d', '--name', DB_NAME, '-e', 'POSTGRES_USER=test', '-e', 'POSTGRES_PASSWORD=test', '-e', 'POSTGRES_DB=autotest_test', '-p', `127.0.0.1:${DB_PORT}:5432`, img])
-      if (start.code === 0 || !/invalid pointer address|Ports are not available/.test(start.out)) break
-      run('docker', ['rm', '-f', DB_NAME])
-      pause(1)
-    }
-    if (start.code !== 0) return { ok: false, detail: `테스트 DB 시작 실패: ${start.out.slice(-300)}` }
+    run('docker', ['rm', '-f', DB_NAME])
+    run('docker', ['network', 'rm', TEST_NET])
+    const net = run('docker', ['network', 'create', '--internal', TEST_NET])
+    if (net.code !== 0) return { ok: false, detail: `테스트 네트워크 생성 실패: ${net.out.slice(-200)}` }
     try {
-      // postgres 이미지는 초기화용 임시 서버를 한 번 띄웠다가 다시 시작한다. 임시 서버에도 pg_isready 가 성공하므로
-      // '준비 완료' 로그가 두 번 나온 뒤(초기화가 끝난 본 서버) 호스트에서 포트로 접속되는지까지 확인한다
+      const db = run('docker', ['run', '-d', '--name', DB_NAME, '--network', TEST_NET, '-e', 'POSTGRES_USER=test', '-e', 'POSTGRES_PASSWORD=test', '-e', 'POSTGRES_DB=autotest_test', img, 'postgres', '-c', 'max_connections=400'])
+      // 테스트마다 Spring 컨텍스트(연결 풀)가 따로 떠서 기본 100 연결을 넘는다
+      if (db.code !== 0) return { ok: false, detail: `테스트 DB 시작 실패: ${db.out.slice(-300)}` }
+      // postgres 이미지는 초기화용 임시 서버를 한 번 띄웠다가 다시 시작한다. '준비 완료' 로그가 두 번 나와야 본 서버다
       let ready = false
       for (let i = 0; i < 90 && !ready; i++) {
-        const logs = run('docker', ['logs', DB_NAME]).out
-        const finalServer = (logs.match(/ready to accept connections/g) ?? []).length >= 2
-        ready = finalServer && hostPortOpen(DB_PORT)
+        ready = (run('docker', ['logs', DB_NAME]).out.match(/ready to accept connections/g) ?? []).length >= 2
         if (!ready) pause(1)
       }
       if (!ready) return { ok: false, detail: '테스트 DB 준비 시간 초과' }
-      const gradlew = isWin ? 'gradlew.bat' : './gradlew'
-      run(gradlew, ['test', '--continue'], { env: { ...process.env, AUTOTEST_TEST_DATABASE_URL: `jdbc:postgresql://localhost:${DB_PORT}/autotest_test` } })
+      for (const mod of readdirSync(ROOT)) { const dir = join(ROOT, mod, 'build', 'test-results', 'test'); if (existsSync(dir)) rmSync(dir, { recursive: true, force: true }) }
+      const script = [
+        'set -e',
+        "tar -C /src --exclude=./.git --exclude='*/node_modules' --exclude='*/build' --exclude=./.gradle --exclude=./frontend/dist -cf - . | tar -C /work -xf -",
+        'cd /work',
+        'set +e',
+        'java -Xmx384m -cp gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain test --continue --no-daemon -q --console=plain > /work/gradle.log 2>&1',
+        'echo "gradle exit $?"',
+        'tail -5 /work/gradle.log',
+        'for d in /work/*/build/test-results/test; do m=$(basename $(dirname $(dirname $(dirname $d)))); mkdir -p /src/$m/build/test-results/test && cp -r $d/. /src/$m/build/test-results/test/; done',
+      ].join('\n')
+      // Gradle 의존성은 볼륨에 보관해 두 번째부터 내려받지 않는다. 처음 한 번은 인터넷이 필요하다(내부 네트워크와 별도로 bridge 연결)
+      const G = `${DB_NAME}-gradle`
+      run('docker', ['rm', '-f', G])
+      const created = run('docker', ['create', '--name', G, '--network', 'bridge', '-v', `${ROOT.replace(/\/$/, '')}:/src`, '-v', 'autotest-test-gradle-cache:/root/.gradle',
+        '--tmpfs', '/work:exec,size=3g', '-e', 'GRADLE_OPTS=-Xmx384m', '-e', `AUTOTEST_TEST_DATABASE_URL=jdbc:postgresql://${DB_NAME}:5432/autotest_test`,
+        '--entrypoint', 'sh', JDK_IMAGE, '-c', script])
+      if (created.code !== 0) return { ok: false, detail: `Gradle 컨테이너 생성 실패(${JDK_IMAGE}): ${created.out.slice(-300)}` }
+      try {
+        run('docker', ['network', 'connect', TEST_NET, G])
+        const gradle = run('docker', ['start', '-a', G])
+        if (!/gradle exit \d+/.test(gradle.out)) return { ok: false, detail: `Gradle 실행 실패: ${gradle.out.slice(-500)}` }
+      } finally { run('docker', ['rm', '-f', G]) }
     } finally {
       run('docker', ['rm', '-f', DB_NAME])
+      run('docker', ['network', 'rm', TEST_NET])
     }
     // 모듈별 결과 XML 집계
     let total = 0, fail = 0, skip = 0

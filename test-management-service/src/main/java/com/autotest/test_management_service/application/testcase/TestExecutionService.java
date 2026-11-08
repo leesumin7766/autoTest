@@ -70,6 +70,18 @@ public class TestExecutionService {
             ((ArrayNode)group.path("caseIds")).add(tc.path("id").asText());
             var item=items.addObject().put("caseId",tc.path("id").asText()).put("featureId",feature).put("executionStatus","PENDING").put("judgmentStatus","PENDING");
             item.set("tc",tc.deepCopy());item.putNull("result");item.putNull("actualResult");item.putNull("reason");item.putArray("evidence");
+            String decision=TcExecutionDecisions.mode(tc);
+            item.put("executionMode",decision);
+            if(TcExecutionDecisions.MANUAL.equals(decision)){
+                // 수동 시험: 브라우저·모델로 보내지 않고 시험원이 결과와 근거를 입력한다(07 결함 검토)
+                item.put("executionStatus","MANUAL").put("reason","수동 시험: 시험원이 직접 확인하고 결과와 근거를 입력합니다.");
+                continue;
+            }
+            if(TcExecutionDecisions.EXCLUDED.equals(decision)){
+                String why=tc.path("executionDecision").path("reason").asText("");
+                item.put("executionStatus","EXCLUDED").put("judgmentStatus","NOT_EXECUTED").put("reason","제외: "+why);
+                continue;
+            }
             String specificationReason=TcExecutionSpecification.preparationReason(tc);
             String missing=prerequisite(tc);if(!missing.isEmpty()){
                 item.put("executionStatus","NEEDS_CONTEXT").put("judgmentStatus","NOT_EXECUTED").put("reason",missing)
@@ -91,7 +103,12 @@ public class TestExecutionService {
             """,rs->{if(wanted.contains(rs.getString("case_id")))previous.addObject().put("sourceRunId",rs.getString(1)).put("caseId",rs.getString(2)).put("result",rs.getString(3)).put("proposedResult",rs.getString(4)).put("reason",rs.getString(5)).put("createdAt",rs.getTimestamp(6).toInstant().toString());},submission,member,set);
         snapshot.put("allowMutation",allowMutation);
         snapshot.put("setupVersion",setups.configurationVersion(submission,member));
-        UUID run=UUID.randomUUID();jdbc.update("INSERT INTO test_execution_runs(run_id,submission_id,member_id,tc_set_id,status,snapshot) VALUES(?,?,?,?,'PREPARED',?::jsonb)",run,submission,member,set,snapshot.toString());
+        // 수동·제외 TC 만 고른 실행은 실행기를 거치지 않고 바로 닫아 결과 입력을 받는다.
+        // 자동 TC 가 하나라도 있으면(사전 정보가 부족해도) 기존처럼 준비 상태로 두고 시작 때 사유를 알린다
+        boolean automatic=false;for(var item:items)if(TcExecutionDecisions.AUTO.equals(item.path("executionMode").asText()))automatic=true;
+        String initial=automatic?"PREPARED":"COMPLETED";
+        if(!automatic)snapshot.put("finishedAt",java.time.Instant.now().toString()).put("requestedAt",java.time.Instant.now().toString());
+        UUID run=UUID.randomUUID();jdbc.update("INSERT INTO test_execution_runs(run_id,submission_id,member_id,tc_set_id,status,snapshot) VALUES(?,?,?,?,?,?::jsonb)",run,submission,member,set,initial,snapshot.toString());
         return status(submission,member,run);
     }
     public ObjectNode status(UUID submission,long member,UUID selected) {
@@ -105,14 +122,17 @@ public class TestExecutionService {
         },selected,submission,member);
         if(values.isEmpty())throw error(HttpStatus.NOT_FOUND,"EXECUTION_NOT_FOUND","시험 실행 이력을 찾을 수 없습니다.");
         var run=values.getFirst();run.put("stale",cases.status(submission,member,UUID.fromString(run.path("tcSetId").asText())).path("set").path("stale").asBoolean());
-        int completed=0,p=0,f=0,na=0,notExecuted=0,review=0,pending=0,errors=0,excluded=0;
+        int completed=0,p=0,f=0,na=0,notExecuted=0,review=0,pending=0,errors=0,excluded=0,manual=0,manualDone=0;
         for(var item:run.path("snapshot").path("items")) {
-            if(!"PENDING".equals(item.path("executionStatus").asText()))completed++;
-            switch(item.path("executionStatus").asText()){case "NEEDS_CONTEXT"->notExecuted++;case "EXCLUDED"->excluded++;case "ERROR"->errors++;case "PENDING"->pending++;case "COMPLETED"->{if(item.path("result").isNull())review++;}default->{}}
+            String state=item.path("executionStatus").asText();
+            if(!"PENDING".equals(state)&&!"MANUAL".equals(state))completed++;
+            switch(state){case "NEEDS_CONTEXT"->notExecuted++;case "EXCLUDED"->excluded++;case "ERROR"->errors++;case "PENDING"->pending++;case "COMPLETED"->{if(item.path("result").isNull())review++;}
+                case "MANUAL"->{manual++;if(!item.path("result").isNull())manualDone++;}default->{}}
             switch(item.path("result").asText()) { case "P"->p++;case "F"->f++;case "N/A"->na++;default->{} }
         }
         run.put("completedCount",completed).put("passCount",p).put("failCount",f).put("naCount",na).put("unjudgedCount",run.path("snapshot").path("caseCount").asInt()-p-f-na);
-        run.put("notExecutedCount",notExecuted).put("reviewCount",review).put("pendingCount",pending).put("errorCount",errors).put("excludedCount",excluded);
+        run.put("notExecutedCount",notExecuted).put("reviewCount",review).put("pendingCount",pending).put("errorCount",errors).put("excludedCount",excluded)
+            .put("manualCount",manual).put("manualDoneCount",manualDone);
         boolean active=Set.of("WAITING_EXECUTOR","RUNNING").contains(run.path("status").asText());
         try{var start=java.time.Instant.parse(run.path("snapshot").path("startedAt").asText(run.path("snapshot").path("requestedAt").asText()));var end=active?java.time.Instant.now():java.time.Instant.parse(run.path("snapshot").path("finishedAt").asText(run.path("updatedAt").asText()));run.put("elapsedMs",Math.max(0,java.time.Duration.between(start,end).toMillis()));}catch(Exception ignored){run.put("elapsedMs",0);}
         result.set("run",run);return result;

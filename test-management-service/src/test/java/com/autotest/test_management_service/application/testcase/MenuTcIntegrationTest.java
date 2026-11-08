@@ -136,7 +136,9 @@ class MenuTcIntegrationTest {
         for(var item:snapshot.path("items")){
             assertTrue(item.path("result").isNull());
             boolean needsSpec=TcExecutionSpecification.VERSION.equals(item.path("tc").path("executionPlan").path("specificationVersion").asText());
-            assertEquals(item.path("tc").path("featureId").asText().startsWith("scope:")||needsSpec?"NEEDS_CONTEXT":"PENDING",item.path("executionStatus").asText());
+            // 2026-11-08: 템플릿이 수동·추가 증거로 표시한 TC(공통 등)는 기본 '수동'이라 실행기로 보내지 않는다
+            boolean manual=TcExecutionDecisions.MANUAL.equals(TcExecutionDecisions.mode(item.path("tc")));
+            assertEquals(manual?"MANUAL":item.path("tc").path("featureId").asText().startsWith("scope:")||needsSpec?"NEEDS_CONTEXT":"PENDING",item.path("executionStatus").asText());
             if(needsSpec){assertEquals("EXECUTION_SPEC_NEEDS_CONTEXT",item.path("reasonCode").asText());assertFalse(item.path("missingBindings").isEmpty());}
             assertTrue(item.path("evidence").isEmpty());
         }
@@ -162,6 +164,13 @@ class MenuTcIntegrationTest {
         mvc.perform(post(executionBase+"/"+run+"/cancel").header("X-Member-Id",member)).andExpect(status().isOk()).andExpect(jsonPath("$.run.status").value("CANCELED"));
         mvc.perform(post(executionBase+"/"+run+"/start").header("X-Member-Id",member)).andExpect(status().isConflict());
         String commonId="";for(var item:snapshot.path("items"))if(item.path("tc").path("featureId").asText().startsWith("scope:")){commonId=item.path("caseId").asText();break;}
+        // 기본 '수동'인 공통 TC 만 고르면 실행기 없이 바로 닫혀 결과 입력을 기다린다
+        var manualOnly=executions.prepare(submission,member,UUID.fromString(set),"https://example.com","",List.of(commonId),false).path("run");
+        assertEquals("COMPLETED",manualOnly.path("status").asText());assertEquals(1,manualOnly.path("manualCount").asInt());
+        mvc.perform(post(executionBase+"/"+manualOnly.path("runId").asText()+"/start").header("X-Member-Id",member)).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EXECUTION_CLOSED"));
+        // 사용자가 '자동'으로 바꾸면 예전처럼 사전 정보가 없어 시작을 막는다
+        mvc.perform(put(base+"/"+set+"/decisions").header("X-Member-Id",member).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"revision\":0,\"decisions\":[{\"caseId\":\""+commonId+"\",\"mode\":\"AUTO\",\"reason\":\"자동 수행 시도\"}]}")).andExpect(status().isOk());
         var common=executions.prepare(submission,member,UUID.fromString(set),"https://example.com","",List.of(commonId),false).path("run");
         assertEquals(1,common.path("notExecutedCount").asInt());
         mvc.perform(post(executionBase+"/"+common.path("runId").asText()+"/start").header("X-Member-Id",member)).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EXECUTION_PREREQUISITES_REQUIRED"));

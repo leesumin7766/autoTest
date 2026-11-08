@@ -142,6 +142,24 @@ public class MenuTcService {
         jdbc.update("UPDATE menu_tc_sets SET output=?::jsonb WHERE set_id=? AND submission_id=? AND member_id=?",output.toString(),selected,submission,member);
         return readBindings(submission,member,selected,caseId);
     }
+    /** 화면용 조회: 수행 방식(자동·수동·제외)과 집계를 붙인다 */
+    public ObjectNode view(UUID submission,long member,UUID selected) {
+        var result=status(submission,member,selected);
+        TcExecutionDecisions.decorate(result.path("set").path("output"));
+        return result;
+    }
+    /** 수행 방식 일괄 저장. TC 본문·명세는 바꾸지 않는다 */
+    @Transactional
+    public ObjectNode saveDecisions(UUID submission,long member,UUID selected,JsonNode request) {
+        owner(submission,member,true);
+        var set=status(submission,member,selected).path("set");
+        if(set.path("stale").asBoolean())throw conflict("TC_SOURCE_CHANGED","메뉴·문서가 변경되었습니다. TC를 다시 생성하세요.");
+        var output=(ObjectNode)set.path("output");
+        TcExecutionDecisions.strip(output);
+        TcExecutionDecisions.apply(output,request,member);
+        jdbc.update("UPDATE menu_tc_sets SET output=?::jsonb WHERE set_id=? AND submission_id=? AND member_id=?",output.toString(),selected,submission,member);
+        return view(submission,member,selected);
+    }
     public byte[] download(UUID submission,long member,UUID selected) {
         var set=status(submission,member,selected).path("set");
         if(set.path("stale").asBoolean())throw conflict("TC_SOURCE_CHANGED","메뉴트리·문서가 변경되었습니다. 새 승인본으로 TC를 생성하세요.");

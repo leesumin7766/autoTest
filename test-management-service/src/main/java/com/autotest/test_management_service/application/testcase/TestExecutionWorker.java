@@ -46,7 +46,8 @@ public class TestExecutionWorker {
     }
     private void pendingGroup(ObjectNode snapshot,JsonNode group,String message){
         Set<String> ids=new HashSet<>();group.path("caseIds").forEach(id->ids.add(id.asText()));
-        for(var item:snapshot.path("items"))if(ids.contains(item.path("caseId").asText()))((ObjectNode)item).put("executionStatus","NEEDS_CONTEXT").put("reason",message);
+        // 수동·제외로 정한 TC 는 그대로 둔다(자동 수행 대기 TC 만 표시)
+        for(var item:snapshot.path("items"))if(ids.contains(item.path("caseId").asText())&&"PENDING".equals(item.path("executionStatus").asText()))((ObjectNode)item).put("executionStatus","NEEDS_CONTEXT").put("reason",message);
     }
     private ArrayNode documents(UUID submission,JsonNode path){
         var excerpts=mapper.createArrayNode();

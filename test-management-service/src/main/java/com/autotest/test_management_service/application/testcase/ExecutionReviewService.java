@@ -71,6 +71,8 @@ public class ExecutionReviewService {
         for(var item:snapshot.path("items")){
             text.append("## ").append(clean(item.path("tc").path("tcId").asText())).append(" — ").append(clean(item.path("tc").path("scenario").asText())).append("\n\n");
             text.append("판정: ").append(item.path("result").isNull()?"미판정":item.path("result").asText()).append(" / 결함 검토: ").append(item.path("defectDisposition").asText("미확정")).append("\n\n");
+            String way=switch(item.path("executionStatus").asText()){case "MANUAL"->"수동(시험원 입력)";case "EXCLUDED"->"제외";default->"자동";};
+            text.append("수행 방식: ").append(way).append("\n\n");
             for(String key:List.of("inputs","expectedResult"))text.append(key).append(": ").append(clean(item.path("tc").path(key).asText())).append("\n\n");
             text.append("실제 결과: ").append(clean(item.path("actualResult").asText())).append("\n\n사유: ").append(clean(item.path("reason").asText())).append("\n\n증거 참조: ").append(clean(item.path("evidenceIds").toString())).append("\n\n");
             text.append("재현 절차·관찰: 기능별 실행 기록과 Qwen 계획을 실행 상세에서 확인하세요.\n\n");
