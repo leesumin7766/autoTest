@@ -158,11 +158,19 @@ public class RemoteCrawlService {
             });
         } catch(DuplicateKeyException busy) { throw error(HttpStatus.CONFLICT,"CRAWL_ALREADY_ACTIVE","이 문서 또는 실행 위치에서 테스트·수집 작업이 이미 진행 중입니다."); }
         if("LOCAL".equals(executionMode)) {
-            ObjectNode payload=tx.execute(status->{
-                var rows=jdbc.query("SELECT job_id,submission_id,member_id,document_digest,setup_snapshot::text,password_ciphertext,purpose FROM playwright_crawl_jobs WHERE job_id=? AND status='QUEUED' FOR UPDATE",
-                        (rs,n)->new Pending(rs.getObject(1,UUID.class),rs.getObject(2,UUID.class),rs.getLong(3),rs.getString(4).trim(),rs.getString(5),rs.getString(6),rs.getString(7)),id);
-                return claimJob(rows.getFirst());
-            });
+            ObjectNode payload;
+            try {
+                payload=tx.execute(status->{
+                    var rows=jdbc.query("SELECT job_id,submission_id,member_id,document_digest,setup_snapshot::text,password_ciphertext,purpose FROM playwright_crawl_jobs WHERE job_id=? AND status='QUEUED' FOR UPDATE",
+                            (rs,n)->new Pending(rs.getObject(1,UUID.class),rs.getObject(2,UUID.class),rs.getLong(3),rs.getString(4).trim(),rs.getString(5),rs.getString(6),rs.getString(7)),id);
+                    return claimJob(rows.getFirst());
+                });
+            } catch(RuntimeException failure) {
+                // 작업 행은 이미 커밋됐다. 넘기기(비밀번호 복호화 등)가 실패하면 QUEUED 로 남겨 10분간 다음 요청을 막지 않도록 바로 실패 처리한다
+                String code=failure instanceof ProductDescriptionException known?known.code():"LOCAL_RUNNER_UNAVAILABLE";
+                jdbc.update("UPDATE playwright_crawl_jobs SET status='FAILED',error_code=?,password_ciphertext=NULL,updated_at=now() WHERE job_id=? AND status='QUEUED'",code,id);
+                throw failure;
+            }
             if(payload.has("jobId")) local.dispatch(payload,code->jdbc.update("UPDATE playwright_crawl_jobs SET status='FAILED',error_code=?,password_ciphertext=NULL,updated_at=now() WHERE job_id=? AND status='RUNNING'",code,id));
         }
         return status(submission,member);

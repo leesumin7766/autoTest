@@ -59,11 +59,28 @@ services:
     image: autotest-test-management-service:prod
     ports: !reset []
     restart: unless-stopped
+    depends_on:
+      test-management-service-volume-init:
+        condition: service_completed_successfully
     environment:
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-test}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     # 100 MiB 문서 파싱(PDF·Excel·HWP)
     mem_limit: 3g
+
+  # 개발 구성(root 로 실행)이 먼저 만든 playwright_credentials 볼륨은 root 소유라 운영 이미지(uid 10001)가 키를 만들지 못한다.
+  # 시작할 때마다 한 번 소유자만 맞추고 끝난다(2026-11-08 운영 결함). 네트워크 없음, CHOWN 권한만 사용.
+  test-management-service-volume-init:
+    image: autotest-test-management-service:prod
+    pull_policy: never
+    user: "0:0"
+    entrypoint: ["sh", "-c", "chown -R app:app /app/.runtime/playwright"]
+    volumes:
+      - playwright_credentials:/app/.runtime/playwright
+    network_mode: none
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    restart: "no"
 
   test-execution-service:
     build:

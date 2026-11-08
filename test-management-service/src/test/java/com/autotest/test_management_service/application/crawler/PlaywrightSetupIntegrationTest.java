@@ -302,6 +302,19 @@ class PlaywrightSetupIntegrationTest {
         assertFalse(channel(agent,"claim",mapper.createObjectNode(),200).has("password"));
         assertEquals("DOCUMENT_VERSION_MISMATCH",remote.status(id,8101).path("job").path("errorCode").asText());
     }
+    /** 2026-11-08 운영 결함: 넘기기(복호화) 실패 시 작업이 QUEUED 로 남아 10분간 다음 시도를 CRAWL_ALREADY_ACTIVE 로 막던 문제 */
+    @Test void localDispatchFailureFailsTheJobImmediatelyInsteadOfLeavingItQueued() throws Exception {
+        save(request());
+        jdbc.update("UPDATE playwright_crawl_setups SET password_ciphertext='v1:AAAAAAAAAAAAAAAA:AAAA' WHERE submission_id=?",id);
+        var failure=assertThrows(RuntimeException.class,()->remote.start(id,8101,null,"LOCAL","CRAWL",null));
+        assertNotNull(failure);
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM playwright_crawl_jobs WHERE submission_id=? AND status IN ('QUEUED','RUNNING')",Integer.class,id));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM playwright_crawl_jobs WHERE submission_id=? AND status='FAILED' AND password_ciphertext IS NULL",Integer.class,id));
+        org.mockito.Mockito.verify(dispatcher,org.mockito.Mockito.never()).dispatch(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
+        // 다음 시도는 '이미 실행 중'으로 막히지 않고 같은 원인으로 다시 실패한다
+        var again=assertThrows(RuntimeException.class,()->remote.start(id,8101,null,"LOCAL","CRAWL",null));
+        assertFalse(again.getMessage()!=null&&again.getMessage().contains("기존 작업"));
+    }
     @Test void connectionCheckNeedsOnlyUrlAndUsesLocalRunnerWithoutRegisteringAgent() throws Exception {
         var draft=new PlaywrightSetupService.SetupRequest("https://test.example/login","NONE","","","","",true);
         var status=remote.start(id,8101,null,"LOCAL","CONNECTION",draft);

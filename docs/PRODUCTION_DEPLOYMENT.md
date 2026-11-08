@@ -172,3 +172,27 @@ Caddy가 사내 전용 CA를 만들어 서버 인증서를 발급·자동 갱신
 - 재발 방지: `.env` 에 `COMPOSE_PATH_SEPARATOR=;`, `COMPOSE_FILE=docker-compose.yml;docker-compose.prod.yml` 추가(바꾸기 전 `.env.before-composefile-20261107`, git 제외). 이제 이 폴더에서 `-f` 없이 `docker compose up -d`·`ps`·`logs` 를 써도 운영 구성. `docker compose up -d` 를 직접 실행해 컨테이너가 그대로인 것을 확인함.
 - 자동 시작: Docker Desktop 은 Windows 로그인 때 시작(HKCU Run), 컨테이너는 모두 `restart: unless-stopped`.
 - 개발 구성으로 돌아가려면: `.env` 의 두 줄을 지우고 8장 "되돌리기" 순서.
+
+### 8-2. 2026-11-08 운영 결함 2건 수정
+
+모델 실행을 뺀 전 단계 점검(가짜 업무 사이트로 01~08)에서 찾은 운영 결함이다.
+
+1. **로그인 정보 저장 실패(`PLAYWRIGHT_CREDENTIAL_STORAGE_UNAVAILABLE`)**
+   - 원인: 개발 구성(root 실행)이 먼저 만든 `playwright_credentials` 볼륨이 root 소유인데, 운영 Java 이미지는 uid 10001(`app`)로 실행되어 키 파일을 만들지 못했다. 로그인이 필요한 화면 수집이 전부 막힌다.
+   - 수정: `docker/java-service.Dockerfile` 이 `/app/.runtime/playwright` 를 `app` 소유로 미리 만든다(새 볼륨은 이 소유자를 물려받음). 이미 있는 볼륨은 `docker-compose.prod.yml` 의 일회성 `test-management-service-volume-init`(root, CHOWN 권한만, 네트워크 없음)이 시작할 때마다 소유자를 맞추고 끝나며, TMS 는 이 작업이 성공한 뒤 시작한다.
+   - 실패 시 TMS 로그에 `Credential key storage unavailable at <경로>: <원인 종류>` 가 남는다(키·비밀번호 값은 남기지 않음).
+2. **매뉴얼 검토 서비스가 없을 때 작업이 `PAUSING` 에 영구 정지**
+   - 원인: 서비스 연결이 안 되면 중단 확인(`/close`)을 받을 수 없어 `STOP_NOT_CONFIRMED` 로 남았고, DB 의 "실행 중 작업 1개" 제약(`manual_review_one_active`, 전체 공용) 때문에 **모든 사용자·작업의 매뉴얼 검토가 `MANUAL_REVIEW_BUSY` 로 막혔다.** TMS 재시작으로도 풀리지 않았다.
+   - 수정(`ManualReviewService`):
+     - 시작·이어하기는 입력 검증 뒤 `/health` 를 확인하고, 서비스가 없으면 `503 MANUAL_REVIEW_UNAVAILABLE` 로 거절하며 작업을 만들지 않는다.
+     - 중단 요청에서 **연결 거부·주소 없음**은 "그쪽에서 처리 중인 작업 없음"으로 보고 정리한다. 응답 지연(시간 초과)은 처리 중일 수 있으므로 기다린다.
+     - 1분마다(그리고 시작·이어하기 직전에) `PAUSING` 작업에 중단을 다시 요청한다. 확인되면 `INTERRUPTED`(`STOP_CONFIRMED_LATE`), 서비스가 없으면 `INTERRUPTED`(`SERVICE_UNAVAILABLE`), 15분이 지나도 확인이 안 되면 `INTERRUPTED`(`STOP_TIMEOUT`). 모두 저장된 페이지부터 이어서 검토할 수 있다. 늦게 도착한 결과는 기존 attempt 비교로 버려진다.
+   - 테스트: `ManualReviewUnavailableIntegrationTest`(4건), `ManualReviewStopTimeoutIntegrationTest`(1건).
+
+3. **(1번에서 이어진 문제) 넘기기 실패 시 수집 작업이 `QUEUED` 로 10분간 남음**
+   - 원인: 작업 행을 저장한 뒤 별도 트랜잭션에서 실행기로 넘기는데(저장된 비밀번호 복호화 포함), 이 단계가 실패하면 작업이 `QUEUED` 로 남아 10분 동안 다음 연결·로그인·수집 요청이 `CRAWL_ALREADY_ACTIVE`(409) 로 막혔다.
+   - 수정(`RemoteCrawlService`): 넘기기가 실패하면 그 작업을 바로 `FAILED`(원인 코드, 비밀번호 사본 삭제)로 바꾸고 오류를 돌려준다. 테스트: `PlaywrightSetupIntegrationTest.localDispatchFailureFailsTheJobImmediatelyInsteadOfLeavingItQueued`(수정 전 코드에서 실패 확인).
+
+검증(이 PC): 볼륨을 root 소유로 되돌려 결함을 재현(로그인 확인 503)한 뒤 새 이미지 배포 → 초기화 작업 성공(종료 코드 0), 기존 키 유지, 로그인 확인 `loginVerified=true`. 매뉴얼 검토 서비스가 없는 상태에서 시작 → 2초 안에 `503 MANUAL_REVIEW_UNAVAILABLE`, 남는 작업 없음. 자동 테스트: Java 179건 중 176 통과(나머지 2건은 기존 문제, 1건 건너뜀).
+
+이 PC 참고: Docker 메모리가 7.8GB 라 매뉴얼 검토 이미지(OCR 모델 준비) 빌드 중 Docker 가 재시작했다. 그래서 이 PC 에서는 매뉴얼 검토 서비스를 띄우지 않는다(`COMPOSE_PROFILES` 미설정). 전체 자동 테스트는 `node scripts/run-all-tests.mjs`.

@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -25,6 +26,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class ManualReviewService {
     private static final int MAX_BYTES=50*1024*1024;
+    /** 중단 확인을 받지 못한 PAUSING 작업을 이 시간이 지나면 포기한다. 작업 1개가 전체 매뉴얼 검토를 막지 않게 한다 */
+    static final Duration STOP_GIVE_UP=Duration.ofMinutes(15);
+    /** 검토 서비스 중단 요청 결과. 연결 자체가 안 되면 그쪽에서 처리 중인 작업도 없다 */
+    enum Stop { STOPPED, UNREACHABLE, UNCONFIRMED }
     private static final String META="job_id,manual_file_id,filename,status,created_at,updated_at,as_of,error_code,attempt,total_pages,current_page,completed_pages,stage,processor_version,elapsed_ms,attempt_started_at,finished_at";
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
@@ -153,10 +158,10 @@ public class ManualReviewService {
         return get(id,member,job);
     }
     public synchronized ObjectNode start(UUID id,long member){
-        owner(id,member);configured();
+        owner(id,member);configured();reclaimStalePausing();
         Input in=tx.execute(status->{
             submissions.findByIdForUpdate(SubmissionId.of(id)).orElseThrow(()->new CommonException(CommonErrorCode.RESOURCE_NOT_FOUND));
-            var doc=manual(id);validateManual(doc);byte[] pdf=bytes(doc);var job=UUID.randomUUID();var asOf=LocalDate.now(ZoneId.of("Asia/Seoul"));
+            var doc=manual(id);validateManual(doc);byte[] pdf=bytes(doc);requireAvailable();var job=UUID.randomUUID();var asOf=LocalDate.now(ZoneId.of("Asia/Seoul"));
             int inserted=jdbc.update("""
                 INSERT INTO manual_review_jobs(job_id,submission_id,member_id,manual_file_id,filename,document_hash,status,as_of,attempt_started_at,stage)
                 VALUES(?,?,?,?,?,?,'RUNNING',?,now(),'COUNTING') ON CONFLICT DO NOTHING
@@ -167,7 +172,7 @@ public class ManualReviewService {
         worker.submit(()->analyze(in));return get(id,member,in.job());
     }
     public synchronized ObjectNode resume(UUID id,long member,UUID job){
-        owner(id,member);configured();
+        owner(id,member);configured();reclaimStalePausing();
         Input in;
         try{in=tx.execute(status->{
             var saved=state(id,member,job,true);
@@ -177,6 +182,7 @@ public class ManualReviewService {
             if(!doc.fileId().equals(saved.file()))throw new TestManagementException(TestManagementErrorCode.MANUAL_REVIEW_INPUT_CHANGED);
             byte[] pdf=bytes(doc);
             if(!hash(pdf).equals(saved.hash()))throw new TestManagementException(TestManagementErrorCode.MANUAL_REVIEW_INPUT_CHANGED);
+            requireAvailable();
             int updated=jdbc.update("""
                 UPDATE manual_review_jobs SET status='RUNNING',attempt=attempt+1,stage='COUNTING',attempt_started_at=now(),finished_at=NULL,error_code=NULL,updated_at=now()
                 WHERE job_id=? AND NOT EXISTS(SELECT 1 FROM manual_review_jobs WHERE status IN ('RUNNING','PAUSING') AND job_id<>?)
@@ -212,8 +218,44 @@ public class ManualReviewService {
         if(response.body().getBytes(StandardCharsets.UTF_8).length>10*1024*1024)throw new ProcessingFailure("RESULT_TOO_LARGE");
         return parse(response.body());
     }
-    private boolean stopRemote(Input in){
-        try{return remote("POST",path(in)+"/close",null,12).path("stopped").asBoolean();}catch(Exception e){return false;}
+    Stop stop(Input in){
+        try{return remote("POST",path(in)+"/close",null,12).path("stopped").asBoolean()?Stop.STOPPED:Stop.UNCONFIRMED;}
+        catch(InterruptedException e){Thread.currentThread().interrupt();return Stop.UNCONFIRMED;}
+        catch(Exception e){return unreachable(e)?Stop.UNREACHABLE:Stop.UNCONFIRMED;}
+    }
+    /** 연결 거부·주소 없음만 '서비스 없음'으로 본다. 응답 지연(시간 초과)은 처리 중일 수 있으므로 아니다 */
+    static boolean unreachable(Throwable e){
+        for(Throwable t=e;t!=null;t=t.getCause()){
+            if(t instanceof java.net.http.HttpTimeoutException)return false;
+            if(t instanceof java.net.ConnectException||t instanceof java.net.UnknownHostException||t instanceof java.nio.channels.UnresolvedAddressException)return true;
+        }
+        return false;
+    }
+    private boolean stopRemote(Input in){return stop(in)!=Stop.UNCONFIRMED;}
+    /** 시작·이어하기 직전(입력 검증 뒤)에 검토 서비스가 떠 있는지 확인한다. 없으면 작업을 만들지 않는다 */
+    private void requireAvailable(){
+        try{
+            var response=http.send(HttpRequest.newBuilder(URI.create(endpoint+"/health")).header("X-Internal-Token",token).timeout(Duration.ofSeconds(5)).GET().build(),HttpResponse.BodyHandlers.discarding());
+            if(response.statusCode()==200)return;
+        }catch(InterruptedException e){Thread.currentThread().interrupt();}catch(Exception ignored){}
+        throw new TestManagementException(TestManagementErrorCode.MANUAL_REVIEW_UNAVAILABLE);
+    }
+    /**
+     * 중단 확인을 받지 못한 PAUSING 작업 정리. 다시 중단을 요청해 확인되거나 서비스가 없으면 바로,
+     * 확인이 계속 안 되면 STOP_GIVE_UP 뒤에 INTERRUPTED(이어하기 가능)로 끝낸다. 늦은 결과는 attempt 로 막힌다.
+     */
+    @Scheduled(initialDelayString="${manual-review.reclaim-delay-ms:60000}",fixedDelayString="${manual-review.reclaim-delay-ms:60000}")
+    public void reclaimStalePausing(){
+        var pausing=jdbc.query("SELECT job_id,attempt,as_of,updated_at<now()-make_interval(secs=>?) FROM manual_review_jobs WHERE status='PAUSING'",
+            (rs,n)->Map.entry(new Input(rs.getObject(1,UUID.class),null,rs.getDate(3).toLocalDate(),rs.getInt(2)),rs.getBoolean(4)),STOP_GIVE_UP.toSeconds());
+        for(var entry:pausing){
+            var in=entry.getKey();
+            switch(stop(in)){
+                case UNREACHABLE->terminal(in,"INTERRUPTED","SERVICE_UNAVAILABLE");
+                case STOPPED->terminal(in,"INTERRUPTED","STOP_CONFIRMED_LATE");
+                case UNCONFIRMED->{if(entry.getValue())terminal(in,"INTERRUPTED","STOP_TIMEOUT");}
+            }
+        }
     }
     private void pausing(Input in,String error){
         jdbc.update("UPDATE manual_review_jobs SET status='PAUSING',stage='PAUSING',error_code=?,updated_at=now() WHERE job_id=? AND attempt=? AND status IN ('RUNNING','PAUSING')",error,in.job(),in.attempt());

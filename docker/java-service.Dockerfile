@@ -24,6 +24,8 @@ FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S app && adduser -S -G app -u 10001 app
 WORKDIR /app
 COPY --from=build /app.jar app.jar
+# 로그인 정보 암호화 키 폴더(test-management-service 의 playwright_credentials 볼륨). 새 볼륨은 이 소유자를 물려받는다
+RUN mkdir -p /app/.runtime/playwright && chown -R app:app /app/.runtime
 USER app
 # 컨테이너 mem_limit 기준으로 힙을 잡는다.
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError"

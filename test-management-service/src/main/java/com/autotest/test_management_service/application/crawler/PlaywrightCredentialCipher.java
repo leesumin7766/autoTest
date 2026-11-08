@@ -52,6 +52,9 @@ public class PlaywrightCredentialCipher {
             return "v1:" + Base64.getEncoder().encodeToString(iv) + ":"
                     + Base64.getEncoder().encodeToString(cipher.doFinal(password.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception failure) {
+            // 비밀번호·키 값은 남기지 않는다. 키 파일 경로와 원인 종류(예: AccessDeniedException = 볼륨 소유자 문제)만 기록
+            org.slf4j.LoggerFactory.getLogger(PlaywrightCredentialCipher.class).warn("Credential key storage unavailable at {}: {}",
+                    keyPath.toAbsolutePath(), failure.getClass().getSimpleName());
             throw new ProductDescriptionException(HttpStatus.SERVICE_UNAVAILABLE, "PLAYWRIGHT_CREDENTIAL_STORAGE_UNAVAILABLE",
                     "로그인 정보 암호화 저장소를 사용할 수 없습니다. 키 파일 및 저장 볼륨을 확인해 주세요.");
         }
