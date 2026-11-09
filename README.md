@@ -224,6 +224,35 @@ sample/, scripts/, output/, docs/   원본·검증·기록·상세 계약
 
 기존 LLM TC의 /api/submissions/{id}/test-cases와 제품 설명 /product-description API는 보존합니다. 과거 /crawl 요청 목록 수집 API는 현재 시험 실행 흐름과 다릅니다.
 
+## 회사에서 사용하기 (2026-11-09)
+
+autoTest 는 **서버 한 대**에서 Docker 로 돌고, 사용자는 브라우저로 접속한다. 개인 PC(DESKTOP-JA2IHD6)의 `https://localhost:18443` 은 검증용이며 그 PC 에서만 열린다. 회사에서는 사내 서버 PC 에 운영 구성으로 올리고 각 PC 가 그 주소로 접속한다.
+
+회사 서버 후보: 문서상 Windows 11 · RAM 32GB PC(`C:\Users\tta\autoTest`)에 개발 구성으로 이미 띄워 둔 서버가 있다(2026-11-04 기준). 개인 PC(Docker 메모리 7.8GB)에서는 27B 모델·매뉴얼 검토(OCR)를 돌릴 수 없었으므로 실제 모델 시험은 회사 서버에서 한다.
+
+### 서버 PC 에서 (한 번)
+
+1. **최신 코드**: `git fetch` 후 `main`(또는 `dev-integration`)을 받는다.
+2. **운영 구성으로 전환**: [운영 배포](docs/PRODUCTION_DEPLOYMENT.md) 4장 순서. 요약:
+   - DB 백업(`pg_dump -Fc` 를 컨테이너 안에서 만들고 꺼냄. PowerShell `>` 로 리다이렉트하지 않음)
+   - 기존 볼륨의 DB 비밀번호를 `ALTER USER` 로 먼저 변경
+   - `.env` 에 `AUTOTEST_SITE_ADDRESS`(서버 IP·사내 이름, 쉼표로 여러 개), `DB_PASSWORD`, `OLLAMA_MODELS`(예: `qwen3:4b`, 메모리가 되면 `qwen3.8:27b`) 추가. 매뉴얼 검토를 쓰려면 `COMPOSE_PROFILES=manual-review`
+   - `.env` 의 `COMPOSE_FILE=docker-compose.yml;docker-compose.prod.yml`, `COMPOSE_PATH_SEPARATOR=;` 로 두면 `docker compose up -d --build` 만으로 운영 구성이 된다(개발 구성 오실행 방지)
+   - 개발 구성에서 넘어올 때 생기던 '로그인 정보 저장 실패'는 이미지·일회성 초기화로 자동 해결된다([8-2](docs/PRODUCTION_DEPLOYMENT.md))
+3. **서버 PC 설정**(관리자): 방화벽 443·80 을 개인(Private) 프로필에서만 허용, IP 고정(DHCP 예약), **절전 해제**, Docker Desktop 자동 시작. 절전 상태가 길면 12시간짜리 내부 인증서 갱신이 밀려 '인증서 만료'가 날 수 있다(그때는 1~2분 뒤 새로고침 또는 `docker compose restart caddy`).
+4. **확인**: `node scripts/run-all-tests.mjs` (모든 자동 테스트, 테스트 DB·JDK 는 일회용 컨테이너), 브라우저로 `https://<서버주소>` 접속, 실제 모델로 TC 1건 실행.
+
+### 각 사용자 PC 에서
+
+1. `https://<서버주소>/downloads/autotest-server-ca.crt` 를 받아 Windows '신뢰할 수 있는 루트 인증 기관'에 설치한다(사내 CA, 한 번).
+2. `https://<서버주소>` 로 접속한다. ATDT 의 "시험 웹앱" 바로가기에도 이 주소를 넣는다.
+3. 서버의 `caddy_data` 볼륨을 지우면 CA 가 바뀌어 모든 PC 에 다시 설치해야 한다.
+
+### 회사 PC 에서 개발할 때
+
+- `dev-integration` 브랜치에서 작업한다. `.env` 는 git 에 없다(DB·저장소·내부 토큰, Jev 키) — 서버의 `.env` 를 쓰거나 USB·비밀번호 관리자로 옮긴다.
+- 서버를 운영 구성으로 띄운 PC 에서 화면만 고칠 때: `npm --prefix frontend run dev:local-prod` → `http://localhost:5173` (`/api` 는 그 PC 의 `https://localhost:18443` 로 전달, 데이터는 실제 서버와 같음).
+
 ## 환경 설정과 실행
 
 Java 21, Gradle Wrapper 8.10.2, Spring Boot 3.5.6, Python 3.13, Node.js 24.21.0(.nvmrc), npm 11.x, Docker Compose를 사용합니다. 아래 개발 구성에는 프런트엔드가 포함되지 않습니다.
